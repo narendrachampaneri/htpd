@@ -153,12 +153,26 @@ bool title_start_ok(std::string_view s) {
     return cp < 0x80 ? is_alpha(static_cast<char>(cp)) : text::letter_count(s.substr(0, i)) == 1;
 }
 
-bool plausible_numbered_title(std::string_view rest, const Line& line) {
+// "3 REAL THINGS PEOPLE BUILT": a title may start with a bare number when the
+// line is set as a heading and words follow. A plain line such as "2. 5 V
+// supply" stays text.
+bool title_starts_with_count(std::string_view s, bool emphasised) {
+    if (!emphasised) return false;
+    const std::size_t space = s.find(' ');
+    if (space == std::string_view::npos || !text::is_all_digits(s.substr(0, space))) return false;
+    const std::string_view after = skip_blanks(s.substr(space));
+    return title_start_ok(after) && text::word_count(after) >= 2;
+}
+
+bool plausible_numbered_title(std::string_view rest, const Line& line, bool emphasised) {
     if (line.text.size() > 160 || line.gaps.size() >= 2 || has_dot_leaders(line.text) ||
         looks_like_toc_entry(line)) {
         return false;   // too long, a table row, or a table-of-contents entry
     }
-    if (!title_start_ok(rest) || text::letter_count(rest) < 2) return false;
+    if (!(title_start_ok(rest) || title_starts_with_count(rest, emphasised)) ||
+        text::letter_count(rest) < 2) {
+        return false;
+    }
     const std::size_t words = text::word_count(rest);
     if (words > 20) return false;
     const char last = rest.back();
@@ -343,7 +357,7 @@ HeadingResult detect_from_text(std::span<const Line> lines) {
             // (a contents entry, a table row, a sentence) is no heading at
             // all, however large it is set.
             const bool title_ok = rest.empty() ? number->keyword
-                                               : plausible_numbered_title(rest, line);
+                                               : plausible_numbered_title(rest, line, emphasised);
             if (title_ok) numbered.push_back({i, std::move(number), styled, styled && !emphasised});
             continue;
         }

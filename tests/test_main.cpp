@@ -613,6 +613,34 @@ TEST(a_short_table_of_contents_is_known_by_its_page_numbers) {
     CHECK(titles(detect_headings(lines, {}, {}).headings) == expected);
 }
 
+TEST(a_title_may_start_with_a_count_when_set_as_a_heading) {
+    std::vector<Line> lines;
+    float y = 100;
+    const auto add_body = [&] {
+        lines.push_back(make_line(0, "Body text in the ordinary size, long enough to be the common one.", y));
+        y += 20;
+        lines.push_back(make_line(0, "A second line of body text keeps ten point the most common size.", y));
+        y += 20;
+    };
+    lines.push_back(make_line(0, "02. HOW IT COMPARES", y, 13, true));
+    y += 20;
+    add_body();
+    lines.push_back(make_line(0, "03. 3 REAL THINGS PEOPLE BUILT", y, 13, true));   // set as a heading
+    y += 20;
+    add_body();
+    lines.push_back(make_line(0, "2. 5 V supply on the board", y));                  // plain text: no heading
+    y += 20;
+    add_body();
+    lines.push_back(make_line(0, "04. THE PATTERN", y, 13, true));
+    y += 20;
+    add_body();
+
+    const HeadingResult result = detect_headings(lines, {}, {});
+    const std::vector<std::string> expected = {"02. HOW IT COMPARES", "03. 3 REAL THINGS PEOPLE BUILT",
+                                               "04. THE PATTERN"};
+    CHECK(titles(result.headings) == expected);
+}
+
 TEST(numbered_sentences_are_not_titles) {
     std::vector<Line> lines;
     float y = 100;
