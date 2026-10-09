@@ -1,0 +1,46 @@
+# build output
+/build/
+/build-*/
+/cmake-build*/
+
+# PDFium is downloaded by scripts/get_pdfium.sh, it is not part of this project
+/third_party/pdfium/
+/third_party/.pdfium-download.*/
+
+# bundles converted while trying things out (examples/ is kept)
+/*.htpd/
+
+# your own documents and everything made from them: never committed
+/private/
+
+# public PDFs for the evaluation: downloaded by eval/get_docs.sh
+/eval/docs/
+
+# editors and language-server caches
+/.cache/
+/compile_commands.json
+/.vscode/
+/.idea/
+
+# each developer's own AI-assistant setup: not part of the project
+/.agents/
+/.claude/
+/.gemini/
+/.serena/
+/.planning/
+/graphify-out/
+/CLAUDE.md
+/GEMINI.md
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+*.egg-info/
+
+# model files (large; described in model/README.md, stored elsewhere)
+/model/checkpoints/
+*.safetensors
+*.gguf
+*.onnx

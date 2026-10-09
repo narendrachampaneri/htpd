@@ -1,0 +1,4 @@
+# LF line ends in every clone, also in one made on Windows
+* text=auto eol=lf
+# PDFs are binary: git never changes their bytes
+*.pdf binary

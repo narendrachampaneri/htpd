@@ -1,0 +1,56 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 9 0 R /Resources << /Font << /F1 4 0 R /F2 5 0 R /F3 7 0 R >> >> >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /TrueType /BaseFont /ListingSans /Encoding /WinAnsiEncoding /FirstChar 32 /LastChar 126 /Widths [500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500] /FontDescriptor 6 0 R >>
+endobj
+6 0 obj
+<< /Type /FontDescriptor /FontName /ListingSans /Flags 32 /FontBBox [-100 -250 1000 950] /ItalicAngle 0 /Ascent 900 /Descent -250 /CapHeight 700 /StemV 80 >>
+endobj
+7 0 obj
+<< /Type /Font /Subtype /TrueType /BaseFont /MonotypeCorsiva /Encoding /WinAnsiEncoding /FirstChar 32 /LastChar 126 /Widths [278 278 355 556 556 889 667 191 333 333 389 584 278 333 278 278 556 556 556 556 556 556 556 556 556 556 278 278 584 584 584 556 1015 667 667 722 722 667 611 778 722 278 500 667 556 833 722 778 667 778 722 667 611 722 667 944 667 667 611 278 278 278 469 556 333 556 556 500 556 556 278 556 556 222 222 500 222 833 556 556 556 556 333 500 278 556 500 722 500 500 500 334 260 334 584] /FontDescriptor 8 0 R >>
+endobj
+8 0 obj
+<< /Type /FontDescriptor /FontName /MonotypeCorsiva /Flags 33 /FontBBox [-100 -250 1000 950] /ItalicAngle 0 /Ascent 900 /Descent -250 /CapHeight 700 /StemV 80 >>
+endobj
+9 0 obj
+<< /Length 650 >>
+stream
+BT /F1 10 Tf 1 0 0 1 72 720 Tm (The listing below is set in a font whose name says nothing.) Tj ET
+BT /F2 9 Tf 1 0 0 1 72 700 Tm (start:) Tj ET
+BT /F2 9 Tf 1 0 0 1 72 689 Tm (    mov   r0, #0        ; counter) Tj ET
+BT /F2 9 Tf 1 0 0 1 72 678 Tm (loop:) Tj ET
+BT /F2 9 Tf 1 0 0 1 72 667 Tm (    add   r0, r0, #1) Tj ET
+BT /F2 9 Tf 1 0 0 1 90 656 Tm (b     loop) Tj ET
+BT /F3 10 Tf 1 0 0 1 72 620 Tm (This note is set in a font that claims to be fixed pitch,) Tj ET
+BT /F3 10 Tf 1 0 0 1 72 607 Tm (but its letters have different widths, so it is ordinary) Tj ET
+BT /F3 10 Tf 1 0 0 1 72 594 Tm (text and its lines are joined into one paragraph.) Tj ET
+endstream
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000261 00000 n 
+0000000358 00000 n 
+0000000900 00000 n 
+0000001073 00000 n 
+0000001620 00000 n 
+0000001797 00000 n 
+trailer
+<< /Size 10 /Root 1 0 R >>
+startxref
+2497
+%%EOF
