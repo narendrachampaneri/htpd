@@ -10,6 +10,7 @@
 ![Python 3.10+](https://img.shields.io/badge/reader-Python%203.10%2B-3776AB)
 ![Runs locally](https://img.shields.io/badge/runs-100%25%20local-2ea44f)
 ![No GPU](https://img.shields.io/badge/hardware-no%20GPU%20needed-2ea44f)
+![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Status](https://img.shields.io/badge/status-0.1%20alpha-orange)
 
 [What it is](#what-is-htpd) ·
@@ -272,10 +273,16 @@ Issues and pull requests are welcome. Before you change anything, read
 
 ## License
 
-No license has been chosen for HTPD yet, so for now all rights are reserved
-by the author. PDFium, which the converter uses, has its own license
-(BSD-style with an Apache-2.0 part); after `scripts/get_pdfium.sh` its
-license texts are in `third_party/pdfium/licenses/`.
+HTPD is open source under the [Apache License 2.0](LICENSE): you may use,
+change and share it, also in commercial products, as long as you keep the
+copyright and license notices ([`NOTICE`](NOTICE)) and mark what you changed.
+The license includes a patent grant from every contributor.
+
+PDFium, which the converter uses, is not part of this repository and has its
+own license (BSD-style with an Apache-2.0 part); after
+`scripts/get_pdfium.sh` its license texts are in
+`third_party/pdfium/licenses/`. If you give the program to others together
+with `libpdfium.so`, give them those files too.
 
 ---
 

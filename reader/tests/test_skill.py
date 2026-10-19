@@ -32,6 +32,7 @@ class SkillPackage(unittest.TestCase):
         names = zipfile.ZipFile(self.zip).namelist()
         self.assertEqual({n.split("/")[0] for n in names}, {"htpd"})
         self.assertIn("htpd/SKILL.md", names)
+        self.assertIn("htpd/LICENSE", names)
         self.assertIn("htpd/scripts/htpd.py", names)
         self.assertIn("htpd/scripts/htpd_reader/miniyaml.py", names)
         self.assertFalse([n for n in names if "__pycache__" in n or "/tests/" in n])

@@ -8,6 +8,8 @@ version = "0.1.0"
 description = "Part B of HTPD: read HTPD bundles and find the exact text, with pages, that answers a question."
 readme = "README.md"
 requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Narendra Champaneri" }]
 dependencies = ["PyYAML>=5.4"]
 
 [project.optional-dependencies]

@@ -1,6 +1,7 @@
 ---
 name: htpd
 description: Answer questions about a document in HTPD format (a .htpd file or folder made from a PDF): only from the file, with page numbers, or say it is not found in the file.
+license: Apache-2.0 (see LICENSE)
 ---
 
 # Answering questions from HTPD files

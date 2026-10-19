@@ -1,0 +1,9 @@
+HTPD - Hyper Text Portable Document
+Copyright 2026 Narendra Champaneri
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The converter uses PDFium (https://pdfium.googlesource.com/pdfium), which is
+not part of this repository. scripts/get_pdfium.sh downloads a build of it;
+PDFium and the libraries it contains have their own licenses, which are put
+into third_party/pdfium/licenses/ by that script.

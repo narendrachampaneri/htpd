@@ -60,6 +60,7 @@ def build(out: Path) -> Path:
     check_skill(skill_md)
     out.parent.mkdir(parents=True, exist_ok=True)
     files: list[tuple[Path, str]] = [(SKILL / "SKILL.md", "htpd/SKILL.md"),
+                                     (ROOT / "LICENSE", "htpd/LICENSE"), (ROOT / "NOTICE", "htpd/NOTICE"),
                                      (SKILL / "scripts" / "htpd.py", "htpd/scripts/htpd.py")]
     for py in sorted(PACKAGE.glob("*.py")):
         files.append((py, f"htpd/scripts/htpd_reader/{py.name}"))
