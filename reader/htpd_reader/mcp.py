@@ -1,6 +1,6 @@
 """Phase 6: HTPD as an MCP server, so any AI agent can read bundles.
 
-    htpd-mcp --bundles ~/manuals              # every *.htpd folder in ~/manuals
+    htpd-mcp --bundles ~/manuals              # every *.htpd folder or file in ~/manuals
     python -m htpd_reader.mcp --bundles DIR [--meaning] [--decider ce|ce-trained]
 
 The server speaks MCP over stdio (JSON-RPC 2.0, one message per line) with
@@ -99,10 +99,15 @@ class Server:
             if (root / "document.md").is_file():
                 out.setdefault(root.name.removesuffix(".htpd"), root)
                 continue
+            if root.is_file() and root.suffix == ".htpd":
+                out.setdefault(root.stem, root)
+                continue
             if root.is_dir():
                 for p in sorted(root.iterdir()):
                     if p.is_dir() and (p / "document.md").is_file():
                         out.setdefault(p.name.removesuffix(".htpd"), p)
+                    elif p.is_file() and p.suffix == ".htpd":   # the single-file form
+                        out.setdefault(p.stem, p)
         return out
 
     def bundle(self, ref: str) -> Bundle:
@@ -110,7 +115,7 @@ class Server:
         path = avail.get(ref.removesuffix(".htpd"))
         if path is None:
             p = Path(ref).expanduser()
-            if not (p / "document.md").is_file():
+            if not ((p / "document.md").is_file() or (p.is_file() and p.suffix == ".htpd")):
                 raise ToolError(f"no bundle {ref!r}; known: {', '.join(sorted(avail)) or 'none'}")
             path = p
         key = str(path.resolve())

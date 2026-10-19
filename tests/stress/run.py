@@ -7,7 +7,8 @@ For each PDF:
 * the converter must end on its own within the time limit, with exit code 0
   (converted) or an error message and code 1 or 2 (a PDF it cannot read) -
   never a crash, never a hang;
-* a converted bundle must pass `htpd-read check` with no error;
+* a converted bundle must pass `htpd-read check` with no error, and its
+  single-file form (`--single`) must hold exactly the same document;
 * with --pdftotext (poppler-utils), the words of the PDF as pdftotext reads
   them are compared with the words of the bundle: the share found is printed,
   and the words that are missing, so a person can see whether they are only
@@ -86,6 +87,22 @@ def main() -> int:
             bad += 1
             continue
         problems = errors(check(b, pdf=pdf))
+        # the single-file form must hold the same document
+        single = out / "single" / (pdf.stem + ".htpd")
+        s_cmd = [args.converter, "convert", str(pdf), "--single", "-o", str(single), "--force", "-q"]
+        if pdf.name in PASSWORDS:
+            s_cmd += ["--password", PASSWORDS[pdf.name]]
+        sp = subprocess.run(s_cmd, capture_output=True, text=True, timeout=args.timeout)
+        if sp.returncode != 0:
+            print(f"SINGLE {pdf.name}: the single file failed: {sp.stderr.strip()[:160]}")
+            bad += 1
+        else:
+            sb = open_bundle(single)
+            key = lambda n: (n.id, n.title, n.number, n.parent, n.page_start, n.page_end,  # noqa: E731
+                             [(k.kind, k.text, k.page) for k in n.blocks])
+            if [key(n) for n in sb.sections] != [key(n) for n in b.sections] or errors(check(sb, pdf=pdf)):
+                print(f"SINGLE {pdf.name}: the single file differs from the folder")
+                bad += 1
         status = "OK    " if not problems else "ERRORS"
         bad += bool(problems)
         line = f"{status} {pdf.name} ({dt:.2f} s): {b.page_count} pages, {len(b)} sections"

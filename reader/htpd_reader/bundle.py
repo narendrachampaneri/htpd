@@ -374,11 +374,15 @@ class Bundle:
 
     # --- opening ---
 
+    single: bool = False  # True when read from one .htpd file (FORMAT.md section 11)
+
     @classmethod
     def open(cls, path: str | Path) -> "Bundle":
         root = Path(path)
+        if root.is_file():
+            return read_single_file(root)
         if not root.is_dir():
-            raise BundleError(f"{root} is not a folder")
+            raise BundleError(f"{root} is not a folder or an HTPD file")
         if not (root / "document.md").is_file():
             raise BundleError(f"{root} has no document.md, so it is not an HTPD bundle")
         problems: list[Problem] = []
@@ -492,7 +496,7 @@ class Bundle:
 
     @property
     def name(self) -> str:
-        return self.root.name
+        return self.root.name.removesuffix(".htpd") if self.single else self.root.name
 
     def contents(self) -> list[dict[str, Any]]:
         """The full tree as a flat list in document order, with depth."""
@@ -503,6 +507,115 @@ def _file_order(f: Path) -> tuple[int, str]:
     """NNNN has at least four digits: 10000 comes after 9999, not before."""
     digits = f.name.split("-", 1)[0]
     return (int(digits) if digits.isdigit() else 1 << 62, f.name)
+
+
+SINGLE_FILE_MAGIC = "---\nhtpd_file: "
+_SECTION_MARK = re.compile(r"^<!-- htpd section (\{.*\}) -->$")
+_SECTION_HEADING = re.compile(r"^## \[S(\d+)\] (.*)$")
+_FOOTNOTE = re.compile(r"^\[\^source-pdf\]: ")
+
+
+def read_single_file(path: Path) -> Bundle:
+    """Read the single-file form of a bundle (one .htpd file) into the same
+    nodes as a bundle folder: the IDs, the tree, the order and the text with
+    its pages are the same."""
+    import json
+
+    try:
+        content = path.read_bytes().decode("utf-8")
+    except (OSError, UnicodeDecodeError) as e:
+        raise BundleError(f"{path} cannot be read: {e}") from None
+    if not content.startswith(SINGLE_FILE_MAGIC):
+        raise BundleError(f"{path} is not an HTPD file (it does not start with 'htpd_file:')")
+    yaml_text, body, first_line = split_front_matter(content)
+    try:
+        head = yaml.load(yaml_text or "", Loader=_Loader)
+    except yaml.YAMLError as e:
+        raise BundleError(f"{path}: the fields at the top are not valid YAML: {e}") from None
+    if not isinstance(head, dict):
+        raise BundleError(f"{path}: the fields at the top are not a mapping")
+    fname = path.name
+    problems: list[Problem] = []
+    lines = body.split("\n")
+
+    # Cut the body at the section marks; inside a code block nothing is a mark.
+    marks: list[tuple[int, dict[str, Any]]] = []
+    fence: str | None = None
+    for i, line in enumerate(lines):
+        if fence is not None:
+            if line == fence:
+                fence = None
+            continue
+        m = _FENCE_OPEN.match(line)
+        if m:
+            fence = m.group(1)
+            continue
+        m = _SECTION_MARK.match(line)
+        if m:
+            try:
+                fields = json.loads(m.group(1))
+                if not isinstance(fields, dict):
+                    raise ValueError("not an object")
+            except ValueError as e:
+                problems.append(Problem("error", "bad-fields", fname, f"section fields are not valid JSON: {e}",
+                                        first_line + i))
+                continue
+            marks.append((i, fields))
+
+    source = {"source_file": head.get("source_file"), "source_sha256": head.get("source_sha256")}
+    sections: list[Node] = []
+    for k, (i, f) in enumerate(marks):
+        end = marks[k + 1][0] if k + 1 < len(marks) else len(lines)
+        chunk = lines[i + 1:end]
+        title = ""
+        j = 0
+        if chunk and (h := _SECTION_HEADING.match(chunk[0])):
+            title = h.group(2)
+            j = 1
+        else:
+            problems.append(Problem("error", "missing-part", fname, "a section mark is not followed by its "
+                                    "'## [S<n>] title' line", first_line + i + 1))
+        while j < len(chunk) and (chunk[j] == "" or chunk[j].startswith("Path: ")):
+            j += 1
+        text_lines = chunk[j:]
+        if k + 1 == len(marks):  # the file ends with the footnote of the source
+            while text_lines and (text_lines[-1] == "" or _FOOTNOTE.match(text_lines[-1])):
+                text_lines.pop()
+        node_id = str(f.get("id", f"sections/{k + 1:04d}"))
+        pages = f.get("pages") if isinstance(f.get("pages"), list) and len(f.get("pages")) == 3 else [None] * 3
+        htpd = {"version": head.get("htpd_file"), "node": "section", "id": node_id, "order": f.get("n"),
+                "level": f.get("level"), "page_start": pages[0], "page_end": pages[1],
+                "span_page_end": pages[2], "parent": f.get("parent"), "children": [], **source}
+        if f.get("number") is not None:
+            htpd["number"] = f.get("number")
+        text_body = "# Text\n\n" + "\n".join(text_lines)
+        _, blocks, _, p = parse_body(text_body, first_line + i + 1 + j - 2, fname)
+        problems += p
+        sections.append(Node(id=node_id, path=node_id + ".md", fields={"type": "Section", "title": title,
+                                                                       "htpd": htpd}, blocks=blocks,
+                             body=text_body))
+    # The order and the tree, as a bundle folder writes them.
+    by_id = {s.id: s for s in sections}
+    top: list[str] = []
+    for n, s in enumerate(sections):
+        h = s.htpd
+        if n > 0:
+            h["previous"] = sections[n - 1].id
+        if n + 1 < len(sections):
+            h["next"] = sections[n + 1].id
+        parent = h.get("parent")
+        if parent == DOCUMENT_ID:
+            top.append(s.id)
+        elif parent in by_id:
+            by_id[parent].htpd["children"].append(s.id)
+    doc_fields = {"type": "Document", "title": head.get("title", path.stem),
+                  "htpd": {"version": head.get("htpd_file"), "node": "document", "id": DOCUMENT_ID,
+                           "pages": head.get("pages"), "sections": head.get("sections"), "children": top,
+                           **source}}
+    document = Node(id=DOCUMENT_ID, path=fname, fields=doc_fields)
+    b = Bundle(path, document, sections, problems)
+    b.single = True
+    return b
 
 
 def open_bundle(path: str | Path) -> Bundle:

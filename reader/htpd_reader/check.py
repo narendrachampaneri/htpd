@@ -78,7 +78,7 @@ def _check_sections(b: Bundle) -> list[Problem]:
             out.append(Problem("error", "wrong-node", f, f"htpd.node is {h.get('node')!r}, not 'section'"))
         if h.get("id") != s.id:
             out.append(Problem("error", "wrong-id", f, f"htpd.id is {h.get('id')!r}, but the file is {s.id!r}"))
-        if not _SECTION_FILE.match(s.id):
+        if not _SECTION_FILE.match(s.id) and not b.single:
             out.append(Problem("warning", "file-name", f, "file name is not NNNN-<title>.md"))
         for key in ("order", "level", "page_start", "page_end", "span_page_end", "parent", "children"):
             if key not in h:
@@ -99,7 +99,7 @@ def _check_sections(b: Bundle) -> list[Problem]:
                     break
         if sha is not None and h.get("source_sha256") not in (None, sha):
             out.append(Problem("error", "source-mismatch", f, "source_sha256 differs from document.md"))
-        if "# Text" not in s.body.split("\n"):
+        if "# Text" not in s.body.split("\n") and not b.single:
             out.append(Problem("error", "missing-part", f, "the part # Text is missing"))
     return out
 
@@ -177,6 +177,8 @@ def _check_order(b: Bundle) -> list[Problem]:
 def _check_links(b: Bundle) -> list[Problem]:
     """Every relative link outside the text of the PDF must point to a file."""
     out: list[Problem] = []
+    if b.single:  # one file: there are no links between files
+        return out
     files: list[tuple[str, list[tuple[int, str]]]] = [(n.path, n.links) for n in [b.document, *b.sections]]
     for extra in ("index.md", "sections/index.md"):
         p = b.root / extra
