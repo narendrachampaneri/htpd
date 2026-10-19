@@ -11,14 +11,15 @@ an AI model can read piece by piece instead of reading the whole document.
 * The text is kept as it stands in the PDF. Nothing is summarised and
   nothing is made up.
 
-This is **part A** of the HTPD idea (the converter). Part B, the tool and
-model that tell an AI how to read a bundle, is the next step; its plan is in
-`docs/PART-B.md`. `docs/FORMAT.md` describes the format, so that B (or
-anybody) can read the bundles.
+This is **part A** of the HTPD idea (the converter). **Part B**, the tool and
+model that tell an AI how to read a bundle, is in Python in `reader/`,
+`eval/` and `model/` (see "Part B" below; the plan is `docs/PART-B.md`).
+`docs/FORMAT.md` describes the format, so that B (or anybody) can read the
+bundles.
 
-Everything here is C++ (C++23). There is no database program: the bundle
-folder on the disk *is* the database. The only thing that is not C++ is one
-optional Python script that makes the test PDFs.
+The converter is C++ (C++23). There is no database program: the bundle
+folder on the disk *is* the database. Part B needs only Python 3.10+ and
+PyYAML; models are optional extras.
 
 ## Quick start (Ubuntu)
 
@@ -322,13 +323,32 @@ honest about the rest.
   depends on part B.
 * **Linux only** for now.
 
-## Next step: part B
+## Part B: reading bundles
 
 A bundle already holds what a reader needs: the contents list with pages,
 one short description per section, the tree, the order, and the page of
-every paragraph. Part B uses this: a reader, a search, and a small trained
-decision model that picks the right sections and hands their exact text,
-with pages, to any AI model, through an MCP server.
+every paragraph. Part B uses this: a reader, a search, and a decision model
+that pick the right sections and hand their exact text, with pages, to any
+AI model, through an MCP server.
+
+```sh
+python3 -m pip install -e .                   # htpd-read and htpd-mcp
+htpd-read contents examples/sample.htpd
+htpd-read check examples/sample.htpd
+htpd-mcp --bundles ~/manuals                  # MCP server over stdio
+python3 -m pip install pytest && python3 -m pytest     # Python tests
+```
+
+* `reader/` - the package `htpd_reader`: reader, check, search, retriever,
+  packer, decider, MCP server (`reader/README.md`).
+* `eval/` - test questions, the harness and `eval/report.md`
+  (`python -m eval --help`).
+* `model/` - training data and the decider models (`model/README.md`).
+* `skills/read-htpd/SKILL.md` - teaches an AI agent to read a bundle.
+
+To use it from Claude Code: `claude mcp add htpd -- htpd-mcp --bundles ~/manuals`.
+Other agents (Antigravity and the like) take the same command in their MCP
+settings: command `htpd-mcp`, arguments `--bundles /path/to/bundles`.
 
 The plan, phase by phase, with the tests that B must pass, is in
 [`docs/PART-B.md`](docs/PART-B.md). The rules for the coding agents are in

@@ -28,8 +28,10 @@ make test                   # all tests must pass
   source file must also be added to `CMakeLists.txt`.
 
 Part B, the reader model (Python 3.10+, folders `reader/`, `model/`,
-`eval/`): run its tests with `python -m pytest` from the repository root.
-Tests must not need the internet.
+`eval/`): run its tests with `python -m pytest` from the repository root
+(without pytest: `PYTHONPATH=reader:. python -m unittest discover -s reader/tests -t .`,
+the same for `eval/tests` and `model/tests`). Tests must not need the
+internet; a test that needs a model uses a small stand-in.
 
 ## Rules
 
@@ -64,9 +66,9 @@ Tests must not need the internet.
 
 * One phase of `docs/PART-B.md` at a time, on its own branch
   (`phase-N-short-name`). Do not add, drop or merge phases without asking.
-* The author of a phase does not approve it. Before a phase is merged,
-  someone else - a person or another agent - reviews the branch and runs
-  all tests.
+* Before a phase is merged, all tests run and pass (C++ and Python). A
+  review by someone else is welcome but not required (decided by the owner
+  on 19 October 2026).
 
 ## Facts that are easy to get wrong
 

@@ -1,6 +1,6 @@
 # Background: how HTPD came to be
 
-Status as of 9 October 2026. Read this to understand why the project is
+Status as of 19 October 2026. Read this to understand why the project is
 the way it is. The rules are in `AGENTS.md`; the format is in
 `docs/FORMAT.md`; the plan for part B is in `docs/PART-B.md`.
 
@@ -82,3 +82,7 @@ the reader.
 * 7 October: `AGENTS.md` (rules for coding agents) added.
 * 9 October: the plan for part B written (`docs/PART-B.md`); the
   repository put on GitHub.
+* 19 October: the code of part B, phases 1 to 6, written and tested, one
+  branch per phase. Narendra decided that a phase needs no separate review;
+  the author runs all tests before a merge. The measurements wait for the
+  public PDFs and the models (see the table in `docs/PART-B.md` section 5).

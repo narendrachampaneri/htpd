@@ -140,7 +140,20 @@ bundle") tells an AI agent how to use the tools.
 ## 5. Phases
 
 One phase at a time, each on its own git branch. A phase is done only when
-its "done when" lines are true and the other agent has reviewed it.
+its "done when" lines are true and all tests pass.
+
+State on 19 October 2026: the code of phases 1 to 6 is written and tested
+(`python -m pytest`). What is still open needs the public PDFs, the models
+or a person, and is done on a PC:
+
+| Phase | Code | Still open |
+|---|---|---|
+| 1 Reader | done | `check` on the bundles of the three public manuals |
+| 2 Evaluation | harness, baselines, report, `eval/get_docs.sh` | pin the PDFs in `eval/docs.list`; write the 300 questions; a person checks 100 (`python -m eval review`); measure the baselines |
+| 3 Retriever, packer | done, with one ablation per part | measure on the test split; embeddings need `sentence-transformers` |
+| 4 Training data | `python -m model.make_data` | run on the training bundles (20 000 examples); a person checks 200 (`model/data/check.md`) |
+| 5 Decider | cross-encoder (untrained and trained on CPU), Laya | train, tune on the tuning split, measure |
+| 6 MCP server, skill | `htpd-mcp`, `skills/read-htpd/SKILL.md` | 20 questions through Claude Code and Antigravity (`python -m eval agent-sheet`, `agent-score`) |
 
 ### Phase 1 - Reader
 
@@ -172,7 +185,8 @@ has the first table.
 ### Phase 3 - Retriever and packer
 
 Word search with the technical tokenizer, embeddings, the tree, fusion,
-and the packer with a token budget and "not found".
+and the packer with a token budget and "not found". Allowed libraries:
+PyYAML; optional `sentence-transformers` (with numpy) for embeddings.
 
 Done when: it beats the best baseline in Recall@5 on the test split, and
 the report shows what each part adds (one row per part switched off).
@@ -195,6 +209,9 @@ duplicates removed, 200 examples checked by a person.
 provides a notebook for fine-tuning; it ran on two free Kaggle T4 GPUs in
 about four hours. Thresholds are set on the tuning split, never on test.
 
+Allowed libraries: `sentence-transformers` (cross-encoder, also to train it
+on a CPU), `laya`. Both optional: without them the system is phase 3.
+
 Done when: the decider improves Recall@5, page accuracy or tokens over
 phase 3 on the test split, within the time target. The model card
 (`model/README.md`) states the data, the licence and the numbers.
@@ -202,7 +219,8 @@ phase 3 on the test split, within the time target. The model card
 ### Phase 6 - MCP server and skill
 
 MCP tools: `contents`, `open_section`, `search`, `ask` (retriever +
-decider + packer), `check`. A `SKILL.md` that teaches an agent to read a
+decider + packer), `check` (and `list_bundles`). The server uses only the
+Python standard library. A `SKILL.md` that teaches an agent to read a
 bundle: start at the contents, open what the decider suggests, follow
 parent and neighbours, quote with pages, say "not found" when needed.
 
