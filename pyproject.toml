@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "htpd-reader"
+version = "0.1.0"
+description = "Part B of HTPD: read HTPD bundles and find the exact text, with pages, that answers a question."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["PyYAML>=5.4"]
+
+[project.scripts]
+htpd-read = "htpd_reader.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["reader"]
+include = ["htpd_reader*"]
+
+[tool.pytest.ini_options]
+# The Python tests of part B. They are plain unittest tests, so
+# `python -m unittest discover -s reader/tests -t .` runs them as well.
+testpaths = ["reader/tests"]
+pythonpath = ["reader", "."]
