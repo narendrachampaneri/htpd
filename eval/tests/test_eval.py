@@ -65,6 +65,7 @@ class Tokens(unittest.TestCase):
             self.assertIn(want, t)
         self.assertNotIn("3", t)
         self.assertNotIn("the", technical_tokens("the reset value", drop_stopwords=True))
+        self.assertEqual(technical_tokens("Maximum"), ["maximum", "max"])
 
     def test_plain_and_count(self) -> None:
         self.assertEqual(plain_words("Bus voltage | 200"), ["bus", "voltage", "200"])
@@ -235,3 +236,48 @@ class CommandLine(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Phase3Systems(unittest.TestCase):
+    def setUp(self) -> None:
+        import eval.systems_htpd  # noqa: F401  (registers the htpd systems)
+
+        self._tmp = tempfile.TemporaryDirectory()
+        t = Path(self._tmp.name)
+        self.t = t
+        self.ctx = Context(embedder_factory=FakeEmbedder, cache_dir=t / "cache")
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_htpd_systems_run_and_beat_whole_document_tokens(self) -> None:
+        qfile = self.t / "q.jsonl"
+        save(qfile, QUESTIONS)
+        docs = self.t / "docs.list"
+        docs.write_text("sample test - -\n")
+        for name in ("htpd", "htpd-words", "htpd-no-tree", "htpd-plain", "htpd-no-words"):
+            m = harness.evaluate(name, "test", [qfile], EXAMPLES, self.ctx, docs_list=docs,
+                                 results_dir=self.t / "results")["metrics"]
+            self.assertIsNotNone(m["recall@5"], name)
+            self.assertLess(m["tokens_vs_whole"], 1.0, name)
+        htpd = harness.evaluate("htpd-words", "test", [qfile], EXAMPLES, self.ctx, docs_list=docs, save=False)
+        b3 = harness.evaluate("B3", "test", [qfile], EXAMPLES, self.ctx, docs_list=docs, save=False)
+        self.assertGreaterEqual(htpd["metrics"]["mrr"], b3["metrics"]["mrr"])
+
+    def test_tune_writes_a_threshold(self) -> None:
+        docs = self.t / "docs.list"
+        docs.write_text("sample train - -\n")
+        ids = [f"t{i}" for i in range(400) if int(hashlib.sha256(f"t{i}".encode()).hexdigest(), 16) % 4 == 0]
+        tune_qs = [Question(ids[i], "sample", x.kind, x.question, x.answer, x.gold_sections, x.gold_pages)
+                   for i, x in enumerate(QUESTIONS)]
+        qfile = self.t / "tune.jsonl"
+        save(qfile, tune_qs)
+        out = self.t / "tuned.json"
+        r = harness.tune_not_found("htpd-words", [qfile], EXAMPLES, self.ctx, docs_list=docs, out=out)
+        self.assertEqual(r["questions"], 5)
+        self.assertEqual(r["balanced_accuracy"], 1.0)
+        saved = json.loads(out.read_text())["htpd-words"]["not_found_below"]
+        self.assertGreater(saved, 0.0)
+        from eval.systems_htpd import tuned
+
+        self.assertEqual(tuned("htpd-words", out), {"not_found_below": saved})
