@@ -10,12 +10,11 @@ says what the models are, what they learn from, and where their numbers are.
 |---|---|---|---|---|
 | `htpd-ce` | `cross-encoder/ms-marco-MiniLM-L-6-v2`, 22M parameters | Apache-2.0 | no (phase 5a) | CPU |
 | `htpd-ce-trained` | the same, fine-tuned (`model/train_cross_encoder.py`) | Apache-2.0 | yes | CPU, also for training |
-| `htpd-laya` | Laya `convaiinnovations/laya`, 421M parameters, fine-tuned | Apache-2.0 | yes (phase 5b) | CPU to run; a GPU to train (free Kaggle 2x T4) |
 
 The models are not stored in git (`model/checkpoints/` is ignored). A trained
-model is saved to `model/checkpoints/cross-encoder-htpd` or
-`model/checkpoints/laya-htpd`, or its place is given with `HTPD_CE_TRAINED` /
-`HTPD_LAYA`.
+model is saved to `model/checkpoints/cross-encoder-htpd`, or its place is
+given with `HTPD_CE_TRAINED`. Everything runs on a normal PC without a GPU,
+and HTPD works without any model at all (`htpd-words`).
 
 ## The data
 
@@ -45,36 +44,15 @@ python -m eval tune htpd-ce-trained                   # "not found" threshold, t
 python -m eval run htpd-ce-trained                    # test split -> eval/report.md
 ```
 
-Laya (needs a GPU to train; Kaggle's free 2x T4 is enough, about four hours):
-
-```sh
-python -m model.export_laya                           # model/data/laya-train.jsonl, laya-dev.jsonl
-```
-
-Upload these two files to Kaggle (they hold only public training documents),
-open Laya's notebook `laya_finetune_typed_decisions_2xT4_kaggle.ipynb`, point
-its dataset step at them, train, refit the temperatures on `laya-dev.jsonl`,
-and download the result into `model/checkpoints/laya-htpd`. Then on the PC:
-
-```sh
-python3 -m pip install laya
-python -m eval tune htpd-laya
-python -m eval run htpd-laya
-```
-
 ## The numbers
 
 Only in `eval/report.md`, written by the harness on the test split (AGENTS.md
 rule 10). The decider stays only if it improves Recall@5, page accuracy or
-tokens over phase 3 within the time target; the numbers decide between the
-cross-encoder and Laya.
+tokens over phase 3 within the time target; otherwise HTPD runs without it.
 
 ## Limits
 
-* Laya's base checkpoints are near chance on new decisions without
-  fine-tuning, and ship over-confident: the temperatures must be refitted on
-  the dev data before its probabilities are used.
-* Laya's English checkpoint reads 512 tokens per question; a card is kept to
-  about 120 words for that reason.
-* The fine-tuning notebook builds its own dataset; check its field names
-  against `model/export_laya.py` for the Laya version you use.
+* The cross-encoder reads about 384 tokens per (question, card) pair; a
+  card is kept to about 120 words for that reason.
+* Its probabilities are not calibrated for HTPD until it is fine-tuned; the
+  "not found" threshold is always set on the tuning split.

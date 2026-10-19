@@ -1,20 +1,17 @@
-"""Tests of phase 5: the decider, the Laya answer reading, the systems and the exports."""
+"""Tests of phase 5: the decider and its systems."""
 
 from __future__ import annotations
 
-import json
 import tempfile
 import unittest
 from pathlib import Path
 
 from htpd_reader import open_bundle
 from htpd_reader.ask import Asker
-from htpd_reader.decider import Decider, LayaScorer, sigmoid
+from htpd_reader.decider import Decider, sigmoid
 from htpd_reader.retriever import Settings
 from htpd_reader.tokens import plain_words
 
-from model.export_laya import to_laya
-from model.make_data import generate
 from model.train_cross_encoder import auc
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -65,11 +62,6 @@ class DeciderTest(unittest.TestCase):
         self.assertEqual({n.id for n in r.ranked}, {n.id for n in plain})
         self.assertEqual([n.id for n in r.ranked[2:]], [n.id for n in plain[2:]])
 
-    def test_laya_answer(self) -> None:
-        self.assertEqual(LayaScorer.yes_probability({"choice": "yes", "confidence": 0.8}), 0.8)
-        self.assertAlmostEqual(LayaScorer.yes_probability({"choice": "no", "confidence": 0.8}), 0.2)
-        self.assertEqual(LayaScorer.yes_probability({"probabilities": {"yes": 0.3, "no": 0.7}}), 0.3)
-
     def test_sigmoid_and_auc(self) -> None:
         self.assertAlmostEqual(sigmoid(0.0), 0.5)
         self.assertEqual(sigmoid(-1000.0), 0.0)
@@ -92,27 +84,9 @@ class Systems(unittest.TestCase):
             docs = t / "docs.list"
             docs.write_text("sample test - -\n")
             ctx = Context(embedder_factory=FakeEmbedder, scorer_factory=lambda name: WordScorer())
-            for name in ("htpd-ce", "htpd-ce-trained", "htpd-laya"):
+            for name in ("htpd-ce", "htpd-ce-trained"):
                 m = harness.evaluate(name, "test", [qf], EXAMPLES, ctx, docs_list=docs, save=False)["metrics"]
                 self.assertIsNotNone(m["recall@5"], name)
-
-
-class Exports(unittest.TestCase):
-    def test_laya_requests(self) -> None:
-        with tempfile.TemporaryDirectory() as t:
-            docs = Path(t) / "docs.list"
-            docs.write_text("sample train - -\n")
-            ex = generate({"sample": open_bundle(SAMPLE)}, docs_list=docs)
-        seen = set()
-        for e in ex:
-            r = to_laya(e)
-            (name, spec), = r["questions"].items()
-            self.assertEqual(spec["type"], "choice")
-            self.assertIn(r["answers"][name], spec["criteria"])
-            self.assertIn(e["question"], r["state"] + spec["instructions"])
-            json.dumps(r)
-            seen.add(name)
-        self.assertEqual(seen, {"relevant", "enough", "child"})
 
 
 if __name__ == "__main__":

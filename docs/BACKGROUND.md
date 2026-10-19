@@ -60,9 +60,10 @@ with two parts:
 
 The plan is in `docs/PART-B.md`: Python, offline first, free and open
 models only. Reader → retriever → decider → packer. The decider is a
-small trained decision model (Laya, fine-tuned on HTPD data, compared
-with an open cross-encoder) - that is what makes B "stronger", not a big
-language model. B is offered to any AI through an MCP server and a
+small decision model (an open cross-encoder of 22M parameters, fine-tuned
+on HTPD data on a CPU) - that is what makes B "stronger", not a big
+language model. Everything runs locally on a normal PC; the models are
+optional. B is offered to any AI through an MCP server and a
 `SKILL.md`. Every part must beat simple baselines on test questions from
 documents that were never used for training. Seven phases; phase 1 is
 the reader.
@@ -86,3 +87,5 @@ the reader.
   branch per phase. Narendra decided that a phase needs no separate review;
   the author runs all tests before a merge. The measurements wait for the
   public PDFs and the models (see the table in `docs/PART-B.md` section 5).
+  Laya was dropped from the plan: HTPD must stay local, free and light,
+  and Laya needs a GPU to train and is slow on a CPU.

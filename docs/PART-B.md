@@ -80,12 +80,14 @@ question
    * **enough?** (yes/no) - to stop when the collected text answers the
      question.
 
-   First choice: **Laya**, an open (Apache-2.0) decision model of about
-   421M parameters that runs on CPU, returns probabilities for typed
-   questions (choice, score, yes/no) and answers in tens of milliseconds.
-   It does not write text, which suits this job. It is fine-tuned on B's
-   own training data (phase 5). To compare: an open cross-encoder
-   reranker. The numbers decide which one stays.
+   The model: a small open cross-encoder reranker
+   (`cross-encoder/ms-marco-MiniLM-L-6-v2`, 22M parameters, Apache-2.0).
+   It scores all candidates in one batch on a CPU, does not write text,
+   and can be fine-tuned on B's own training data on a normal PC
+   (phase 5). The decider is optional: without it B runs with no model at
+   all, and it stays only if the numbers show that it helps.
+   (Laya was the first idea; it was dropped on 19 October 2026 because it
+   is about 20 times larger, slower on a CPU, and needs a GPU to train.)
 4. **Packer**: puts together what the AI gets, within a token budget: the
    chosen sections with their exact text, the location line, the pages,
    and the parent titles for context. It says "not found" when nothing
@@ -152,7 +154,7 @@ or a person, and is done on a PC:
 | 2 Evaluation | harness, baselines, report, `eval/get_docs.sh` | pin the PDFs in `eval/docs.list`; write the 300 questions; a person checks 100 (`python -m eval review`); measure the baselines |
 | 3 Retriever, packer | done, with one ablation per part | measure on the test split; embeddings need `sentence-transformers` |
 | 4 Training data | `python -m model.make_data` | run on the training bundles (20 000 examples); a person checks 200 (`model/data/check.md`) |
-| 5 Decider | cross-encoder (untrained and trained on CPU), Laya | train, tune on the tuning split, measure |
+| 5 Decider | cross-encoder (untrained and trained on CPU) | train, tune on the tuning split, measure |
 | 6 MCP server, skill | `htpd-mcp`, `skills/read-htpd/SKILL.md` | 20 questions through Claude Code and Antigravity (`python -m eval agent-sheet`, `agent-score`) |
 
 ### Phase 1 - Reader
@@ -205,12 +207,11 @@ duplicates removed, 200 examples checked by a person.
 ### Phase 5 - Decider model
 
 (a) An open cross-encoder reranker, untrained, as the first comparison.
-(b) Laya, fine-tuned on the phase 4 data for the three decisions. Laya
-provides a notebook for fine-tuning; it ran on two free Kaggle T4 GPUs in
-about four hours. Thresholds are set on the tuning split, never on test.
+(b) The same cross-encoder, fine-tuned on the phase 4 data on a CPU.
+Thresholds are set on the tuning split, never on test.
 
-Allowed libraries: `sentence-transformers` (cross-encoder, also to train it
-on a CPU), `laya`. Both optional: without them the system is phase 3.
+Allowed library: `sentence-transformers` (the cross-encoder, also to train
+it on a CPU). Optional: without it the system is phase 3.
 
 Done when: the decider improves Recall@5, page accuracy or tokens over
 phase 3 on the test split, within the time target. The model card
@@ -247,7 +248,5 @@ docs/     FORMAT.md (the contract), PART-B.md (this plan), BACKGROUND.md
 ## 7. Open questions (the numbers decide)
 
 * Which embedding model.
-* Whether a card fits Laya's input length (its multilingual checkpoint
-  reads 1 024 tokens by default and up to 8 192).
 * Whether walking down the tree beats sorting all candidates at once, or
   whether the two work best together.

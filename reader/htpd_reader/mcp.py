@@ -1,7 +1,7 @@
 """Phase 6: HTPD as an MCP server, so any AI agent can read bundles.
 
     htpd-mcp --bundles ~/manuals              # every *.htpd folder in ~/manuals
-    python -m htpd_reader.mcp --bundles DIR [--meaning] [--decider ce|ce-trained|laya]
+    python -m htpd_reader.mcp --bundles DIR [--meaning] [--decider ce|ce-trained]
 
 The server speaks MCP over stdio (JSON-RPC 2.0, one message per line) with
 only the Python standard library. Tools:
@@ -292,15 +292,13 @@ def _threshold(name: str) -> float:
 
 
 def make_decider(name: str) -> Any:
-    from .decider import DEFAULT_CROSS_ENCODER, CrossEncoderScorer, Decider, LayaScorer
+    from .decider import DEFAULT_CROSS_ENCODER, CrossEncoderScorer, Decider
 
     checkpoints = Path(__file__).resolve().parents[2] / "model" / "checkpoints"
     if name == "ce":
         scorer: Any = CrossEncoderScorer(os.environ.get("HTPD_CROSS_ENCODER", DEFAULT_CROSS_ENCODER))
     elif name == "ce-trained":
         scorer = CrossEncoderScorer(os.environ.get("HTPD_CE_TRAINED", str(checkpoints / "cross-encoder-htpd")))
-    elif name == "laya":
-        scorer = LayaScorer(os.environ.get("HTPD_LAYA", str(checkpoints / "laya-htpd")))
     else:
         raise ValueError(f"unknown decider {name!r}")
     return Decider(scorer, not_found_below=_threshold(f"htpd-{name}"))
@@ -311,7 +309,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--bundles", nargs="+", default=[os.environ.get("HTPD_BUNDLES", ".")],
                     help="folders that hold *.htpd bundles, or bundle folders (default: $HTPD_BUNDLES or .)")
     ap.add_argument("--meaning", action="store_true", help="also meaning search (needs sentence-transformers)")
-    ap.add_argument("--decider", choices=["ce", "ce-trained", "laya"], help="re-order with a decider model")
+    ap.add_argument("--decider", choices=["ce", "ce-trained"], help="re-order with a decider model")
     ap.add_argument("--budget", type=int, default=1500, help="most tokens of text per answer")
     args = ap.parse_args(argv)
     Server([Path(p).expanduser() for p in args.bundles], args.meaning, args.decider, args.budget).serve()

@@ -13,8 +13,6 @@ dependencies = ["PyYAML>=5.4"]
 [project.optional-dependencies]
 # meaning search, the cross-encoder decider and its training (downloads models once)
 models = ["sentence-transformers>=2.2"]
-# the Laya decider
-laya = ["laya"]
 
 [project.scripts]
 htpd-read = "htpd_reader.cli:main"

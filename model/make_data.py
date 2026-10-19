@@ -42,7 +42,7 @@ from htpd_reader.tokens import technical_tokens
 ROOT = Path(__file__).resolve().parents[1]
 DOCS_LIST = ROOT / "eval" / "docs.list"
 OUT = ROOT / "model" / "data"
-MAX_OPTIONS = 8  # options of a "child" question (Laya gets worse with many)
+MAX_OPTIONS = 8  # options of a "child" question
 NEGATIVES = 4  # negatives per question for "relevant"
 TEXT_WORDS = 300  # words of a section in an "enough" example
 

@@ -5,22 +5,21 @@ A decider looks at the question and a short card of each candidate section
 holding the answer. The candidates are then sorted by that probability; when
 even the best one is below `not_found_below`, the answer is "not found".
 
-Scorers (all optional, all run on a CPU, all open licences):
+Scorer (optional, runs on a CPU, open licence):
 
-* CrossEncoderScorer - an open cross-encoder reranker, e.g.
-  `cross-encoder/ms-marco-MiniLM-L-6-v2` (Apache-2.0), untrained on HTPD
-  data (phase 5a), or the same model fine-tuned on the phase 4 data
-  (model/train_cross_encoder.py).
-* LayaScorer - Laya (Apache-2.0), fine-tuned on the phase 4 data (phase 5b).
+* CrossEncoderScorer - an open cross-encoder reranker,
+  `cross-encoder/ms-marco-MiniLM-L-6-v2` (22M parameters, Apache-2.0),
+  untrained on HTPD data (phase 5a), or the same model fine-tuned on the
+  phase 4 data on a CPU (model/train_cross_encoder.py).
 
-None of the libraries is needed by the rest of htpd_reader.
+The library is not needed by the rest of htpd_reader.
 """
 
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any, Protocol, Sequence
+from typing import Protocol, Sequence
 
 from .bundle import Bundle, Node
 from .retriever import Retrieval, card_text
@@ -83,49 +82,3 @@ class CrossEncoderScorer:
         if all(0.0 <= v <= 1.0 for v in vals):
             return vals
         return [sigmoid(v) for v in vals]
-
-
-LAYA_QUESTION = {
-    "type": "choice",
-    "instructions": "Does this part of a technical manual answer the question below? Question: {question}",
-    "criteria": {"yes": "the text answers the question", "no": "the text does not answer the question"},
-}
-
-
-class LayaScorer:
-    """Laya asked one yes/no choice per candidate card.
-
-    Laya's `noul` answers can stick to their labels; its documentation
-    suggests a two-option `choice` instead, which is what this uses. The
-    probability of "yes" is read from the answer: `probabilities` when the
-    installed version gives them, else `confidence` of the chosen option.
-    """
-
-    def __init__(self, model: str, subfolder: str | None = None, device: str = "cpu"):
-        try:
-            import laya  # type: ignore
-        except ImportError as e:  # pragma: no cover - depends on the machine
-            from .embed import NotAvailable
-
-            raise NotAvailable("Laya needs: python3 -m pip install laya") from e
-        self.name = f"laya:{model}"
-        kwargs: dict[str, Any] = {} if device == "cpu" else {"device": device}
-        if subfolder:
-            kwargs["subfolder"] = subfolder
-        self._agent = laya.load(model, **kwargs)
-
-    @staticmethod
-    def yes_probability(answer: dict[str, Any]) -> float:
-        probs = answer.get("probabilities") or answer.get("probs")
-        if isinstance(probs, dict) and "yes" in probs:
-            return float(probs["yes"])
-        choice, conf = answer.get("choice"), float(answer.get("confidence", 0.5))
-        return conf if choice == "yes" else 1.0 - conf
-
-    def score(self, question: str, cards: Sequence[str]) -> list[float]:
-        q = dict(LAYA_QUESTION, instructions=LAYA_QUESTION["instructions"].format(question=question))
-        out = []
-        for c in cards:
-            result = self._agent.predict(c, {"relevant": q})
-            out.append(self.yes_probability(result["answers"]["relevant"]))
-        return out

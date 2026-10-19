@@ -2,7 +2,6 @@
 
   htpd-ce          + open cross-encoder, not trained on HTPD data (phase 5a)
   htpd-ce-trained  + the same cross-encoder fine-tuned on the phase 4 data
-  htpd-laya        + Laya fine-tuned on the phase 4 data (phase 5b)
 
 The retriever is the full one of phase 3 (words, meaning, tree, numbers). The
 models are read from model/checkpoints/ (see model/README.md); the cross-encoder
@@ -18,7 +17,7 @@ from typing import Any
 
 from htpd_reader import Bundle
 from htpd_reader.ask import Asker
-from htpd_reader.decider import DEFAULT_CROSS_ENCODER, CrossEncoderScorer, Decider, LayaScorer
+from htpd_reader.decider import DEFAULT_CROSS_ENCODER, CrossEncoderScorer, Decider
 from htpd_reader.retriever import Settings
 
 from .systems import Answer, Context, System, register
@@ -30,7 +29,6 @@ PHASE = "Phase 5 - decider"
 LABELS = {
     "htpd-ce": "HTPD + cross-encoder (untrained)",
     "htpd-ce-trained": "HTPD + cross-encoder (trained on HTPD data)",
-    "htpd-laya": "HTPD + Laya (trained on HTPD data)",
 }
 
 
@@ -39,8 +37,6 @@ def default_scorer(name: str) -> Any:
         return CrossEncoderScorer(os.environ.get("HTPD_CROSS_ENCODER", DEFAULT_CROSS_ENCODER))
     if name == "htpd-ce-trained":
         return CrossEncoderScorer(os.environ.get("HTPD_CE_TRAINED", str(CHECKPOINTS / "cross-encoder-htpd")))
-    if name == "htpd-laya":
-        return LayaScorer(os.environ.get("HTPD_LAYA", str(CHECKPOINTS / "laya-htpd")))
     raise KeyError(name)
 
 
