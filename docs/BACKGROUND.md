@@ -56,23 +56,23 @@ with two parts:
   lose their form, only English documents tested, reading order is the
   order stored in the PDF, Linux only.
 
-## Part B - next
+## Part B - the reader
 
-The plan is in `docs/PART-B.md`: Python, offline first, free and open
-models only. Reader → retriever → decider → packer. The decider is a
-small decision model (an open cross-encoder of 22M parameters, fine-tuned
-on HTPD data on a CPU) - that is what makes B "stronger", not a big
-language model. Everything runs locally on a normal PC; the models are
-optional. B is offered to any AI through an MCP server and a
-`SKILL.md`. Every part must beat simple baselines on test questions from
-documents that were never used for training. Seven phases; phase 1 is
-the reader.
+Part B is written and works (`reader/`, `skills/htpd/`). The plan and
+its phases are in `docs/PART-B.md`: Python, offline first, free and open
+models only. Reader → retriever → decider → packer. It needs nothing but
+Python 3.10+; the small open models (a cross-encoder of 22M parameters
+as decider, an embedding model for meaning search) are optional and run
+on a CPU. B is offered to any AI as a single `.htpd` file with reading
+rules, as a skill (`skills/htpd/SKILL.md`) and through an MCP server.
+Still open: measuring it with the evaluation harness on public test
+documents, and better search in very large manuals.
 
 ## How the work is done
 
-* One phase at a time, each on its own branch. The author of a phase does
-  not approve it: before a merge, the phase is reviewed and all tests are
-  run.
+* One phase at a time, each on its own branch. Before a merge all tests
+  are run and must pass; a review by someone else is welcome but not
+  required.
 * Test first; a task is done only when all tests pass.
 * The rules for coding agents are in `AGENTS.md`.
 
