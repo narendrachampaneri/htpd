@@ -255,6 +255,35 @@ TEST(layout_keeps_superscript_on_the_line) {
     CHECK(lines[0].size == 10.0f);
 }
 
+TEST(layout_keeps_a_high_raised_mark_on_the_line) {
+    // "Cortex®-M33" as a datasheet sets it: the mark is raised by more than
+    // half the font size (more than the baseline tolerance), small, and
+    // directly after the word.
+    PageText page;
+    put_text(page, "Cortex", 72, 394.17f, 9);           // ends at x = 72 + 6 * 4.95
+    put_text(page, "\u00AE", 72 + 6 * 4.95f, 389.37f, 6);
+    put_text(page, "-M33 core", 72 + 6 * 4.95f + 3.3f, 394.17f, 9);
+    const auto lines = build_lines(page);
+    REQUIRE(lines.size() == 1);
+    CHECK_EQ(lines[0].text, std::string("Cortex\u00AE-M33 core"));
+    CHECK(std::fabs(lines[0].baseline - 394.17f) < 0.01f);
+}
+
+TEST(layout_small_text_on_the_next_line_stays_a_new_line) {
+    // A smaller note that starts again at the left margin is a new line,
+    // even when it lies close below.
+    PageText page;
+    put_text(page, "Main text of the cell", 72, 100, 9);
+    put_text(page, "small note", 72, 105, 6);
+    const auto lines = build_lines(page);
+    REQUIRE(lines.size() == 2);
+    // and small text far to the right on another baseline is not a raised mark
+    PageText page2;
+    put_text(page2, "Value", 72, 100, 9);
+    put_text(page2, "x", 72 + 5 * 4.95f + 30, 95, 6);
+    REQUIRE(build_lines(page2).size() == 2);
+}
+
 TEST(layout_marks_column_gaps) {
     PageText page;
     put_text(page, "Bus voltage", 72, 100, 9, true);

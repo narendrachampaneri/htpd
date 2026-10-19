@@ -37,7 +37,16 @@ public:
         const bool same_baseline =
             std::fabs(g.baseline - line_.baseline) <= options_->baseline_tolerance * ref;
         const bool jumped_back = g.x0 < last_x1_ - 2.0f * ref;
-        return same_baseline && !jumped_back;
+        if (jumped_back) return false;
+        if (same_baseline) return true;
+        // A raised or lowered mark set higher than the tolerance (a ® or ™ in
+        // "Cortex®-M33", an exponent, an index): smaller than the line, right
+        // after the last glyph, and touching the line's height.
+        const bool smaller = g.size <= 0.85f * main_size_;
+        const bool adjacent = g.x0 >= last_x1_ - 0.5f * main_size_ && g.x0 <= last_x1_ + 0.5f * main_size_;
+        const bool touches = g.y1 > line_.y0 && g.y0 < line_.y1;
+        const bool near = std::fabs(g.baseline - line_.baseline) <= 0.75f * main_size_;
+        return smaller && adjacent && touches && near;
     }
 
     void add(const Glyph& g, bool space_before) {
