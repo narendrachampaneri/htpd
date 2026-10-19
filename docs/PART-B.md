@@ -155,7 +155,7 @@ or a person, and is done on a PC:
 | 3 Retriever, packer | done, with one ablation per part | measure on the test split; embeddings need `sentence-transformers` |
 | 4 Training data | `python -m model.make_data` | run on the training bundles (20 000 examples); a person checks 200 (`model/data/check.md`) |
 | 5 Decider | cross-encoder (untrained and trained on CPU) | train, tune on the tuning split, measure |
-| 6 MCP server, skill | `htpd-mcp`, `skills/read-htpd/SKILL.md` | 20 questions through Claude Code and Antigravity (`python -m eval agent-sheet`, `agent-score`) |
+| 6 MCP server, skill | `htpd-mcp`, the htpd skill (`skills/htpd/`, `dist/htpd-skill.zip`) | 20 questions through Claude Code and Antigravity (`python -m eval agent-sheet`, `agent-score`) |
 
 ### Phase 1 - Reader
 

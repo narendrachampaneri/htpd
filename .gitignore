@@ -51,3 +51,4 @@ __pycache__/
 *.onnx
 # stress-test PDFs, made by tests/stress/make_stress_pdfs.py
 /build/stress/
+/dist/

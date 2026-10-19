@@ -355,7 +355,27 @@ python3 -m pip install pytest && python3 -m pytest     # Python tests
 * `eval/` - test questions, the harness and `eval/report.md`
   (`python -m eval --help`).
 * `model/` - training data and the decider models (`model/README.md`).
-* `skills/read-htpd/SKILL.md` - teaches an AI agent to read a bundle.
+* `skills/htpd/` - the **htpd skill** for AI apps (see "Adding HTPD to an AI" below).
+
+### Adding HTPD to an AI
+
+**Any app that supports skills** (the Claude app, Claude Code and other
+agents that read `SKILL.md` files):
+
+```sh
+python3 scripts/build_skill.py        # writes dist/htpd-skill.zip
+```
+
+* Claude app: Customize > Skills, upload `htpd-skill.zip`, switch it on.
+  Code execution must be on. Then upload a `.htpd` file to a chat and ask.
+* Claude Code and other agents: unpack the zip into their skills folder
+  (for Claude Code `~/.claude/skills/`, giving `~/.claude/skills/htpd/`).
+
+The skill needs only Python 3.10+ in the app's sandbox, nothing else. It
+answers from the file with pages, or says "Not found in this file." and
+why. In an app without code it still tells the model how to read the file.
+
+**Tools that use MCP servers** instead of skills:
 
 To use it from Claude Code: `claude mcp add htpd -- htpd-mcp --bundles ~/manuals`.
 Other agents (Antigravity and the like) take the same command in their MCP
