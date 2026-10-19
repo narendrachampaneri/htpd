@@ -42,6 +42,13 @@ class SingleFile(unittest.TestCase):
         same(self, a, b)
         self.assertEqual(check(a), [])
 
+    def test_short_labels(self) -> None:
+        b = open_bundle(SINGLE)
+        for ref in ("S11", "[S11]", "s11"):
+            self.assertEqual(b.find(ref).title, "3.1 Thermal derating", ref)
+        self.assertIsNone(b.find("S99"))
+        self.assertIn("[S11] 3.1 Thermal derating", SINGLE.read_text(encoding="utf-8"))
+
     def test_starts_with_rules_for_the_model(self) -> None:
         text = SINGLE.read_text(encoding="utf-8")
         head = text[: text.index("\n# Contents\n")]

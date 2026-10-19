@@ -16,12 +16,40 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
 
-import yaml
+import os
 
-try:  # the C loader is much faster on large bundles; it gives the same result
-    _Loader: Any = yaml.CSafeLoader
-except AttributeError:  # pragma: no cover - depends on how PyYAML was built
-    _Loader = yaml.SafeLoader
+from . import miniyaml
+
+# PyYAML when it is installed (the C loader is much faster on large bundles);
+# otherwise the small reader of the fields HTPD writes, so that the reader
+# also runs with nothing but Python (an AI chat's sandbox, for example).
+# HTPD_NO_YAML=1 forces the small reader (for its tests).
+try:
+    if os.environ.get("HTPD_NO_YAML"):
+        raise ImportError
+    import yaml
+
+    _Loader: Any = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+    _FieldError: tuple[type[Exception], ...] = (yaml.YAMLError, miniyaml.MiniYAMLError)
+except ImportError:
+    yaml = None
+    _Loader = None
+    _FieldError = (miniyaml.MiniYAMLError,)
+
+
+def load_fields(text: str) -> Any:
+    """The fields at the top of a file, as Python values."""
+    if yaml is not None:
+        return yaml.load(text, Loader=_Loader)
+    return miniyaml.load(text)
+
+
+def _field_error_line(e: Exception) -> int | None:
+    mark = getattr(e, "problem_mark", None)
+    if mark is not None:
+        return mark.line + 2
+    line = getattr(e, "line", None)
+    return line + 1 if isinstance(line, int) else None
 
 FORMAT_VERSIONS = ("0.1",)
 DOCUMENT_ID = "document"
@@ -340,11 +368,11 @@ def read_node(root: Path, path: str) -> tuple[Node | None, list[Problem]]:
     if yaml_text is None:
         return None, problems + [Problem("error", "no-fields", path, "the file does not start with fields between --- lines")]
     try:
-        fields = yaml.load(yaml_text, Loader=_Loader)
-    except yaml.YAMLError as e:
-        mark = getattr(e, "problem_mark", None)
-        line = mark.line + 2 if mark is not None else None
-        return None, problems + [Problem("error", "bad-fields", path, f"fields are not valid YAML: {getattr(e, 'problem', e)}", line)]
+        fields = load_fields(yaml_text)
+    except _FieldError as e:
+        return None, problems + [Problem("error", "bad-fields", path,
+                                         f"fields are not valid YAML: {getattr(e, 'problem', e)}",
+                                         _field_error_line(e))]
     if not isinstance(fields, dict):
         return None, problems + [Problem("error", "bad-fields", path, "fields are not a mapping")]
     location, blocks, links, body_problems = parse_body(body, first_line, path)
@@ -422,8 +450,12 @@ class Bundle:
             raise KeyError(f"no node {node_id!r} in the bundle") from None
 
     def find(self, ref: str) -> Node | None:
-        """Find a node by ID, file name, file path or section number."""
+        """Find a node by ID, file name, file path, section number or the
+        short label of the single file ("S14" or "[S14]")."""
         ref = ref.strip()
+        short = re.fullmatch(r"\[?[Ss](\d+)\]?", ref)
+        if short and 1 <= int(short.group(1)) <= len(self.sections):
+            return self.sections[int(short.group(1)) - 1]
         for candidate in (ref, node_id_for(ref), f"sections/{node_id_for(ref)}"):
             if candidate in self.nodes:
                 return self.nodes[candidate]
@@ -529,8 +561,8 @@ def read_single_file(path: Path) -> Bundle:
         raise BundleError(f"{path} is not an HTPD file (it does not start with 'htpd_file:')")
     yaml_text, body, first_line = split_front_matter(content)
     try:
-        head = yaml.load(yaml_text or "", Loader=_Loader)
-    except yaml.YAMLError as e:
+        head = load_fields(yaml_text or "")
+    except _FieldError as e:
         raise BundleError(f"{path}: the fields at the top are not valid YAML: {e}") from None
     if not isinstance(head, dict):
         raise BundleError(f"{path}: the fields at the top are not a mapping")
