@@ -2,14 +2,15 @@
 
 Read these before you change anything:
 
-* `README.md` - the converter (part A): build, use, limits.
+* `README.md` - what HTPD is, quick start, how to use it with an AI.
+* `docs/CONVERTER.md` - the converter (part A): build, use, limits.
 * `docs/FORMAT.md` - the bundle format. It is the contract between part A
   and part B.
 * `docs/PART-B.md` - the plan for part B, the reader model, phase by phase.
 * `docs/BACKGROUND.md` - why the project is the way it is: the idea, the
   decisions, the state and the history.
 
-What is true: these four files and this one. If anything else (notes kept
+What is true: these five files and this one. If anything else (notes kept
 by a tool, a generated summary, your own notes) says something different,
 these files win - fix the other thing, or ask.
 
