@@ -20,5 +20,5 @@ include = ["htpd_reader*"]
 [tool.pytest.ini_options]
 # The Python tests of part B. They are plain unittest tests, so
 # `python -m unittest discover -s reader/tests -t .` runs them as well.
-testpaths = ["reader/tests"]
+testpaths = ["reader/tests", "eval/tests"]
 pythonpath = ["reader", "."]

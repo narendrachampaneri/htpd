@@ -1,0 +1,9 @@
+# The public documents of the evaluation (docs/PART-B.md section 4).
+# eval/get_docs.sh downloads each one into eval/docs/, checks its SHA-256 and
+# converts it into eval/bundles/<name>.htpd. Questions of "test" documents are
+# the test split; nothing from them is ever used for training or tuning.
+#
+# name          split  sha256                                                            url
+riscv-debug     test   -                                                                 -
+aapcs64         test   -                                                                 -
+riscv-isa       train  -                                                                 -

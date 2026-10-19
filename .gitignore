@@ -13,8 +13,11 @@
 # your own documents and everything made from them: never committed
 /private/
 
-# public PDFs for the evaluation: downloaded by eval/get_docs.sh
+# public PDFs for the evaluation: downloaded by eval/get_docs.sh, and their bundles
 /eval/docs/
+/eval/bundles/
+# embeddings cached by the evaluation
+/eval/cache/
 
 # editors and language-server caches
 /.cache/
