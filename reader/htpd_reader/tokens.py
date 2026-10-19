@@ -1,0 +1,60 @@
+"""Tokenizers and the one token count used for every number in the report.
+
+* `plain_words`: lower-case runs of letters, digits and `_` - what a
+  simple search uses (the baselines).
+* `technical_tokens`: keeps the words of technical manuals whole and also
+  gives their parts: register and field names (`dmcontrol`,
+  `__arm_sme_state` -> also `arm`, `sme`, `state`), hex numbers (`0x7a1`),
+  section numbers (`3.14.2`), CamelCase (`DebugModule` -> also `debug`,
+  `module`).
+* `count_tokens`: the number of words and punctuation marks. It is not the
+  tokenizer of any one AI model; it is one fixed measure, so the numbers of
+  all systems can be compared with each other.
+"""
+
+from __future__ import annotations
+
+import re
+
+_PLAIN = re.compile(r"\w+", re.UNICODE)
+_TECH = re.compile(
+    r"0[xX][0-9A-Fa-f_]+"  # hex number
+    r"|\d+(?:\.\d+)+"  # 3.14.2, 1.0
+    r"|[A-Za-z_][A-Za-z0-9_]*"  # identifiers and words
+    r"|\d+"
+)
+_CAMEL = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+")
+_COUNT = re.compile(r"\w+|[^\w\s]", re.UNICODE)
+
+STOPWORDS = frozenset(
+    "a an and are as at be by can do does for from has have how i if in is it its of on or "
+    "that the this to was what when where which who why will with".split()
+)
+
+
+def plain_words(text: str) -> list[str]:
+    return [w.lower() for w in _PLAIN.findall(text)]
+
+
+def technical_tokens(text: str, drop_stopwords: bool = False) -> list[str]:
+    out: list[str] = []
+    for m in _TECH.finditer(text):
+        raw = m.group(0)
+        tok = raw.lower()
+        if drop_stopwords and tok in STOPWORDS:
+            continue
+        out.append(tok)
+        if tok.startswith("0x"):
+            continue
+        parts: list[str] = []
+        if "_" in raw.strip("_"):
+            parts = [p.lower() for p in raw.split("_") if p]
+        elif any(c.isupper() for c in raw[1:]) and any(c.islower() for c in raw):
+            parts = [p.lower() for p in _CAMEL.findall(raw)]
+        if len(parts) > 1:
+            out.extend(p for p in parts if p != tok)
+    return out
+
+
+def count_tokens(text: str) -> int:
+    return len(_COUNT.findall(text))
