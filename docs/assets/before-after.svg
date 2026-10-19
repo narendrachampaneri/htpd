@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="560" viewBox="0 0 1280 560" role="img" aria-label="A PDF page on the left becomes a clean HTPD section with page marks on the right">
+  <defs>
+    <filter id="sh" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="9" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#1d4ed8"/>
+    </marker>
+  </defs>
+  <rect width="1280" height="560" rx="24" fill="#f8fafc"/>
+  <g font-family="Segoe UI, Helvetica, Arial, sans-serif">
+    <text x="250" y="52" font-size="22" font-weight="700" fill="#334155" text-anchor="middle">PDF page</text>
+    <text x="250" y="78" font-size="15" fill="#64748b" text-anchor="middle">1.7 MB · layout, fonts, repeated headers</text>
+    <text x="930" y="52" font-size="22" font-weight="700" fill="#1d4ed8" text-anchor="middle">HTPD section</text>
+    <text x="930" y="78" font-size="15" fill="#64748b" text-anchor="middle">plain text · its place in the document · page marks</text>
+  </g>
+
+  <!-- the PDF page -->
+  <g transform="translate(70,100)" filter="url(#sh)">
+    <rect width="360" height="430" rx="10" fill="#ffffff" stroke="#e2e8f0"/>
+    <g font-family="Segoe UI, Helvetica, Arial, sans-serif">
+      <text x="22" y="30" font-size="11" fill="#94a3b8">NXP Semiconductors          IMX93AEC</text>
+      <line x1="22" y1="40" x2="338" y2="40" stroke="#e2e8f0"/>
+      <text x="22" y="74" font-size="15" font-weight="700" fill="#0f172a">4.1.5 Maximum frequency of main</text>
+      <text x="22" y="94" font-size="15" font-weight="700" fill="#0f172a">modules</text>
+      <rect x="22" y="110" width="300" height="8" rx="4" fill="#e2e8f0"/>
+      <rect x="22" y="124" width="250" height="8" rx="4" fill="#e2e8f0"/>
+      <g font-size="10.5" fill="#334155">
+        <rect x="22" y="148" width="316" height="26" fill="#f1f5f9"/>
+        <text x="28" y="165" font-weight="700">Module</text><text x="138" y="165" font-weight="700">Low drive</text>
+        <text x="206" y="165" font-weight="700">Nominal</text><text x="270" y="165" font-weight="700">Overdrive</text>
+        <text x="28" y="192">Cortex®-A55</text><text x="138" y="192">0.9 GHz</text><text x="206" y="192">1.4 GHz</text><text x="270" y="192">1.7 GHz</text>
+        <text x="28" y="216">DRAM</text><text x="138" y="216">933 MHz</text><text x="206" y="216">1400 MHz</text><text x="270" y="216">1866 MHz</text>
+        <text x="28" y="240">NPU</text><text x="138" y="240">500 MHz</text><text x="206" y="240">800 MHz</text><text x="270" y="240">1000 MHz</text>
+        <g stroke="#cbd5e1"><line x1="22" y1="174" x2="338" y2="174"/><line x1="22" y1="200" x2="338" y2="200"/>
+          <line x1="22" y1="224" x2="338" y2="224"/><line x1="22" y1="248" x2="338" y2="248"/>
+          <line x1="130" y1="148" x2="130" y2="248"/><line x1="198" y1="148" x2="198" y2="248"/><line x1="262" y1="148" x2="262" y2="248"/></g>
+      </g>
+      <rect x="22" y="272" width="316" height="8" rx="4" fill="#e2e8f0"/>
+      <rect x="22" y="286" width="280" height="8" rx="4" fill="#e2e8f0"/>
+      <rect x="22" y="300" width="300" height="8" rx="4" fill="#e2e8f0"/>
+      <rect x="230" y="322" width="108" height="80" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+      <text x="284" y="367" font-size="11" fill="#94a3b8" text-anchor="middle">figure</text>
+      <line x1="22" y1="408" x2="338" y2="408" stroke="#e2e8f0"/>
+      <text x="22" y="422" font-size="10" fill="#94a3b8">Product data sheet       18 / 109</text>
+    </g>
+  </g>
+
+  <!-- arrow -->
+  <g font-family="Segoe UI, Helvetica, Arial, sans-serif">
+    <line x1="460" y1="315" x2="590" y2="315" stroke="#1d4ed8" stroke-width="4" stroke-linecap="round" marker-end="url(#arrow)"/>
+    <rect x="452" y="262" width="146" height="34" rx="17" fill="#dbeafe"/>
+    <text x="525" y="284" font-size="15" font-weight="700" fill="#1d4ed8" text-anchor="middle">htpd convert</text>
+    <text x="525" y="350" font-size="13" fill="#64748b" text-anchor="middle">under 1 s for 109 pages</text>
+  </g>
+
+  <!-- the HTPD section -->
+  <g transform="translate(620,100)" filter="url(#sh)">
+    <rect width="600" height="430" rx="10" fill="#ffffff" stroke="#bfdbfe"/>
+    <rect width="600" height="36" rx="10" fill="#eff6ff"/>
+    <rect y="26" width="600" height="10" fill="#eff6ff"/>
+    <circle cx="22" cy="18" r="6" fill="#fca5a5"/><circle cx="42" cy="18" r="6" fill="#fcd34d"/><circle cx="62" cy="18" r="6" fill="#86efac"/>
+    <text x="300" y="23" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#475569" text-anchor="middle">IMX93AEC.htpd</text>
+    <g font-family="DejaVu Sans Mono, Consolas, Menlo, monospace" font-size="14">
+      <text x="24" y="72" fill="#94a3b8">&lt;!-- htpd section {"n":14,"number":"4.1.5",...} --&gt;</text>
+      <text x="24" y="102" fill="#1d4ed8" font-weight="700">## [S14] 4.1.5 Maximum frequency of main modules</text>
+      <text x="24" y="134" fill="#0f766e">Path: 4 Electrical characteristics &gt;</text>
+      <text x="24" y="154" fill="#0f766e">      4.1 Chip-level conditions &gt; 4.1.5 - page 18</text>
+      <text x="24" y="190" fill="#b45309" font-weight="700">&lt;!-- page 18 --&gt;</text>
+      <text x="24" y="226" fill="#64748b">```text</text>
+      <text x="24" y="250" fill="#0f172a">Cortex®-A55 cores | 0.9 GHz | 1.4 GHz | 1.7 GHz</text>
+      <text x="24" y="274" fill="#0f172a">DRAM | 933 MHz | 1400 MHz | 1866 MHz</text>
+      <text x="24" y="298" fill="#0f172a">NPU | 500 MHz | 800 MHz | 1000 MHz</text>
+      <text x="24" y="322" fill="#64748b">```</text>
+    </g>
+    <g font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="600">
+      <rect x="24" y="356" width="172" height="28" rx="14" fill="#ecfdf5" stroke="#a7f3d0"/>
+      <text x="110" y="375" fill="#047857" text-anchor="middle">✓ text word for word</text>
+      <rect x="206" y="356" width="168" height="28" rx="14" fill="#ecfdf5" stroke="#a7f3d0"/>
+      <text x="290" y="375" fill="#047857" text-anchor="middle">✓ page of every fact</text>
+      <rect x="384" y="356" width="192" height="28" rx="14" fill="#ecfdf5" stroke="#a7f3d0"/>
+      <text x="480" y="375" fill="#047857" text-anchor="middle">✓ headers/footers gone</text>
+      <text x="24" y="412" font-size="12.5" font-weight="400" fill="#64748b">From the real output for the NXP i.MX 93 data sheet (shortened). Figures are not converted.</text>
+    </g>
+  </g>
+</svg>

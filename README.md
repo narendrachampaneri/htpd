@@ -1,26 +1,27 @@
-<div align="center">
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="HTPD - Hyper Text Portable Document" width="100%">
+</p>
 
-# HTPD
+<p align="center">
+  <img src="https://img.shields.io/badge/converter-C%2B%2B23-1d4ed8?style=for-the-badge" alt="C++23">
+  <img src="https://img.shields.io/badge/reader-Python%203.10%2B-0f766e?style=for-the-badge" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/license-Apache--2.0-475569?style=for-the-badge" alt="Apache-2.0">
+  <img src="https://img.shields.io/badge/status-0.1%20alpha-b45309?style=for-the-badge" alt="0.1 alpha">
+</p>
 
-### Hyper Text Portable Document
+<p align="center">
+  <a href="#what-is-htpd"><b>What it is</b></a> &nbsp;·&nbsp;
+  <a href="#quick-start"><b>Quick start</b></a> &nbsp;·&nbsp;
+  <a href="#use-it-with-your-ai"><b>Use with your AI</b></a> &nbsp;·&nbsp;
+  <a href="#the-format"><b>Format</b></a> &nbsp;·&nbsp;
+  <a href="#results"><b>Results</b></a> &nbsp;·&nbsp;
+  <a href="#roadmap"><b>Roadmap</b></a>
+</p>
 
-**Turn long PDFs into documents that AI models read fast, answer from exactly, and cite by page.**
-
-![C++23](https://img.shields.io/badge/converter-C%2B%2B23-00599C)
-![Python 3.10+](https://img.shields.io/badge/reader-Python%203.10%2B-3776AB)
-![Runs locally](https://img.shields.io/badge/runs-100%25%20local-2ea44f)
-![No GPU](https://img.shields.io/badge/hardware-no%20GPU%20needed-2ea44f)
-![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)
-![Status](https://img.shields.io/badge/status-0.1%20alpha-orange)
-
-[What it is](#what-is-htpd) ·
-[Quick start](#quick-start) ·
-[Use it with your AI](#use-it-with-your-ai) ·
-[The format](#the-format) ·
-[Results](#results) ·
-[Roadmap](#roadmap)
-
-</div>
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="Converting a data sheet with htpd and asking questions with htpd-read" width="88%">
+  <br><sub>Real commands on the NXP i.MX 93 data sheet (answer output shortened).</sub>
+</p>
 
 ---
 
@@ -47,12 +48,13 @@ flowchart LR
     AGENT --> ANS
 ```
 
-**Principles**
+<p align="center">
+  <img src="docs/assets/features.svg" alt="Exact text - Every fact has a page - Says not found - 100 % local" width="100%">
+</p>
 
-- **Nothing is made up.** The text is word for word what the PDF says. Nothing is summarised or rewritten.
-- **Every fact has a page.** Each paragraph carries its page, and the file names the PDF it came from (with its SHA-256).
-- **"Not found" is an answer.** A question the document cannot answer gets *"Not found in this file"*, not a guess.
-- **Local, free and light.** Runs on a normal PC, offline, with no GPU and no cloud service. The core needs no AI model at all.
+<p align="center">
+  <img src="docs/assets/before-after.svg" alt="A PDF page becomes a clean HTPD section with its place in the document and page marks" width="100%">
+</p>
 
 ---
 
@@ -155,7 +157,10 @@ For Antigravity, Codex or any MCP client: command `htpd-mcp`, arguments
 ## The format
 
 An HTPD document is plain UTF-8 text: Markdown with a few fields. Any
-model, editor or `grep` can read it. A section in the single file:
+model, editor or `grep` can read it.
+
+<details>
+<summary><b>See one section of an HTPD file</b> (shortened)</summary>
 
 ````markdown
 <!-- htpd section {"n":14,"id":"sections/0014-4-1-5-maximum-frequency-of-main-modules","number":"4.1.5","level":3,"pages":[18,18,18],"parent":"sections/0008-4-1-chip-level-conditions"} -->
@@ -171,6 +176,8 @@ DRAM | 933 MHz | 1400 MHz | 1866 MHz
 NPU | 500 MHz | 800 MHz | 1000 MHz
 ```
 ````
+
+</details>
 
 - **Sections** follow the document's own headings (bookmarks, numbered headings, font sizes) and form a tree: parent, children, previous, next.
 - **Page marks** `<!-- page N -->` stand above the text of every page.
@@ -190,7 +197,7 @@ Measured with the converter on real public documents:
 
 | Document | Pages | Sections | PDF → `.htpd` | Time |
 |---|---:|---:|---|---:|
-| NXP i.MX 93 Automotive Data Sheet | 109 | 109 | 1.7 MB → 235 KB | 0.35 s |
+| NXP i.MX 93 Automotive Data Sheet | 109 | 109 | 1.7 MB → 230 KB | 0.6 s |
 | NXP i.MX 93 Reference Manual | 5 652 | 5 641 | 56.3 MB → 11.6 MB | 14 s |
 | RISC-V Debug Specification | 119 | 164 | – | 0.3 s |
 | Arm AAPCS64 | 65 | 125 | – | 0.2 s |
@@ -239,6 +246,9 @@ documents. Details: [`docs/CONVERTER.md`](docs/CONVERTER.md#limits-please-read).
 
 ## Project layout
 
+<details>
+<summary><b>Folders and documentation</b></summary>
+
 ```
 include/ src/ cli/      the converter (C++23, PDFium is used in one file only)
 reader/htpd_reader/     the reader: bundle, check, search, retriever, packer, ask, MCP server
@@ -258,6 +268,8 @@ examples/               a converted document in both forms
 | [`docs/PART-B.md`](docs/PART-B.md) | The plan and measures for the reader |
 | [`docs/BACKGROUND.md`](docs/BACKGROUND.md) | Why HTPD is built the way it is |
 | [`AGENTS.md`](AGENTS.md) | Rules for contributors and coding agents |
+
+</details>
 
 ---
 
