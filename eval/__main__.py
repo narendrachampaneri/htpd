@@ -140,7 +140,7 @@ def _load_phase_systems() -> None:
     """Later phases add systems; they register when their module is imported."""
     import importlib.util
 
-    for name in ("eval.systems_htpd",):
+    for name in ("eval.systems_htpd", "eval.systems_decider"):
         if importlib.util.find_spec(name) is not None:
             importlib.import_module(name)
 

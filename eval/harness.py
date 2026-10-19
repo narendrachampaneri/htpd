@@ -157,7 +157,8 @@ def tune_not_found(name: str, questions_paths: list[Path], bundles_dir: Path, ct
     if not any(q.kind == 4 for q in qs) or not any(q.kind != 4 for q in qs):
         raise SystemExit("the tuning split needs answerable and not-found questions")
     rows = run(REGISTRY[name], qs, bundles_dir, ctx)
-    cov = [((r.extra or {}).get("coverage", 0.0), r.q.kind == 4) for r in rows]
+    # nf_score: the number a system says "not found" below (coverage, or a decider's best probability)
+    cov = [((r.extra or {}).get("nf_score", 0.0), r.q.kind == 4) for r in rows]
     best = (0.0, -1.0)
     for step in range(0, 101):
         t = step / 100

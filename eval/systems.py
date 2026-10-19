@@ -54,6 +54,7 @@ class Context:
 
     cache_dir: Path | None = None
     embedder_factory: Callable[[], Any] | None = None
+    scorer_factory: Callable[[str], Any] | None = None  # system name -> scorer (phase 5; tests)
     _embedder: Any = None
 
     def embedder(self) -> Any:

@@ -55,7 +55,7 @@ def make(name: str, label: str, changes: dict[str, Any]) -> System:
     def answer(asker: Asker, question: str) -> Answer:
         r = asker.ask(question)
         return Answer([n.id for n in r.ranked], r.top_page, r.pack.text, r.not_found,
-                      {"coverage": r.retrieval.coverage})
+                      {"coverage": r.retrieval.coverage, "nf_score": r.retrieval.coverage})
 
     return System(name, label, PHASE, prepare, answer)
 
