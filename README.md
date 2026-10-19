@@ -83,15 +83,14 @@ make test                      # optional: the C++ tests
 ```sh
 python3 -m pip install -e .                  # installs htpd-read and htpd-mcp
 
-htpd-read ask IMX93AEC.htpd "What is the maximum NPU frequency?"
+# try it on the sample file that comes with the repository
+htpd-read ask examples/single-file/sample.htpd "What is the maximum bus voltage?"
 ```
 
 ```
-[page 18, 4.1.5 Maximum frequency of main modules]
-  EdgeLock® Secure Enclave | 133 MHz | 200 MHz | 250 MHz
-  NPU | 500 MHz | 800 MHz | 1000 MHz
-[page 18, 4.1.5 Maximum frequency of main modules]
-  Maximum frequency of main modules[1]
+[page 2, 2.1.1 Limits]
+  Parameter | Min | Typ | Max | Unit
+  Bus voltage | 200 | 400 | 480 | V
 ...
 ```
 
@@ -99,12 +98,14 @@ Each answer line is copied word for word from the file, with its page and
 section; `--context` adds the whole sections for the AI to read.
 
 ```sh
-htpd-read ask IMX93AEC.htpd "How many PCIe lanes are there?"
+htpd-read ask examples/single-file/sample.htpd "Which OCPP version is supported?"
 ```
 
 ```
-Not found in this file. (the file never mentions PCIe)
+Not found in this file. (the file never mentions OCPP)
 ```
+
+Then use your own file the same way: `htpd-read ask manual.htpd "your question"`.
 
 ---
 
