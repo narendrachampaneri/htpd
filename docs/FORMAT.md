@@ -334,9 +334,12 @@ changes:
   characters without width are dropped.
 * **Raised and lowered characters** stay in their line as ordinary
   characters: m² may come out as `m2`.
-* **Rotated text** (turned by more than 30 degrees: labels at the side,
-  "DRAFT" across the page) is left out. The notes give the number of
-  characters.
+* **Pages whose text runs sideways or upside down** (a wide table printed
+  sideways, a page turned by /Rotate) are turned first, so that their main
+  text is read upright, in order.
+* **Rotated text** that runs another way than the main text of its page (turned
+  by more than 30 degrees: labels at the side, "DRAFT" across the page) is
+  left out. The notes give the number of characters.
 * **Order**: the text is kept in the order in which the PDF stores it,
   which is the reading order in almost all PDFs. Only a page that is
   stored from bottom to top, or in no order at all, is sorted from top to

@@ -145,8 +145,10 @@ private:
 //   - pages stored from the bottom to the top: almost every step goes up;
 //   - pages stored in no order at all: many jumps far back up the page.
 // A step to a column further right is normal and never counts.
-bool order_is_scrambled(const std::vector<Line>& lines) {
-    if (lines.size() < 8) return false;
+bool order_is_scrambled(const std::vector<Line>& lines, bool turned) {
+    // A page that was turned to read sideways text has no reliable stored
+    // order: there even two lines are enough to judge.
+    if (lines.size() < (turned ? 2u : 8u)) return false;
     std::size_t steps_up = 0;   // to a line above (less than 0.8 of a line is a subscript or a fraction)
     std::size_t jumps = 0;      // far back up the page
     for (std::size_t i = 1; i < lines.size(); ++i) {
@@ -187,7 +189,7 @@ std::vector<Line> build_lines(const PageText& page, const LayoutOptions& options
     }
     flush();
 
-    if (order_is_scrambled(lines)) {
+    if (order_is_scrambled(lines, page.turned != 0)) {
         // Fall back to plain top-to-bottom, left-to-right order.
         std::ranges::stable_sort(lines, {}, &Line::baseline);
         for (std::size_t begin = 0; begin < lines.size();) {

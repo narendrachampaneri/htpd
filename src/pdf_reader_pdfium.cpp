@@ -92,6 +92,60 @@ Affine page_affine(FPDF_PAGE page, float width, float height) {
     return t;
 }
 
+// A then B: the transform that applies `first`, then `second`.
+Affine then(const Affine& first, const Affine& second) {
+    Affine r;
+    r.a = second.a * first.a + second.c * first.b;
+    r.b = second.b * first.a + second.d * first.b;
+    r.c = second.a * first.c + second.c * first.d;
+    r.d = second.b * first.c + second.d * first.d;
+    r.e = second.a * first.e + second.c * first.f + second.e;
+    r.f = second.b * first.e + second.d * first.f + second.f;
+    return r;
+}
+
+// The quarter turn (0 to 3, clockwise on the screen) in which most of the
+// text of a page runs, or 0 when most of it is upright or it is not clear.
+// A landscape table printed sideways on a portrait page, or a page whose
+// /Rotate turns its text, is then read like any other page; only text that
+// runs another way than the rest of its page counts as rotated.
+int main_text_direction(FPDF_TEXTPAGE tp, int count, const Affine& to_display) {
+    std::size_t quarters[4] = {0, 0, 0, 0};
+    std::size_t counted = 0;
+    constexpr double kQuarter = 1.5707963267948966;
+    for (int i = 0; i < count; ++i) {
+        FS_MATRIX m{1, 0, 0, 1, 0, 0};
+        if (!FPDFText_GetMatrix(tp, i, &m)) continue;
+        const double dx = to_display.a * m.a + to_display.c * m.b;
+        const double dy = to_display.b * m.a + to_display.d * m.b;
+        if (dx == 0 && dy == 0) continue;
+        const double angle = std::atan2(dy, dx);              // y grows downwards: +90 = runs down
+        const double q = std::round(angle / kQuarter);
+        if (std::fabs(angle - q * kQuarter) > kMaxTilt) continue;
+        ++quarters[(static_cast<int>(q) % 4 + 4) % 4];
+        ++counted;
+    }
+    int best = 0;
+    for (int q = 1; q < 4; ++q) {
+        if (quarters[q] > quarters[best]) best = q;
+    }
+    return best != 0 && quarters[best] * 2 > counted ? best : 0;
+}
+
+// The transform that turns a page by `quarters` so that its main text runs
+// left to right; it also gives the size of the turned page.
+Affine turn(int quarters, float& width, float& height) {
+    const float w = width, h = height;
+    Affine r;
+    switch (quarters) {
+        case 1: r = {0, -1, 1, 0, 0, w}; std::swap(width, height); break;   // text ran down
+        case 2: r = {-1, 0, 0, -1, w, h}; break;                             // upside down
+        case 3: r = {0, 1, -1, 0, h, 0}; std::swap(width, height); break;   // text ran up
+        default: break;
+    }
+    return r;
+}
+
 bool name_says_bold(std::string_view font_name) {
     const std::string n = text::to_lower_ascii(font_name);
     return n.contains("bold") || n.contains("black") || n.contains("heavy") ||
@@ -293,13 +347,21 @@ Result<PageText> PdfDocument::read_page(int index) const {
     out.width = FPDF_GetPageWidthF(page.get());
     out.height = FPDF_GetPageHeightF(page.get());
     out.user_to_display = page_affine(page.get(), out.width, out.height);
-    const Affine& to_display = out.user_to_display;
+    // The size above is the size before /Rotate; a quarter turn swaps it.
+    if (std::fabs(out.user_to_display.a) < 0.5f && std::fabs(out.user_to_display.b) > 0.5f) {
+        std::swap(out.width, out.height);
+    }
 
     const TextPagePtr text_page(FPDFText_LoadPage(page.get()));
     if (!text_page) return out;   // a page without a text layer is not an error
     const FPDF_TEXTPAGE tp = text_page.get();
 
     const int count = FPDFText_CountChars(tp);
+    if (const int quarters = main_text_direction(tp, count, out.user_to_display); quarters != 0) {
+        out.user_to_display = then(out.user_to_display, turn(quarters, out.width, out.height));
+        out.turned = quarters;
+    }
+    const Affine& to_display = out.user_to_display;
     if (count > 0) out.glyphs.reserve(static_cast<std::size_t>(count));
 
     // The last character that was kept, for measuring the fonts.

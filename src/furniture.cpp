@@ -217,9 +217,12 @@ FurnitureReport remove_furniture(std::vector<std::vector<Line>>& pages,
         std::vector<std::size_t> removed_pages;
         std::vector<std::string_view> removed_keys;
         for (BandLine& line : slot) {
-            line.remove = keys.pages(line.key) >= options.min_pages ||
-                          (same_head && line.head == best_head) ||
-                          (same_tail && line.tail == best_tail);
+            const bool repeats = keys.pages(line.key) >= options.min_pages;
+            const bool same_affix = (same_head && line.head == best_head) || (same_tail && line.tail == best_tail);
+            // A line that only shares its first or last words with the others
+            // is kept when it is the only text of its page: then it is the
+            // content of the page, not a running header.
+            line.remove = repeats || (same_affix && pages[line.page].size() > 1);
             if (!line.remove) {
                 zone_blocked[line.page] = true;
                 continue;

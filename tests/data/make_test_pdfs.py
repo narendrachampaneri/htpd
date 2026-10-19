@@ -204,6 +204,48 @@ def lowlevel(path):
     c.save()
 
 
+def sideways(path):
+    """Pages whose text runs sideways or upside down on the screen.
+
+      1. A portrait page with a table printed sideways (text runs upwards),
+         as datasheets print wide pin tables.
+      2. A /Rotate 90 page whose text is upright in the page's own space, so
+         it runs downwards on the screen.
+      3. An upside-down page.
+      4. An upright page with one vertical label: only the label is rotated text.
+    """
+    c = canvas.Canvas(path, pagesize=letter)
+    c.saveState(); c.translate(0, 0); c.rotate(90)          # text runs upwards
+    c.setFont('Helvetica-Bold', 12); c.drawString(100, -100, 'Pin table printed sideways')
+    c.setFont('Helvetica', 10)
+    for i in range(3):
+        c.drawString(100, -130 - 16 * i, 'Ball A%d is GPIO%d and its supply is NVCC_GPIO' % (i + 1, i))
+    c.restoreState()
+    c.showPage()
+
+    c.setPageRotation(90)                                    # upright content, page turned
+    c.setFont('Helvetica', 10)
+    c.drawString(72, 700, 'First line of the turned page.')
+    c.drawString(72, 686, 'Second line of the turned page.')
+    c.showPage()
+
+    c.setPageRotation(0)
+    c.saveState(); c.translate(W, H); c.rotate(180)          # upside down
+    c.setFont('Helvetica', 10)
+    c.drawString(72, 700, 'Upside down first line.')
+    c.drawString(72, 686, 'Upside down second line.')
+    c.restoreState()
+    c.showPage()
+
+    c.setFont('Helvetica', 10)
+    for i in range(4):
+        c.drawString(72, 700 - 14 * i, 'Upright body line %d of the last page.' % (i + 1))
+    c.saveState(); c.translate(560, 300); c.rotate(90)
+    c.setFont('Helvetica', 8); c.drawString(0, 0, 'SIDE LABEL'); c.restoreState()
+    c.showPage()
+    c.save()
+
+
 def raw_pdf(path, objects):
     """Writes a PDF file from the bodies of its objects (object 1 is the catalog)."""
     out = bytearray(b'%PDF-1.4\n')
@@ -273,4 +315,5 @@ if __name__ == '__main__':
     Manual(os.path.join(OUT, 'sample_nobookmarks.pdf'), bookmarks=False).build(manual_story())
     lowlevel(os.path.join(OUT, 'lowlevel.pdf'))
     fonts(os.path.join(OUT, 'fonts.pdf'))
-    print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf to', OUT)
+    sideways(os.path.join(OUT, 'sideways.pdf'))
+    print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf, sideways.pdf to', OUT)

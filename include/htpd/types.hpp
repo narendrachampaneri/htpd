@@ -59,6 +59,7 @@ struct PageText {
     Affine user_to_display;              // PDF user space -> display space
     std::vector<Glyph> glyphs;           // in the order the PDF library reports
     std::size_t skipped_rotated = 0;     // glyphs dropped: not upright on the page
+    int turned = 0;                      // quarter turns applied so that the main text is upright
     std::size_t unmapped = 0;            // glyphs without a Unicode mapping
 };
 

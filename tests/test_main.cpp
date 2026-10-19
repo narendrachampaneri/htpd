@@ -426,6 +426,22 @@ TEST(furniture_keeps_text_that_only_repeats_at_the_top_of_some_pages) {
     CHECK_EQ(pages[3][0].text, std::string("Field Description Access Reset"));
 }
 
+TEST(furniture_never_takes_the_only_text_of_a_page) {
+    // Every page holds one sentence at the top, and all start with the same
+    // two words. That is the content of the pages, not a running header.
+    std::vector<std::vector<Line>> pages(12);
+    const std::vector<float> heights(12, 842.0f);
+    const char* words[] = {"offset interrupt field", "voltage timer reset", "bus clock frame", "packet status value",
+                           "supply channel mode", "buffer memory signal", "address sample enable", "disable current bus",
+                           "register field clock", "timer status frame", "channel value packet", "mode reset supply"};
+    for (int p = 0; p < 12; ++p) {
+        pages[static_cast<std::size_t>(p)].push_back(
+            make_line(p, "Page " + std::to_string(p + 1) + " body text " + words[p], 50));
+    }
+    CHECK_EQ(remove_furniture(pages, heights).removed_lines, std::size_t{0});
+    for (const auto& page : pages) CHECK_EQ(page.size(), std::size_t{1});
+}
+
 TEST(furniture_is_only_what_lies_at_the_page_edge) {
     // Every page starts with a line of ordinary text, and below it the same
     // table header on all pages. The header repeats, but text stands between
@@ -1554,6 +1570,49 @@ std::vector<std::string> texts(const std::vector<Line>& lines) {
     std::vector<std::string> out;
     for (const Line& line : lines) out.push_back(line.text);
     return out;
+}
+
+TEST(reader_turns_pages_whose_text_runs_sideways) {
+    const auto doc = PdfDocument::open(fs::path(HTPD_TEST_DATA) / "sideways.pdf");
+    REQUIRE(doc.has_value());
+    REQUIRE(doc->page_count() == 4);
+    const auto lines_of = [&](int index) -> std::vector<std::string> {
+        const auto page = doc->read_page(index);
+        return page.has_value() ? texts(build_lines(*page)) : std::vector<std::string>{};
+    };
+    // 1. A table printed sideways on a portrait page: read, not skipped.
+    const auto first = doc->read_page(0);
+    REQUIRE(first.has_value());
+    CHECK_EQ(first->skipped_rotated, std::size_t{0});
+    CHECK_EQ(first->turned, 3);
+    CHECK(first->width > first->height);   // read as the landscape page it is
+    const std::vector<std::string> table = {"Pin table printed sideways",
+                                            "Ball A1 is GPIO0 and its supply is NVCC_GPIO",
+                                            "Ball A2 is GPIO1 and its supply is NVCC_GPIO",
+                                            "Ball A3 is GPIO2 and its supply is NVCC_GPIO"};
+    REQUIRE(lines_of(0) == table);
+    // 2. /Rotate 90 over upright content: turned back, lines in reading order.
+    const std::vector<std::string> turned = {"First line of the turned page.", "Second line of the turned page."};
+    REQUIRE(lines_of(1) == turned);
+    // 3. Upside down.
+    const std::vector<std::string> upside = {"Upside down first line.", "Upside down second line."};
+    REQUIRE(lines_of(2) == upside);
+    // 4. Upright page: only the vertical label is rotated text.
+    const auto last = doc->read_page(3);
+    REQUIRE(last.has_value());
+    CHECK_EQ(last->turned, 0);
+    CHECK_EQ(last->skipped_rotated, std::size_t{9});   // "SIDE LABEL" without its space
+    CHECK_EQ(lines_of(3).size(), std::size_t{4});
+}
+
+TEST(reader_gives_the_size_of_a_rotated_page_as_shown) {
+    // lowlevel.pdf page 2 has /Rotate 90 on a portrait page: shown landscape.
+    const auto doc = PdfDocument::open(fs::path(HTPD_TEST_DATA) / "lowlevel.pdf");
+    REQUIRE(doc.has_value());
+    const auto page = doc->read_page(1);
+    REQUIRE(page.has_value());
+    CHECK(std::fabs(page->width - 792.0f) < 0.5f && std::fabs(page->height - 612.0f) < 0.5f);
+    CHECK_EQ(page->turned, 0);
 }
 
 TEST(reader_gives_upright_text_in_reading_order) {

@@ -208,7 +208,7 @@ One PDF goes through six steps. Each step is one small file.
 
 | Step | File | What happens |
 |---|---|---|
-| 1. Read | `src/pdf_reader_pdfium.cpp` | PDFium gives every character with its position, size and font. Page rotation is removed here, so all later steps see upright pages. This is the only file that knows PDFium. |
+| 1. Read | `src/pdf_reader_pdfium.cpp` | PDFium gives every character with its position, size and font. Page rotation is removed here, and a page whose text mainly runs sideways or upside down is turned, so all later steps see upright pages. This is the only file that knows PDFium. |
 | 2. Lines | `src/layout.cpp` | Characters become lines. Wide gaps are marked (table columns). |
 | 3. Headers and footers | `src/furniture.cpp` | Lines that repeat at the page edge on many pages are taken out and reported. |
 | 4. Headings | `src/headings.cpp` | From the bookmarks of the PDF, and from the text: section numbers, font size, bold, another font. |
