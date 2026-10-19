@@ -3,6 +3,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/narendrachampaneri/htpd/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/narendrachampaneri/htpd/tests.yml?branch=main&label=tests&style=for-the-badge" alt="tests"></a>
   <img src="https://img.shields.io/badge/converter-C%2B%2B23-1d4ed8?style=for-the-badge" alt="C++23">
   <img src="https://img.shields.io/badge/reader-Python%203.10%2B-0f766e?style=for-the-badge" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/license-Apache--2.0-475569?style=for-the-badge" alt="Apache-2.0">

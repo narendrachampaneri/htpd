@@ -1,0 +1,57 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  converter:
+    name: Converter (C++)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get PDFium
+        run: ./scripts/get_pdfium.sh
+      - name: Build (Makefile)
+        run: make
+      - name: C++ tests
+        run: make test
+      - name: Build and test (CMake)
+        run: |
+          cmake -S . -B build-cmake
+          cmake --build build-cmake -j
+          ctest --test-dir build-cmake --output-on-failure
+
+  reader:
+    name: Reader (Python ${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install
+        run: python -m pip install -e .
+      - name: Python tests
+        run: |
+          for d in reader eval model; do
+            PYTHONPATH=reader:. python -m unittest discover -s $d/tests -t .
+          done
+      - name: Python tests without PyYAML (as in a chat sandbox)
+        run: |
+          for d in reader eval model; do
+            HTPD_NO_YAML=1 PYTHONPATH=reader:. python -m unittest discover -s $d/tests -t .
+          done
+      - name: Ask the sample file
+        run: |
+          htpd-read ask examples/single-file/sample.htpd "What is the maximum bus voltage?"
+          htpd-read check examples/single-file/sample.htpd
+      - name: Build the skill
+        run: python scripts/build_skill.py
