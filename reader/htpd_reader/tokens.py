@@ -6,7 +6,7 @@
   gives their parts: register and field names (`dmcontrol`,
   `__arm_sme_state` -> also `arm`, `sme`, `state`), hex numbers (`0x7a1`),
   section numbers (`3.14.2`), CamelCase (`DebugModule` -> also `debug`,
-  `module`).
+  `module`), and the short forms of tables (`maximum` -> also `max`).
 * `count_tokens`: the number of words and punctuation marks. It is not the
   tokenizer of any one AI model; it is one fixed measure, so the numbers of
   all systems can be compared with each other.
@@ -26,6 +26,10 @@ _TECH = re.compile(
 _CAMEL = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+")
 _COUNT = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 
+# Words that tables of technical manuals shorten: the long form also gives the short one.
+SHORT_FORMS = {"maximum": "max", "minimum": "min", "typical": "typ", "registers": "register",
+               "address": "addr", "addresses": "addr"}
+
 STOPWORDS = frozenset(
     "a an and are as at be by can do does for from has have how i if in is it its of on or "
     "that the this to was what when where which who why will with".split()
@@ -44,6 +48,8 @@ def technical_tokens(text: str, drop_stopwords: bool = False) -> list[str]:
         if drop_stopwords and tok in STOPWORDS:
             continue
         out.append(tok)
+        if tok in SHORT_FORMS:
+            out.append(SHORT_FORMS[tok])
         if tok.startswith("0x"):
             continue
         parts: list[str] = []
