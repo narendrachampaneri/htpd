@@ -6,7 +6,8 @@
   gives their parts: register and field names (`dmcontrol`,
   `__arm_sme_state` -> also `arm`, `sme`, `state`), hex numbers (`0x7a1`),
   section numbers (`3.14.2`), CamelCase (`DebugModule` -> also `debug`,
-  `module`), and the short forms of tables (`maximum` -> also `max`).
+  `module`), the short forms of tables (`maximum` -> also `max`), and
+  words broken at a hyphen (`inter-rupt` -> also `interrupt`).
 * `count_tokens`: the number of words and punctuation marks. It is not the
   tokenizer of any one AI model; it is one fixed measure, so the numbers of
   all systems can be compared with each other.
@@ -36,6 +37,14 @@ STOPWORDS = frozenset(
 )
 
 
+_HYPHENATED = re.compile(r"\b([A-Za-z]+)-([A-Za-z0-9]+)\b")
+
+
+def main_tokens(text: str) -> list[str]:
+    """The whole technical words of a text, lower case, without their parts."""
+    return [m.group(0).lower() for m in _TECH.finditer(text)]
+
+
 def plain_words(text: str) -> list[str]:
     return [w.lower() for w in _PLAIN.findall(text)]
 
@@ -59,6 +68,10 @@ def technical_tokens(text: str, drop_stopwords: bool = False) -> list[str]:
             parts = [p.lower() for p in _CAMEL.findall(raw)]
         if len(parts) > 1:
             out.extend(p for p in parts if p != tok)
+    # A word the PDF broke at a line end keeps its hyphen in the text
+    # ("inter-rupt", "RS-485"); the joined form is searched as well.
+    for m in _HYPHENATED.finditer(text):
+        out.append((m.group(1) + m.group(2)).lower())
     return out
 
 

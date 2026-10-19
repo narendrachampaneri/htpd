@@ -66,6 +66,8 @@ class Tokens(unittest.TestCase):
         self.assertNotIn("3", t)
         self.assertNotIn("the", technical_tokens("the reset value", drop_stopwords=True))
         self.assertEqual(technical_tokens("Maximum"), ["maximum", "max"])
+        self.assertIn("interrupt", technical_tokens("raises an inter-rupt"))
+        self.assertIn("rs485", technical_tokens("the RS-485 port"))
 
     def test_plain_and_count(self) -> None:
         self.assertEqual(plain_words("Bus voltage | 200"), ["bus", "voltage", "200"])
