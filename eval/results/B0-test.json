@@ -1,0 +1,281 @@
+{
+  "system": "B0",
+  "label": "B0 whole document",
+  "phase": "Phase 2 - baselines",
+  "split": "test",
+  "only_checked": false,
+  "bundles": [
+    "aapcs64",
+    "riscv-debug"
+  ],
+  "when": "2026-10-20",
+  "machine": "Linux x86_64, Python 3.13.16",
+  "metrics": {
+    "questions": 133,
+    "answerable": 111,
+    "not_in_document": 22,
+    "recall@1": null,
+    "recall@5": null,
+    "recall@10": null,
+    "mrr": null,
+    "page_accuracy": null,
+    "not_found_accuracy": 0.0,
+    "false_not_found": 0.0,
+    "tokens_mean": 45556.0977443609,
+    "tokens_vs_whole": 1.0,
+    "ms_per_question": 0.006790127816004274,
+    "by_kind": {}
+  },
+  "misses": [
+    {
+      "id": "aapcs-001",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-002",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-003",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-004",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-005",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-006",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-007",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-008",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-009",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-010",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-011",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-012",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-013",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-014",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-015",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-016",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-017",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-018",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-019",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-020",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-021",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-022",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-023",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-024",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-025",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-026",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-027",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-028",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-029",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-030",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-031",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-032",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-033",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-034",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-035",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-036",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-037",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-038",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-039",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-040",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-041",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-042",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-043",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-044",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-045",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-046",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-047",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-048",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "aapcs-049",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "debug-001",
+      "rank": null,
+      "top": []
+    }
+  ]
+}

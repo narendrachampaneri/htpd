@@ -242,9 +242,11 @@ Python tests also run without PyYAML, as the skill does in a chat sandbox.
 **Answering.** A first check on the i.MX 93 data sheet: of 12 questions
 with known answers the right section came first for 7, and both questions
 about things the data sheet does not contain (PCIe, HDMI) were answered
-*"Not found in this file."* Proper numbers on public test sets will come from
-the evaluation harness in [`eval/`](eval/README.md) - a developer tool that is
-written but not run yet; see the roadmap.
+*"Not found in this file."* Measured numbers on public manuals (133 test
+questions) are in [`eval/report.md`](eval/report.md), written by the
+evaluation harness in [`eval/`](eval/README.md). They show what to improve
+next: the reader still says "not found" too often for questions the file
+does answer.
 
 ---
 
@@ -257,7 +259,8 @@ HTPD is version 0.1. It works today; these are the known next steps.
 - [x] Reader, word search, "not found" rule, `ask`, MCP server, skill for AI apps
 - [ ] **Better search on very large manuals** - a saved index next to the file (today each question re-indexes, about 7 s on 5600 pages) and better ranking for register and table questions
 - [ ] Optional meaning search (small open embedding model, CPU only) - measured, then kept only if it helps
-- [ ] Evaluation on public test sets, with the numbers in `eval/report.md`
+- [x] Evaluation on public test sets, with the numbers in `eval/report.md` (questions still to be checked by a person)
+- [ ] **Fewer false "not found"** answers and better ranking than plain BM25 (see the report)
 - [ ] OCR for scanned pages (Tesseract, local)
 - [ ] Windows build
 

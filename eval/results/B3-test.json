@@ -1,0 +1,170 @@
+{
+  "system": "B3",
+  "label": "B3 HTPD sections, BM25",
+  "phase": "Phase 2 - baselines",
+  "split": "test",
+  "only_checked": false,
+  "bundles": [
+    "aapcs64",
+    "riscv-debug"
+  ],
+  "when": "2026-10-20",
+  "machine": "Linux x86_64, Python 3.13.16",
+  "metrics": {
+    "questions": 133,
+    "answerable": 111,
+    "not_in_document": 22,
+    "recall@1": 0.6486486486486487,
+    "recall@5": 0.8738738738738738,
+    "recall@10": 0.9279279279279279,
+    "mrr": 0.7482731689253428,
+    "page_accuracy": 0.5405405405405406,
+    "not_found_accuracy": 0.0,
+    "false_not_found": 0.0,
+    "tokens_mean": 2194.4436090225563,
+    "tokens_vs_whole": 0.053567074365371954,
+    "ms_per_question": 0.31064647367585213,
+    "by_kind": {
+      "1": {
+        "n": 66,
+        "recall@5": 0.8787878787878788
+      },
+      "2": {
+        "n": 29,
+        "recall@5": 0.8620689655172413
+      },
+      "3": {
+        "n": 16,
+        "recall@5": 0.875
+      }
+    }
+  },
+  "misses": [
+    {
+      "id": "aapcs-001",
+      "rank": 14,
+      "top": [
+        "sections/0125-15-footnotes",
+        "sections/0015-2-1-3-references",
+        "sections/0051-6-4-2-properties-of-a-thread"
+      ]
+    },
+    {
+      "id": "aapcs-003",
+      "rank": 26,
+      "top": [
+        "sections/0027-5-6-scalable-vectors",
+        "sections/0092-8-1-5-arm-get-current-vg",
+        "sections/0118-12-appendix-support-for-scalable-vectors"
+      ]
+    },
+    {
+      "id": "aapcs-005",
+      "rank": 13,
+      "top": [
+        "sections/0047-6-2-sme-state",
+        "sections/0094-8-1-7-arm-sme-save",
+        "sections/0125-15-footnotes"
+      ]
+    },
+    {
+      "id": "aapcs-029",
+      "rank": 8,
+      "top": [
+        "sections/0024-5-3-half-precision-floating-point",
+        "sections/0017-3-scope",
+        "sections/0040-6-the-base-procedure-call-standard"
+      ]
+    },
+    {
+      "id": "aapcs-038",
+      "rank": 10,
+      "top": [
+        "sections/0024-5-3-half-precision-floating-point",
+        "sections/0082-7-1-half-precision-format-compatibility",
+        "sections/0014-2-1-2-change-history"
+      ]
+    },
+    {
+      "id": "debug-003",
+      "rank": 23,
+      "top": [
+        "sections/0089-4-9-3-debug-scratch-register-0-dscratch0-at-0x7b2",
+        "sections/0090-4-9-4-debug-scratch-register-1-dscratch1-at-0x7b3",
+        "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0"
+      ]
+    },
+    {
+      "id": "debug-004",
+      "rank": 6,
+      "top": [
+        "sections/0116-5-7-11-match-control-mcontrol-at-0x7a1",
+        "sections/0117-5-7-12-match-control-type-6-mcontrol6-at-0x7a1",
+        "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0"
+      ]
+    },
+    {
+      "id": "debug-025",
+      "rank": 22,
+      "top": [
+        "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0",
+        "sections/0086-4-9-core-debug-registers",
+        "sections/0160-b-2-10-handling-exceptions"
+      ]
+    },
+    {
+      "id": "debug-028",
+      "rank": 11,
+      "top": [
+        "sections/0097-5-4-native-triggers",
+        "sections/0119-5-7-14-interrupt-trigger-itrigger-at-0x7a1",
+        "sections/0111-5-7-6-trigger-control-tcontrol-at-0x7a5"
+      ]
+    },
+    {
+      "id": "debug-033",
+      "rank": 21,
+      "top": [
+        "sections/0163-b-3-1-single-step",
+        "sections/0025-3-3-selecting-harts",
+        "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0"
+      ]
+    },
+    {
+      "id": "debug-041",
+      "rank": 7,
+      "top": [
+        "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11",
+        "sections/0023-3-1-debug-module-interface-dmi",
+        "sections/0143-b-2-1-debug-module-interface-access"
+      ]
+    },
+    {
+      "id": "debug-044",
+      "rank": 7,
+      "top": [
+        "sections/0023-3-1-debug-module-interface-dmi",
+        "sections/0055-3-14-13-next-debug-module-nextdm-at-0x1d",
+        "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11"
+      ]
+    },
+    {
+      "id": "debug-055",
+      "rank": 12,
+      "top": [
+        "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0",
+        "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11",
+        "sections/0023-3-1-debug-module-interface-dmi"
+      ]
+    },
+    {
+      "id": "debug-059",
+      "rank": 6,
+      "top": [
+        "sections/0144-b-2-2-checking-for-halted-harts",
+        "sections/0020-1-5-supported-features",
+        "sections/0056-3-14-14-abstract-data-0-data0-at-0x04"
+      ]
+    }
+  ]
+}

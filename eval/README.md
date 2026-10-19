@@ -10,13 +10,19 @@ itself.
 
 ## State
 
-The harness and its tests are written; it has **not been run yet**, so
-there is no `eval/report.md` and there are no numbers. Still missing:
+The first numbers are in [`report.md`](report.md).
 
-* `docs.list` names the public test documents, but their download links
-  and SHA-256 are not filled in yet (`-`).
-* `questions/` is empty: the question files (`*.jsonl`, format in
-  `questions.py`) are still to be written and checked by hand.
+* `docs.list` pins four public manuals (download link and SHA-256):
+  the RISC-V Debug Specification and the Arm AAPCS64 for **test**, the
+  RISC-V privileged manual for **tuning** the "not found" threshold, the
+  RISC-V unprivileged manual for **training** only.
+* `questions/` holds 173 questions (133 test, 40 tuning) of four kinds:
+  a fact, a value from a table, an answer from two sections, and a question
+  the document does not answer. Every answer is copied from the document
+  and checked by `validate` against its section and page. They were
+  written with an AI and are not yet checked by a person (`"checked":
+  false`); docs/PART-B.md asks for at least 100 test questions checked by
+  hand.
 
 ## How it is used
 
