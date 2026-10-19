@@ -263,8 +263,10 @@ examples/               a converted document in both forms
 
 ## Contributing
 
-Issues and pull requests are welcome. Before you change anything, read
-[`AGENTS.md`](AGENTS.md); the short version:
+Issues and pull requests are welcome - see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Every pull request is reviewed by the maintainer before it is merged.
+Security problems: please report them privately ([`SECURITY.md`](SECURITY.md)).
+The short version of the rules ([`AGENTS.md`](AGENTS.md)):
 
 - All tests pass before a change is merged: `make test` and `python3 -m pytest`.
 - Every new rule in the code comes with a test that fails without it.
