@@ -44,6 +44,7 @@ class Result:
         d["top_page"] = self.top_page
         d["coverage"] = round(self.retrieval.coverage, 4)
         d["ranked"] = [n.id for n in self.ranked[:20]]
+        d["reason"] = self.retrieval.reason if self.not_found else ""
         return d
 
 
@@ -61,10 +62,13 @@ class Asker:
         r = self.retriever.retrieve(question)
         if self.decider is not None:
             ranked, not_found = self.decider.decide(self.bundle, question, r)
+            not_found = not_found or bool(r.missing)  # a term the file never uses stays "not found"
         else:
             ranked, not_found = [c.node for c in r.candidates], r.not_found
+        reason = r.reason if not_found and r.not_found else ("" if not not_found else
+                                                              "no section passes the decider")
         p = pack(self.bundle, question, ranked, budget=self.budget, max_sections=self.max_sections,
-                 not_found=not_found)
+                 not_found=not_found, reason=reason)
         top = None
         if not p.not_found and p.sections:
             blk = best_block(p.sections[0].node, question)

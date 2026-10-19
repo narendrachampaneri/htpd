@@ -112,8 +112,33 @@ class Manual(unittest.TestCase):
         self.assertTrue(r.retrieve("What is the baud rate of the UART?").not_found)
         self.assertFalse(r.retrieve("reset value of dmcontrol").not_found)
         self.assertFalse(r.retrieve("What does section 3 say about baud?").not_found)
-        off = Retriever(self.b, Settings(meaning=False))
+        # the coverage rule alone: switched off when its threshold is 0
+        off = Retriever(self.b, Settings(meaning=False, unknown_terms=False))
         self.assertFalse(off.retrieve("What is the baud rate of the UART?").not_found)
+
+    def test_terms_the_file_never_uses(self) -> None:
+        r = Retriever(self.b, Settings(meaning=False))
+        x = r.retrieve("What is the baud rate of the UART?")
+        self.assertEqual((x.not_found, x.missing), (True, ["UART"]))
+        self.assertEqual(x.reason, "the file never mentions UART")
+        for q in ("What is the reset value of dmcontrol?", "Where is DMCONTROL described?",
+                  "What does __arm_sme_state save?", "Which version is 3.14.2?", "abstractcs reset",
+                  "How many registers?"):
+            self.assertFalse(r.retrieve(q).not_found, q)
+        self.assertTrue(r.retrieve("Does the PCIe link support Gen3?").not_found)
+        self.assertEqual(r.retrieve("dmcontrol and HDMI0 and x0").missing, ["HDMI0"])
+        # a named section is never "not found", even with an unknown term
+        self.assertFalse(r.retrieve("What does section 2.1 say about PCIe?").not_found)
+        # switched off
+        self.assertFalse(Retriever(self.b, Settings(meaning=False, unknown_terms=False))
+                         .retrieve("Does the PCIe link support Gen3?").not_found)
+
+    def test_specific_terms(self) -> None:
+        from htpd_reader.retriever import specific_terms
+
+        self.assertEqual(specific_terms("What is the max I2C speed of the PCIe and VDD_SOC on Cortex-A55 at 3.3 V?"),
+                         ["I2C", "PCIe", "VDD_SOC", "Cortex-A55"])
+        self.assertEqual(specific_terms("What is the reset value?"), [])
 
     def test_coverage(self) -> None:
         r = Retriever(self.b, Settings(meaning=False))

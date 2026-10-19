@@ -15,9 +15,18 @@ Three ranked lists, merged by reciprocal rank fusion (RRF):
 A section number in the question ("section 3.14.2", "see 4.1") puts that
 section first.
 
-"Not found": the share of the question's rare words (weighted by IDF) that
-stand in the best candidates. Below `not_found_below` the retriever says not
-found. The threshold is set on the tuning split, never on the test split.
+"Not found" has two rules, both without any model:
+
+* the question names a specific term - an acronym, a register or signal
+  name, a part number (PCIe, HDMI, VDD_SOC, I2C, Cortex-A55) - that the
+  document never mentions. A document cannot answer a question about a thing
+  it does not name. The answer says which term is missing.
+* the share of the question's rare words (weighted by IDF) that stand in the
+  best candidates is below `not_found_below` (set on the tuning split, never
+  on the test split; 0 switches this rule off).
+
+A question that names a section of the document ("section 4.1") is never
+"not found".
 """
 
 from __future__ import annotations
@@ -28,9 +37,10 @@ from typing import Any
 
 from .bm25 import BM25
 from .bundle import Bundle, Node
-from .tokens import STOPWORDS, plain_words, technical_tokens
+from .tokens import STOPWORDS, main_tokens, plain_words, technical_tokens
 
 RRF_K = 60
+_WORD_IN_QUESTION = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.+-]*")
 _SECTION_REF = re.compile(r"(?:section|chapter|clause|appendix|table|§)\s*([A-Z]?\d+(?:\.\d+)*|[A-Z](?:\.\d+)*)\b",
                           re.IGNORECASE)
 
@@ -45,6 +55,7 @@ class Settings:
     candidates: int = 50  # length of each ranked list
     not_found_below: float = 0.0  # 0 disables "not found"
     coverage_of: int = 3  # how many top candidates count for the coverage
+    unknown_terms: bool = True  # "not found" when the question names a term the document never uses
 
 
 @dataclass
@@ -60,10 +71,36 @@ class Retrieval:
     candidates: list[Candidate]
     coverage: float  # share of the question's IDF found in the best candidates
     not_found: bool
+    missing: list[str] = field(default_factory=list)  # specific terms of the question the document never uses
+
+    @property
+    def reason(self) -> str:
+        if not self.not_found:
+            return ""
+        if self.missing:
+            return "the file never mentions " + ", ".join(self.missing)
+        return "no part of the file matches the question well enough"
 
     @property
     def ids(self) -> list[str]:
         return [c.node.id for c in self.candidates]
+
+
+def specific_terms(question: str) -> list[str]:
+    """Words of a question that name one specific thing: an acronym (PCIe,
+    HDMI, ADC), a name with a digit or an underscore (I2C, VDD_SOC,
+    Cortex-A55). Plain words and plain numbers are not specific."""
+    out: list[str] = []
+    for m in _WORD_IN_QUESTION.finditer(question):
+        w = m.group(0).strip(".+-")
+        if not w or not any(c.isalpha() for c in w):
+            continue
+        caps = sum(c.isupper() for c in w)
+        has_digit = any(c.isdigit() for c in w)
+        if caps >= 2 or "_" in w or has_digit:
+            if w not in out:
+                out.append(w)
+    return out
 
 
 def card_text(bundle: Bundle, node: Node, max_words: int = 120) -> str:
@@ -84,6 +121,7 @@ class Retriever:
         self.word_index = BM25([tok(s.title) * 2 + tok(s.text) for s in self.sections])
         self.tree_index = BM25([tok(" ".join(bundle.path_titles(s)[1:])) for s in self.sections])
         self.by_number = {s.number.lower(): i for i, s in enumerate(self.sections) if s.number}
+        self._vocabulary: set[str] | None = None
         self.embedder = embedder if self.settings.meaning else None
         self.vectors: list[list[float]] | None = None
         if self.embedder is not None:
@@ -139,9 +177,39 @@ class Retriever:
         order = sorted(fused, key=lambda i: (-fused[i], i))[:k]
         cands = [Candidate(self.sections[i], fused[i], ranks.get(i, {})) for i in order]
         coverage = self.coverage(question, [c.node for c in cands[: st.coverage_of]])
+        missing = self.missing_terms(question) if st.unknown_terms and not named else []
         # a question that names a section of the document is never "not found"
-        not_found = not cands or (not named and st.not_found_below > 0 and coverage < st.not_found_below)
-        return Retrieval(question, cands, coverage, not_found)
+        low = not named and st.not_found_below > 0 and coverage < st.not_found_below
+        not_found = not cands or bool(missing) or low
+        return Retrieval(question, cands, coverage, not_found, missing)
+
+    @property
+    def vocabulary(self) -> set[str]:
+        """Every whole word of the document, lower case, and the joined form
+        of words broken at a hyphen."""
+        if self._vocabulary is None:
+            vocab: set[str] = set(main_tokens(self.bundle.title))
+            for s in self.sections:
+                for text in (s.title, s.text):
+                    vocab.update(main_tokens(text))
+                    vocab.update(t for t in technical_tokens(text) if t not in vocab)
+            self._vocabulary = vocab
+        return self._vocabulary
+
+    def missing_terms(self, question: str) -> list[str]:
+        """The specific terms of the question that the document never uses."""
+        vocab = self.vocabulary
+        missing = []
+        for term in specific_terms(question):
+            words = main_tokens(term)
+            joined = "".join(w for w in words)
+
+            def known(w: str) -> bool:
+                return w in vocab or (w.endswith("s") and w[:-1] in vocab)
+
+            if not (all(known(w) for w in words) or known(joined)):
+                missing.append(term)
+        return missing
 
     def coverage(self, question: str, nodes: list[Node]) -> float:
         """Share of the question's word weight (IDF) that the nodes hold."""
