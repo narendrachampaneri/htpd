@@ -59,6 +59,7 @@ class Row:
     not_found: bool
     tokens: int
     seconds: float
+    extra: dict[str, Any] | None = None
 
     def rank(self) -> int | None:
         for i, s in enumerate(self.ranked, 1):
@@ -78,7 +79,7 @@ def run(system: System, questions: list[Question], bundles_dir: Path, ctx: Conte
         t0 = time.perf_counter()
         a = system.answer(states[q.bundle], q.question)
         dt = time.perf_counter() - t0
-        rows.append(Row(q, a.ranked, a.top_page, a.not_found, count_tokens(a.context), dt))
+        rows.append(Row(q, a.ranked, a.top_page, a.not_found, count_tokens(a.context), dt, a.extra))
     return rows
 
 
@@ -141,6 +142,35 @@ def evaluate(name: str, split: str, questions_paths: list[Path], bundles_dir: Pa
         results_dir.mkdir(parents=True, exist_ok=True)
         (results_dir / f"{name}-{split}.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     return result
+
+
+def tune_not_found(name: str, questions_paths: list[Path], bundles_dir: Path, ctx: Context,
+                   docs_list: Path = DOCS_LIST, out: Path | None = None) -> dict[str, Any]:
+    """Pick the "not found" threshold on the tuning split and store it.
+
+    The threshold is the one with the best balanced accuracy: the mean of
+    "not found" said for questions the document does not answer, and not
+    said for questions it does answer.
+    """
+    docs = doc_splits(docs_list)
+    qs = [q for q in load(questions_paths) if split_of(q, docs) == "tune"]
+    if not any(q.kind == 4 for q in qs) or not any(q.kind != 4 for q in qs):
+        raise SystemExit("the tuning split needs answerable and not-found questions")
+    rows = run(REGISTRY[name], qs, bundles_dir, ctx)
+    cov = [((r.extra or {}).get("coverage", 0.0), r.q.kind == 4) for r in rows]
+    best = (0.0, -1.0)
+    for step in range(0, 101):
+        t = step / 100
+        absent = [c < t for c, is4 in cov if is4]
+        present = [c >= t for c, is4 in cov if not is4]
+        score = (sum(absent) / len(absent) + sum(present) / len(present)) / 2
+        if score > best[1]:
+            best = (t, score)
+    out = out or (EVAL / "tuned.json")
+    data = json.loads(out.read_text(encoding="utf-8")) if out.is_file() else {}
+    data[name] = {"not_found_below": best[0]}
+    out.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return {"system": name, "not_found_below": best[0], "balanced_accuracy": best[1], "questions": len(qs)}
 
 
 # --------------------------------------------------------------------------

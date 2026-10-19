@@ -2,6 +2,7 @@
 
   run SYSTEM [--split test]   measure one system (B0 B1 B2 B3, htpd, ...); saves eval/results/
   report                      write eval/report.md from eval/results/
+  tune SYSTEM                 set the "not found" threshold on the tuning split (eval/tuned.json)
   validate                    check every question against its bundle; exit 1 on a bad one
   review [--bundle NAME]      check unchecked test questions by hand, one by one
   stats                       how many questions of each kind, split and state
@@ -41,6 +42,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--checked", action="store_true", help="only questions checked by a person")
     p.add_argument("--cache", default=str(EVAL / "cache"), help="cache for embeddings")
     sub.add_parser("report")
+    p = sub.add_parser("tune")
+    p.add_argument("system", choices=sorted(REGISTRY))
+    p.add_argument("--cache", default=str(EVAL / "cache"), help="cache for embeddings")
     sub.add_parser("validate")
     p = sub.add_parser("review")
     p.add_argument("--bundle")
@@ -55,6 +59,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.cmd == "report":
         print(harness.write_report(), end="")
+        return 0
+    if args.cmd == "tune":
+        t = harness.tune_not_found(args.system, _question_files(args.questions), bundles, Context(cache_dir=Path(args.cache)))
+        print(f"{t['system']}: not found below coverage {t['not_found_below']:.2f} "
+              f"(balanced accuracy {t['balanced_accuracy']:.3f} on {t['questions']} tuning questions); "
+              "saved in eval/tuned.json")
         return 0
     if args.cmd == "run":
         ctx = Context(cache_dir=Path(args.cache))
