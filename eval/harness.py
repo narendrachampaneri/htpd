@@ -174,6 +174,56 @@ def tune_not_found(name: str, questions_paths: list[Path], bundles_dir: Path, ct
     return {"system": name, "not_found_below": best[0], "balanced_accuracy": best[1], "questions": len(qs)}
 
 
+def agent_questions(qs: list[Question], n: int = 20, docs_list: Path = DOCS_LIST) -> list[Question]:
+    """A fixed spread of test questions for the end-to-end check with an AI agent:
+    checked ones first, every kind, the same ones every time."""
+    docs = doc_splits(docs_list)
+    test = [q for q in qs if split_of(q, docs) == "test"]
+    test.sort(key=lambda q: (not q.checked, hashlib.sha256(q.id.encode()).hexdigest()))
+    out: list[Question] = []
+    kinds = sorted({q.kind for q in test})
+    while len(out) < min(n, len(test)):
+        for k in kinds:
+            pick = next((q for q in test if q.kind == k and q not in out), None)
+            if pick is not None and len(out) < n:
+                out.append(pick)
+    return out
+
+
+def agent_score(name: str, qs: list[Question], answers: Path, results_dir: Path = RESULTS) -> dict[str, Any]:
+    """End-to-end: did the agent cite a right page, and say "not found" when it should?
+
+    The agent answers each question of `agent-sheet` through the MCP server; a
+    person writes down per question the pages the answer cites and whether it
+    said the document does not answer it. Nothing else is judged here.
+    """
+    by_id = {q.id: q for q in qs}
+    got = [json.loads(x) for x in answers.read_text(encoding="utf-8").splitlines() if x.strip()]
+    rows = []
+    for a in got:
+        q = by_id.get(a["id"])
+        if q is None:
+            raise SystemExit(f"unknown question {a['id']!r}")
+        rows.append((q, [int(p) for p in a.get("pages", [])], bool(a.get("not_found", False))))
+    answerable = [(q, p, nf) for q, p, nf in rows if q.kind != 4]
+    absent = [(q, p, nf) for q, p, nf in rows if q.kind == 4]
+    metrics: dict[str, Any] = {
+        "questions": len(rows), "answerable": len(answerable), "not_in_document": len(absent),
+        "recall@1": None, "recall@5": None, "recall@10": None, "mrr": None,
+        "page_accuracy": _mean([1.0 if (set(p) & set(q.gold_pages)) and not nf else 0.0 for q, p, nf in answerable]),
+        "not_found_accuracy": _mean([1.0 if nf else 0.0 for q, p, nf in absent]) if absent else None,
+        "false_not_found": _mean([1.0 if nf else 0.0 for q, p, nf in answerable]) if answerable else None,
+        "tokens_mean": 0.0, "tokens_vs_whole": None, "ms_per_question": 0.0, "by_kind": {},
+    }
+    result = {"system": f"agent-{name}", "label": f"Agent {name} through the MCP server",
+              "phase": "Phase 6 - end to end", "split": "test", "only_checked": False,
+              "bundles": sorted({q.bundle for q, _, _ in rows}), "when": _dt.date.today().isoformat(),
+              "machine": "answers scored by hand", "metrics": metrics, "misses": []}
+    results_dir.mkdir(parents=True, exist_ok=True)
+    (results_dir / f"agent-{name}-test.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    return result
+
+
 # --------------------------------------------------------------------------
 # the report
 

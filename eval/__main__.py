@@ -7,12 +7,15 @@
   review [--bundle NAME]      check unchecked test questions by hand, one by one
   stats                       how many questions of each kind, split and state
   systems                     list the systems
+  agent-sheet [--n 20]        the test questions to ask an AI agent through the MCP server
+  agent-score NAME FILE       score the agent's answers (JSONL: id, pages, not_found) -> eval/results/
 """
 
 from __future__ import annotations
 
 import argparse
 import importlib
+import json
 import sys
 from collections import Counter
 from pathlib import Path
@@ -50,6 +53,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--bundle")
     sub.add_parser("stats")
     sub.add_parser("systems")
+    p = sub.add_parser("agent-sheet")
+    p.add_argument("--n", type=int, default=20)
+    p = sub.add_parser("agent-score")
+    p.add_argument("name", help="the agent, e.g. claude-code or antigravity")
+    p.add_argument("answers", help="JSONL: one line per question: {id, pages: [..], not_found: bool}")
     args = ap.parse_args(argv)
     bundles = Path(args.bundles)
 
@@ -104,6 +112,17 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if bad else 0
     if args.cmd == "review":
         return _review(files, bundle, args.bundle)
+    if args.cmd == "agent-sheet":
+        for q in harness.agent_questions(qs, args.n):
+            print(json.dumps({"id": q.id, "bundle": q.bundle, "question": q.question}, ensure_ascii=False))
+        return 0
+    if args.cmd == "agent-score":
+        r = harness.agent_score(args.name, qs, Path(args.answers))
+        m = r["metrics"]
+        print(f"{args.name}: {m['questions']} questions, page {harness._f(m['page_accuracy'])}, "
+              f"not found {harness._f(m['not_found_accuracy'])}")
+        harness.write_report()
+        return 0
     return 2
 
 

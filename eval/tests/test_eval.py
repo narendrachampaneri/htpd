@@ -281,3 +281,22 @@ class Phase3Systems(unittest.TestCase):
         from eval.systems_htpd import tuned
 
         self.assertEqual(tuned("htpd-words", out), {"not_found_below": saved})
+
+
+class AgentCheck(unittest.TestCase):
+    def test_sheet_and_score(self) -> None:
+        with tempfile.TemporaryDirectory() as t:
+            t = Path(t)
+            docs = t / "docs.list"
+            docs.write_text("sample test - -\n")
+            sheet = harness.agent_questions(QUESTIONS, 4, docs_list=docs)
+            self.assertEqual(len(sheet), 4)
+            self.assertEqual(len({q.kind for q in sheet}), 4)
+            answers = t / "a.jsonl"
+            answers.write_text("\n".join(json.dumps(x) for x in [
+                {"id": "s1", "pages": [3]}, {"id": "s2", "pages": [9]}, {"id": "s5", "not_found": True}]))
+            r = harness.agent_score("test-agent", QUESTIONS, answers, results_dir=t / "results")
+            m = r["metrics"]
+            self.assertEqual((m["questions"], m["page_accuracy"], m["not_found_accuracy"]), (3, 0.5, 1.0))
+            text = harness.write_report(t / "results", t / "report.md")
+            self.assertIn("Phase 6 - end to end", text)
