@@ -27,9 +27,10 @@ never the whole document.
    * quote values exactly as they stand (numbers, units, names);
    * cite the page of every fact: "(page 42)". The page is the nearest
      `<!-- page N -->` above the text;
-   * when the tools say `NOT FOUND` and opening the likely sections does not
-     help, say that the document does not answer the question. Do not fill
-     the gap from memory.
+   * when the tools say `NOT FOUND in this file` (it also says why, e.g.
+     "the file never mentions PCIe"), answer that the information is not
+     available in this file. Do not fill the gap from memory or from other
+     documents.
 
 ## Without the tools (reading the files)
 

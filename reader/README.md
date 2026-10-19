@@ -21,11 +21,20 @@ Without pytest: `PYTHONPATH=reader:. python3 -m unittest discover -s reader/test
 htpd-read contents manual.htpd [--depth 2]   # the tree with pages
 htpd-read section  manual.htpd 3.1           # one section: ID, file name or number
 htpd-read search   manual.htpd temperature exceeds
+htpd-read ask      manual.htpd "What is the maximum NPU frequency?" [--context]
 htpd-read check    manual.htpd [--pdf manual.pdf]
 ```
 
 Every command takes `--json`. `check` lists every problem and ends with
 exit code 1 when there is an error.
+
+`ask` answers only from the file: it prints the exact lines (a table row with
+its header row, a sentence, a code line) with their page and section, and
+`--context` adds the sections they come from. When the file cannot answer it
+prints `Not found in this file.` and why - for example when the question
+names a term the file never uses ("the file never mentions PCIe"). No model
+is needed; `--meaning` adds meaning search when sentence-transformers is
+installed.
 
 ## Library
 

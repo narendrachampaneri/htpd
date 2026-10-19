@@ -3,6 +3,8 @@
   contents BUNDLE              the tree of sections with pages
   section  BUNDLE REF          one section: REF is an ID, a file name or a number
   search   BUNDLE WORDS...     sections that hold all the words
+  ask      BUNDLE QUESTION     the exact lines of the file that answer it, with pages,
+                               or "Not found in this file" and why
   check    BUNDLE [--pdf FILE] every problem of the bundle; exit 1 on errors
 
 --json gives the same as JSON. Text is printed exactly as the bundle has it.
@@ -91,6 +93,30 @@ def cmd_search(b: Bundle, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_ask(b: Bundle, args: argparse.Namespace) -> int:
+    from .answer import answer
+    from .ask import Asker
+    from .retriever import Settings
+
+    embedder = None
+    if args.meaning:
+        from .embed import SentenceTransformerEmbedder
+
+        embedder = SentenceTransformerEmbedder()
+    asker = Asker(b, Settings(meaning=args.meaning), embedder=embedder, budget=args.budget)
+    a = answer(asker, " ".join(args.question), lines=args.lines)
+    if args.json:
+        data = a.to_dict()
+        if args.context and a.result is not None:
+            data["context"] = a.result.pack.text
+        _print_json(data)
+        return 0 if a.found else 1
+    print(a.text())
+    if args.context and a.found and a.result is not None:
+        print("\n" + a.result.pack.text)
+    return 0 if a.found else 1
+
+
 def cmd_check(b: Bundle, args: argparse.Namespace) -> int:
     problems = check(b, pdf=args.pdf)
     bad = errors(problems)
@@ -126,6 +152,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--limit", type=int, default=10)
     p.add_argument("--any", action="store_true", help="any of the words is enough")
     p.set_defaults(func=cmd_search)
+    p = add("ask", "the exact lines of the file that answer a question")
+    p.add_argument("question", nargs="+")
+    p.add_argument("--lines", type=int, default=3, help="how many lines to give (default 3)")
+    p.add_argument("--context", action="store_true", help="also print the sections the lines come from")
+    p.add_argument("--budget", type=int, default=1500, help="most tokens of context")
+    p.add_argument("--meaning", action="store_true", help="also meaning search (needs sentence-transformers)")
+    p.set_defaults(func=cmd_ask)
     p = add("check", "list every problem of the bundle")
     p.add_argument("--pdf", help="also check that the bundle was made from this PDF")
     p.set_defaults(func=cmd_check)
