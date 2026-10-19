@@ -30,6 +30,7 @@ struct ConvertOptions {
     double margin_band = 0.09;           // header/footer zone, fraction of page height
     HeadingMode headings = HeadingMode::Auto;
     bool dehyphenate = false;            // "inter-" + "rupt" -> "interrupt"
+    bool single_file = false;            // write one file "<input name>.htpd" instead of a folder
     std::function<void(int done, int total)> on_progress;   // called once per page
 };
 

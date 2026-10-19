@@ -131,7 +131,8 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
 
     WriteOptions write_options;
     write_options.force = options.force;
-    auto written = write_bundle(out_dir, sections, info, write_options);
+    auto written = options.single_file ? write_single_file(out_dir, sections, info, write_options)
+                                       : write_bundle(out_dir, sections, info, write_options);
     if (!written) return std::unexpected(written.error());
 
     ConvertReport report;

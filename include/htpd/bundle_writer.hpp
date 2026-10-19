@@ -59,6 +59,13 @@ Result<WriteReport> write_bundle(const std::filesystem::path& out_dir,
                                  std::vector<Section>& sections, const BundleInfo& info,
                                  const WriteOptions& options = {});
 
+// Writes the whole document as ONE file (docs/FORMAT.md section 11): reading
+// rules for AI models, the contents, the conversion notes and every section
+// with its text and page marks. Made to be handed to an AI model as it is.
+Result<WriteReport> write_single_file(const std::filesystem::path& file,
+                                      std::vector<Section>& sections, const BundleInfo& info,
+                                      const WriteOptions& options = {});
+
 // The title shown for the document: PDF title, or the file name without ".pdf".
 std::string document_title(const BundleInfo& info);
 

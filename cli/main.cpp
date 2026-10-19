@@ -22,7 +22,11 @@ Usage:
   htpd --help
 
 Options for convert:
-  -o, --output <folder>     Output folder (default: <file name>.htpd)
+  -o, --output <path>       Output folder, or file with --single
+                            (default: <file name>.htpd)
+      --single              Write ONE file instead of a folder: the whole
+                            document with reading rules for AI models, to
+                            hand to any AI chat as it is
       --force               Replace a previous bundle in the output folder
       --keep-headers        Keep running headers and footers in the text
       --dehyphenate         Join words split at a line end ("inter-" "rupt")
@@ -107,7 +111,7 @@ int run_convert(Args& args) {
 
     const htpd::ConvertReport& r = *report;
     print(std::format("Converted \"{}\"\n", r.title));
-    print(std::format("  output folder   {}\n", r.output_dir.string()));
+    print(std::format("  output {}   {}\n", args.convert.single_file ? "file  " : "folder", r.output_dir.string()));
     print(std::format("  pages           {}\n", r.pages));
     print(std::format("  sections        {}  (headings from: {})\n", r.sections,
                       htpd::to_string(r.heading_source)));
@@ -140,7 +144,12 @@ int run_convert(Args& args) {
     if (r.heading_source == htpd::HeadingSource::None) {
         print("Warning: no headings were found; the text was split by page.\n");
     }
-    print(std::format("Start reading at {}\n", (r.output_dir / "document.md").string()));
+    if (args.convert.single_file) {
+        print(std::format("Give {} to any AI model and ask your questions about the document.\n",
+                          r.output_dir.string()));
+    } else {
+        print(std::format("Start reading at {}\n", (r.output_dir / "document.md").string()));
+    }
     return 0;
 }
 
@@ -213,6 +222,8 @@ int main(int argc, char** argv) {
             if (!value(v) || !parse_fraction(v, args.convert.margin_band)) {
                 return usage_error("--margin-band must be a number from 0 to 0.3");
             }
+        } else if (arg == "--single") {
+            args.convert.single_file = true;
         } else if (arg == "--force") {
             args.convert.force = true;
         } else if (arg == "--keep-headers") {

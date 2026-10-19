@@ -27,12 +27,23 @@ PyYAML; models are optional extras.
 sudo apt install build-essential curl      # g++ 13 or newer is needed
 ./scripts/get_pdfium.sh                    # downloads the PDF library once
 make                                       # builds build/htpd
-make test                                  # 63 tests
+make test                                  # all C++ tests
 ./build/htpd convert tests/data/sample.pdf -o /tmp/sample.htpd
 ```
 
 Then open `/tmp/sample.htpd/document.md`. The same bundle is in
 `examples/sample.htpd/`, so you can look at one without building anything.
+
+To hand a document to an AI chat (Claude, ChatGPT, ...) as **one file**:
+
+```sh
+./build/htpd convert manual.pdf --single        # writes manual.htpd
+```
+
+Upload `manual.htpd` instead of the PDF. It starts with the rules the model
+must follow (answer only from this file, give the page of every fact, say
+"Not found in this file." when the answer is not there), then the contents
+and every section with its pages. `examples/single-file/sample.htpd` is one.
 
 (If the system answers "Permission denied" to the script, start it with
 `bash scripts/get_pdfium.sh`.)

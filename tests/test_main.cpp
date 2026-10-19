@@ -1736,6 +1736,44 @@ TEST(end_to_end_with_bookmarks) {
     CHECK(read_file(dir / "document.md").contains("* Removed 8 running header/footer lines (2 patterns):"));
 }
 
+TEST(end_to_end_single_file) {
+    ConvertOptions options;
+    options.input = fs::path(HTPD_TEST_DATA) / "sample.pdf";
+    options.single_file = true;
+    const fs::path dir = fresh_temp_dir("e2e_single");
+    options.output_dir = dir / "sample.htpd";
+    const auto report = convert(options);
+    if (!report) std::fprintf(stderr, "    %s\n", report.error().message.c_str());
+    REQUIRE(report.has_value());
+    CHECK_EQ(report->sections, std::size_t{14});
+    REQUIRE(fs::is_regular_file(options.output_dir));
+    const std::string f = read_file(options.output_dir);
+    CHECK(f.starts_with("---\nhtpd_file: \"0.1\"\ntitle: \"ACME DC Charger Controller Reference Manual\"\n"));
+    // The rules for the AI model come first, then the whole contents.
+    CHECK(f.contains("# How to read this file\n"));
+    CHECK(f.contains("say: \"Not found in this file.\" Never guess."));
+    CHECK(f.contains("  * [S11] 3.1 Thermal derating - pages 3-4\n"));
+    // Every section: fields for programs, a heading, its place, its text with pages.
+    CHECK(f.contains("<!-- htpd section {\"n\":11,\"id\":\"sections/0011-3-1-thermal-derating\",\"number\":\"3.1\","
+                     "\"level\":2,\"pages\":[3,4,4],\"parent\":\"sections/0010-3-charging-sequence\"} -->\n"
+                     "## [S11] 3.1 Thermal derating\n\nPath: 3 Charging sequence > 3.1 Thermal derating - pages 3-4\n\n"
+                     "<!-- page 3 -->\n\nIf the temperature exceeds 85 \xC2\xB0" "C"));
+    CHECK(f.contains("\nOutput current | 0 |  | 200 | A\n```\n"));
+    CHECK(f.ends_with("[^source-pdf]: sample.pdf\n"));
+
+    // A second run needs --force; a file that is not HTPD is never replaced.
+    CHECK(!convert(options).has_value());
+    options.force = true;
+    CHECK(convert(options).has_value());
+    const fs::path other = dir / "notes.txt";
+    { std::ofstream(other) << "my notes"; }
+    options.output_dir = other;
+    CHECK(!convert(options).has_value());
+    CHECK_EQ(read_file(other), std::string("my notes"));
+    options.output_dir = dir;   // a folder
+    CHECK(!convert(options).has_value());
+}
+
 TEST(end_to_end_without_bookmarks) {
     ConvertOptions options;
     options.input = fs::path(HTPD_TEST_DATA) / "sample_nobookmarks.pdf";
