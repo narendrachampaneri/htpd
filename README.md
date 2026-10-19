@@ -12,6 +12,7 @@
 
 <p align="center">
   <a href="#what-is-htpd"><b>What it is</b></a> &nbsp;·&nbsp;
+  <a href="https://github.com/narendrachampaneri/htpd/releases"><b>Download</b></a> &nbsp;·&nbsp;
   <a href="#quick-start"><b>Quick start</b></a> &nbsp;·&nbsp;
   <a href="#use-it-with-your-ai"><b>Use with your AI</b></a> &nbsp;·&nbsp;
   <a href="#the-format"><b>Format</b></a> &nbsp;·&nbsp;
@@ -60,6 +61,23 @@ flowchart LR
 ---
 
 ## Quick start
+
+### Download (no build needed)
+
+Get the files from the [**release page**](https://github.com/narendrachampaneri/htpd/releases):
+
+| File | What it is |
+|---|---|
+| `htpd-0.1.0-linux-x64.tar.gz` | The converter, ready to run - Linux x64, Ubuntu 24.04 or newer, also WSL on Windows |
+| `htpd-skill.zip` | The skill for AI apps ([how to add it](#2-apps-with-skills---the-htpd-skill)) |
+
+```sh
+tar xzf htpd-0.1.0-linux-x64.tar.gz
+cd htpd-0.1.0-linux-x64
+./htpd convert manual.pdf --single           # writes manual.htpd - give it to your AI
+```
+
+### Build from source
 
 **Requirements:** Linux (tested on Ubuntu 24.04, also in WSL), g++ 13+, make or CMake, Python 3.10+.
 
@@ -127,6 +145,9 @@ it is plain text.
 > hundred pages). For very large manuals, use the skill below.
 
 ### 2. Apps with skills - the `htpd` skill
+
+Download `htpd-skill.zip` from the [release page](https://github.com/narendrachampaneri/htpd/releases),
+or build it from the repository:
 
 ```sh
 python3 scripts/build_skill.py               # writes dist/htpd-skill.zip
