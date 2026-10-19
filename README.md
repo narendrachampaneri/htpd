@@ -220,8 +220,9 @@ Python tests also run without PyYAML, as the skill does in a chat sandbox.
 **Answering.** A first check on the i.MX 93 data sheet: of 12 questions
 with known answers the right section came first for 7, and both questions
 about things the data sheet does not contain (PCIe, HDMI) were answered
-*"Not found in this file."* Proper numbers on public test sets come from the
-evaluation harness in [`eval/`](eval/) - see the roadmap.
+*"Not found in this file."* Proper numbers on public test sets will come from
+the evaluation harness in [`eval/`](eval/README.md) - a developer tool that is
+written but not run yet; see the roadmap.
 
 ---
 
