@@ -39,6 +39,14 @@ class Generator(unittest.TestCase):
         with self.assertRaises(TestDocumentError):
             generate({"sample": self.b}, docs_list=pinned)
 
+    def test_refuses_tuning_documents(self) -> None:
+        tune = self.t / "tune.list"
+        tune.write_text(f"tuned tune {self.b.source_sha256} -\n")
+        with self.assertRaises(TestDocumentError):
+            generate({"tuned": self.b}, docs_list=tune)
+        with self.assertRaises(TestDocumentError):
+            generate({"sample": self.b}, docs_list=tune)
+
     def test_all_three_tasks(self) -> None:
         tasks = {e["task"] for e in self.ex}
         self.assertEqual(tasks, {"relevant", "child", "enough"})

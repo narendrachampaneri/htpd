@@ -205,6 +205,8 @@ class Harness(unittest.TestCase):
         self.assertIn("## Split: test", text)
         self.assertIn("| B3 HTPD sections, BM25 | 5 |", text)
         self.assertIn("| B0 whole document | 5 | - |", text)
+        # a system that refuses answerable questions must show it next to its "not found" score
+        self.assertIn("| Not found | False not found |", text)
 
     def test_splits(self) -> None:
         docs = {"a": "test", "b": "train"}
@@ -212,6 +214,11 @@ class Harness(unittest.TestCase):
         splits = {harness.split_of(q(f"b-{i}", 1, "?", "", [], [], bundle="b"), docs) for i in range(40)}
         self.assertEqual(splits, {"train", "tune"})
         self.assertEqual(harness.split_of(q("x", 1, "?", "", [], [], bundle="c"), docs), "unknown")
+
+    def test_a_tuning_document_gives_only_tuning_questions(self) -> None:
+        docs = {"t": "tune"}
+        splits = {harness.split_of(q(f"t-{i}", 1, "?", "", [], [], bundle="t"), docs) for i in range(40)}
+        self.assertEqual(splits, {"tune"})
 
     def test_all_baselines_registered(self) -> None:
         self.assertLessEqual({"B0", "B1", "B2", "B3"}, set(REGISTRY))

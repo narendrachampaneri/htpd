@@ -18,9 +18,9 @@ Hard negatives: the siblings of the right section, its neighbours, and the
 sections a word search confuses it with. The ancestors of the right section
 are never used as negatives (they hold its context).
 
-A bundle whose name is a test document in eval/docs.list, or whose source
-SHA-256 is the one of a test document, is refused: nothing from the test
-documents is ever used for training (AGENTS.md rule 10).
+A bundle whose name is a test or tuning document in eval/docs.list, or whose
+source SHA-256 is the one of such a document, is refused: nothing from them
+is ever used for training (AGENTS.md rule 10).
 """
 
 from __future__ import annotations
@@ -70,12 +70,12 @@ def h(text: str) -> int:
 
 
 def test_documents(docs_list: Path = DOCS_LIST) -> tuple[set[str], set[str]]:
-    """Names and pinned SHA-256 values of the test documents."""
+    """Names and pinned SHA-256 values of the test and tuning documents."""
     names, shas = set(), set()
     if docs_list.is_file():
         for line in docs_list.read_text(encoding="utf-8").split("\n"):
             parts = line.split("#", 1)[0].split()
-            if len(parts) >= 2 and parts[1] == "test":
+            if len(parts) >= 2 and parts[1] in ("test", "tune"):
                 names.add(parts[0])
                 if len(parts) >= 3 and parts[2] != "-":
                     shas.add(parts[2].lower())
@@ -86,7 +86,7 @@ def refuse_test_documents(bundles: dict[str, Bundle], docs_list: Path = DOCS_LIS
     names, shas = test_documents(docs_list)
     for name, b in bundles.items():
         if name in names or (b.source_sha256 or "").lower() in shas:
-            raise TestDocumentError(f"{name} is a test document: it is never used for training")
+            raise TestDocumentError(f"{name} is a test or tuning document: it is never used for training")
 
 
 # --------------------------------------------------------------------------

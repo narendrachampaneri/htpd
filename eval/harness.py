@@ -30,7 +30,7 @@ SPLITS = ("test", "tune", "train", "all")
 
 
 def doc_splits(path: Path = DOCS_LIST) -> dict[str, str]:
-    """bundle name -> "test" or "train", from eval/docs.list."""
+    """bundle name -> "test", "tune" or "train", from eval/docs.list."""
     out: dict[str, str] = {}
     if not path.is_file():
         return out
@@ -43,9 +43,10 @@ def doc_splits(path: Path = DOCS_LIST) -> dict[str, str]:
 
 
 def split_of(q: Question, docs: dict[str, str]) -> str:
-    """test documents give test questions; a quarter of the rest is for tuning."""
-    if docs.get(q.bundle) == "test":
-        return "test"
+    """Test documents give test questions and tuning documents tuning questions;
+    of the other documents a quarter is for tuning."""
+    if docs.get(q.bundle) in ("test", "tune"):
+        return docs[q.bundle]
     if docs.get(q.bundle) is None:
         return "unknown"
     return "tune" if int(hashlib.sha256(q.id.encode()).hexdigest(), 16) % 4 == 0 else "train"
@@ -240,7 +241,8 @@ def write_report(results_dir: Path = RESULTS, out: Path = REPORT) -> str:
              "Written by `python -m eval report` from `eval/results/`. Never edit by hand.", "",
              "Recall@k: a gold section is among the first k. MRR: mean of 1/rank of the first gold section.",
              "Page: the first page the system points to is a gold page. Not found: share of questions",
-             "about things the document does not hold that get \"not found\". Tokens: words and",
+             "about things the document does not hold that get \"not found\". False not found: share of",
+             "questions the document does answer that still get \"not found\" (lower is better). Tokens: words and",
              "punctuation marks handed to the AI (one measure for all systems); \"of whole\" is the",
              "share of the whole document.", ""]
     for split in ("test", "tune", "train", "all"):
@@ -251,15 +253,15 @@ def write_report(results_dir: Path = RESULTS, out: Path = REPORT) -> str:
         for phase in sorted({r["phase"] for r in rs}):
             group = [r for r in rs if r["phase"] == phase]
             lines += [f"### {phase}", "",
-                      "| System | Questions | R@1 | R@5 | R@10 | MRR | Page | Not found | Tokens | Of whole | ms/question |",
-                      "|---|---|---|---|---|---|---|---|---|---|---|"]
+                      "| System | Questions | R@1 | R@5 | R@10 | MRR | Page | Not found | False not found | Tokens | Of whole | ms/question |",
+                      "|---|---|---|---|---|---|---|---|---|---|---|---|"]
             for r in sorted(group, key=lambda r: r["system"]):
                 m = r["metrics"]
                 checked = " (checked only)" if r.get("only_checked") else ""
                 lines.append(
                     f"| {r['label']}{checked} | {m['questions']} | {_f(m['recall@1'])} | {_f(m['recall@5'])} | "
                     f"{_f(m['recall@10'])} | {_f(m['mrr'])} | {_f(m['page_accuracy'])} | "
-                    f"{_f(m['not_found_accuracy'])} | {m['tokens_mean']:.0f} | {_f(m['tokens_vs_whole'], True)} | "
+                    f"{_f(m['not_found_accuracy'])} | {_f(m.get('false_not_found'))} | {m['tokens_mean']:.0f} | {_f(m['tokens_vs_whole'], True)} | "
                     f"{m['ms_per_question']:.1f} |")
             bundles = sorted({b for r in group for b in r["bundles"]})
             when = sorted({r["when"] for r in group})
