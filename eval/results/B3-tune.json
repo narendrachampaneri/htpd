@@ -1,0 +1,70 @@
+{
+  "system": "B3",
+  "label": "B3 HTPD sections, BM25",
+  "phase": "Phase 2 - baselines",
+  "split": "tune",
+  "only_checked": false,
+  "bundles": [
+    "riscv-priv"
+  ],
+  "when": "2026-10-20",
+  "machine": "Linux x86_64, Python 3.13.16",
+  "metrics": {
+    "questions": 73,
+    "answerable": 57,
+    "not_in_document": 16,
+    "recall@1": 0.7719298245614035,
+    "recall@5": 0.9473684210526315,
+    "recall@10": 0.9824561403508771,
+    "mrr": 0.8450292397660818,
+    "page_accuracy": 0.7192982456140351,
+    "not_found_accuracy": 0.0,
+    "false_not_found": 0.0,
+    "tokens_mean": 3472.123287671233,
+    "tokens_vs_whole": 0.03690685694499493,
+    "ms_per_question": 0.37667031506861637,
+    "by_kind": {
+      "1": {
+        "n": 44,
+        "recall@5": 1.0
+      },
+      "2": {
+        "n": 7,
+        "recall@5": 0.5714285714285714
+      },
+      "3": {
+        "n": 6,
+        "recall@5": 1.0
+      }
+    }
+  },
+  "misses": [
+    {
+      "id": "priv-020",
+      "rank": 10,
+      "top": [
+        "sections/0121-10-1-11-supervisor-address-translation-and-protection-satp-r",
+        "sections/0164-18-2-10-hypervisor-guest-address-translation-and-protection-r",
+        "sections/0190-18-6-4-trap-return"
+      ]
+    },
+    {
+      "id": "priv-021",
+      "rank": 6,
+      "top": [
+        "sections/0010-2-1-csr-address-mapping-conventions",
+        "sections/0009-chapter-2-control-and-status-registers-csrs",
+        "sections/0152-chapter-18-h-extension-for-hypervisor-support-version-1-0"
+      ]
+    },
+    {
+      "id": "priv-022",
+      "rank": 12,
+      "top": [
+        "sections/0164-18-2-10-hypervisor-guest-address-translation-and-protection-r",
+        "sections/0175-18-3-2-hypervisor-memory-management-fence-instructions",
+        "sections/0185-18-5-3-memory-management-fences"
+      ]
+    }
+  ]
+}

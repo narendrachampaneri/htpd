@@ -14,48 +14,39 @@
     "questions": 133,
     "answerable": 111,
     "not_in_document": 22,
-    "recall@1": 0.42342342342342343,
-    "recall@5": 0.6576576576576577,
-    "recall@10": 0.7477477477477478,
-    "mrr": 0.5393662722610091,
-    "page_accuracy": 0.2972972972972973,
-    "not_found_accuracy": 1.0,
-    "false_not_found": 0.36936936936936937,
-    "tokens_mean": 774.0225563909775,
-    "tokens_vs_whole": 0.019393727053399094,
-    "ms_per_question": 5.576499105260134,
+    "recall@1": 0.5765765765765766,
+    "recall@5": 0.8558558558558559,
+    "recall@10": 0.9369369369369369,
+    "mrr": 0.691091091091091,
+    "page_accuracy": 0.4594594594594595,
+    "not_found_accuracy": 0.9545454545454546,
+    "false_not_found": 0.009009009009009009,
+    "tokens_mean": 1231.1353383458647,
+    "tokens_vs_whole": 0.030345680902684233,
+    "ms_per_question": 7.301089894736522,
     "by_kind": {
       "1": {
         "n": 66,
-        "recall@5": 0.6212121212121212
+        "recall@5": 0.8333333333333334
       },
       "2": {
         "n": 29,
-        "recall@5": 0.6551724137931034
+        "recall@5": 0.8620689655172413
       },
       "3": {
         "n": 16,
-        "recall@5": 0.8125
+        "recall@5": 0.9375
       }
     }
   },
   "misses": [
     {
       "id": "aapcs-001",
-      "rank": null,
+      "rank": 15,
       "top": [
         "sections/0015-2-1-3-references",
-        "sections/0011-2-about-this-document",
-        "sections/0016-2-2-terms-and-abbreviations"
-      ]
-    },
-    {
-      "id": "aapcs-002",
-      "rank": null,
-      "top": [
-        "sections/0005-1-3-latest-release-and-defects-report",
-        "sections/0094-8-1-7-arm-sme-save",
-        "sections/0071-6-6-10-asynchronous-transfers-of-control"
+        "sections/0051-6-4-2-properties-of-a-thread",
+        "sections/0125-15-footnotes"
       ]
     },
     {
@@ -69,128 +60,47 @@
     },
     {
       "id": "aapcs-004",
-      "rank": null,
+      "rank": 6,
       "top": [
         "sections/0102-10-1-2-types-varying-by-data-model",
-        "sections/0106-10-1-6-volatile-data-types",
-        "sections/0030-5-9-byte-order-endianness"
+        "sections/0040-6-the-base-procedure-call-standard",
+        "sections/0104-10-1-4-additional-types"
       ]
     },
     {
       "id": "aapcs-005",
-      "rank": 14,
-      "top": [
-        "sections/0096-8-2-dynamic-symbols-for-supported-state",
-        "sections/0118-12-appendix-support-for-scalable-vectors",
-        "sections/0047-6-2-sme-state"
-      ]
-    },
-    {
-      "id": "aapcs-010",
-      "rank": 8,
-      "top": [
-        "sections/0056-6-4-5-2-stack-constraints-at-a-public-interface",
-        "sections/0075-6-7-2-za-interfaces",
-        "sections/0074-6-7-1-pstate-sm-interfaces"
-      ]
-    },
-    {
-      "id": "aapcs-011",
-      "rank": 11,
-      "top": [
-        "sections/0075-6-7-2-za-interfaces",
-        "sections/0074-6-7-1-pstate-sm-interfaces",
-        "sections/0059-6-5-1-use-of-ip0-and-ip1-by-the-linker"
-      ]
-    },
-    {
-      "id": "aapcs-012",
-      "rank": null,
-      "top": [
-        "sections/0056-6-4-5-2-stack-constraints-at-a-public-interface",
-        "sections/0074-6-7-1-pstate-sm-interfaces",
-        "sections/0075-6-7-2-za-interfaces"
-      ]
-    },
-    {
-      "id": "aapcs-019",
       "rank": 12,
       "top": [
-        "sections/0109-10-1-8-1-bit-fields-no-larger-than-their-container",
-        "sections/0123-14-3-the-va-start-macro",
-        "sections/0114-10-2-argument-passing-conventions"
-      ]
-    },
-    {
-      "id": "aapcs-020",
-      "rank": 8,
-      "top": [
-        "sections/0123-14-3-the-va-start-macro",
-        "sections/0120-14-appendix-variable-argument-lists",
-        "sections/0114-10-2-argument-passing-conventions"
+        "sections/0096-8-2-dynamic-symbols-for-supported-state",
+        "sections/0047-6-2-sme-state",
+        "sections/0125-15-footnotes"
       ]
     },
     {
       "id": "aapcs-021",
-      "rank": 13,
-      "top": [
-        "sections/0042-6-1-1-general-purpose-registers",
-        "sections/0043-6-1-2-simd-and-floating-point-registers",
-        "sections/0041-6-1-machine-registers"
-      ]
-    },
-    {
-      "id": "aapcs-027",
       "rank": 6,
       "top": [
-        "sections/0024-5-3-half-precision-floating-point",
-        "sections/0023-5-2-modal-8-bit-floating-point",
+        "sections/0041-6-1-machine-registers",
+        "sections/0042-6-1-1-general-purpose-registers",
         "sections/0043-6-1-2-simd-and-floating-point-registers"
       ]
     },
     {
-      "id": "aapcs-028",
-      "rank": 20,
-      "top": [
-        "sections/0030-5-9-byte-order-endianness",
-        "sections/0093-8-1-6-arm-sme-state-size",
-        "sections/0024-5-3-half-precision-floating-point"
-      ]
-    },
-    {
       "id": "aapcs-029",
-      "rank": null,
+      "rank": 9,
       "top": [
         "sections/0024-5-3-half-precision-floating-point",
         "sections/0040-6-the-base-procedure-call-standard",
-        "sections/0023-5-2-modal-8-bit-floating-point"
-      ]
-    },
-    {
-      "id": "aapcs-030",
-      "rank": 13,
-      "top": [
-        "sections/0025-5-4-decimal-floating-point",
-        "sections/0043-6-1-2-simd-and-floating-point-registers",
-        "sections/0024-5-3-half-precision-floating-point"
+        "sections/0041-6-1-machine-registers"
       ]
     },
     {
       "id": "aapcs-038",
-      "rank": 11,
+      "rank": 10,
       "top": [
         "sections/0082-7-1-half-precision-format-compatibility",
-        "sections/0059-6-5-1-use-of-ip0-and-ip1-by-the-linker",
-        "sections/0024-5-3-half-precision-floating-point"
-      ]
-    },
-    {
-      "id": "aapcs-049",
-      "rank": null,
-      "top": [
-        "sections/0102-10-1-2-types-varying-by-data-model",
-        "sections/0005-1-3-latest-release-and-defects-report",
-        "sections/0029-5-8-pointers"
+        "sections/0024-5-3-half-precision-floating-point",
+        "sections/0036-5-10-5-homogeneous-aggregates"
       ]
     },
     {
@@ -204,142 +114,52 @@
     },
     {
       "id": "debug-004",
-      "rank": 9,
+      "rank": 6,
       "top": [
-        "sections/0078-4-3-wait-for-interrupt-instruction",
-        "sections/0144-b-2-2-checking-for-halted-harts",
-        "sections/0001-the-risc-v-debug-specification"
+        "sections/0116-5-7-11-match-control-mcontrol-at-0x7a1",
+        "sections/0117-5-7-12-match-control-type-6-mcontrol6-at-0x7a1",
+        "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0"
       ]
     },
     {
       "id": "debug-005",
-      "rank": 19,
-      "top": [
-        "sections/0001-the-risc-v-debug-specification",
-        "sections/0041-3-13-version-detection",
-        "sections/0043-3-14-1-debug-module-status-dmstatus-at-0x11"
-      ]
-    },
-    {
-      "id": "debug-006",
-      "rank": 18,
-      "top": [
-        "sections/0129-6-1-4-dtm-control-and-status-dtmcs-at-0x10",
-        "sections/0001-the-risc-v-debug-specification",
-        "sections/0043-3-14-1-debug-module-status-dmstatus-at-0x11"
-      ]
-    },
-    {
-      "id": "debug-008",
-      "rank": 16,
-      "top": [
-        "sections/0044-3-14-2-debug-module-control-dmcontrol-at-0x10",
-        "sections/0043-3-14-1-debug-module-status-dmstatus-at-0x11",
-        "sections/0101-5-5-3-cache-operations"
-      ]
-    },
-    {
-      "id": "debug-010",
-      "rank": 16,
-      "top": [
-        "sections/0030-3-6-halt-groups-resume-groups-and-external-triggers",
-        "sections/0139-a-3-debug-module-interface-signals",
-        "sections/0138-a-2-execution-based"
-      ]
-    },
-    {
-      "id": "debug-011",
-      "rank": 9,
-      "top": [
-        "sections/0121-5-7-16-external-trigger-tmexttrigger-at-0x7a1",
-        "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0",
-        "sections/0119-5-7-14-interrupt-trigger-itrigger-at-0x7a1"
-      ]
-    },
-    {
-      "id": "debug-017",
       "rank": 6,
       "top": [
-        "sections/0018-1-3-3-1-long-name-shortname-at-0x123",
-        "sections/0107-5-7-2-trigger-data-1-tdata1-at-0x7a1",
-        "sections/0011-1-2-1-4-new-features-from-0-13-to-1-0"
-      ]
-    },
-    {
-      "id": "debug-020",
-      "rank": 7,
-      "top": [
-        "sections/0036-3-8-program-buffer",
-        "sections/0153-b-2-7-2-using-program-buffer",
-        "sections/0157-b-2-8-2-using-program-buffer"
-      ]
-    },
-    {
-      "id": "debug-021",
-      "rank": 18,
-      "top": [
-        "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0",
-        "sections/0094-5-1-enumeration",
-        "sections/0116-5-7-11-match-control-mcontrol-at-0x7a1"
-      ]
-    },
-    {
-      "id": "debug-022",
-      "rank": null,
-      "top": [
-        "sections/0102-5-5-4-address-matches",
-        "sections/0107-5-7-2-trigger-data-1-tdata1-at-0x7a1",
-        "sections/0091-4-10-virtual-debug-registers"
-      ]
-    },
-    {
-      "id": "debug-023",
-      "rank": 18,
-      "top": [
-        "sections/0036-3-8-program-buffer",
-        "sections/0163-b-3-1-single-step",
-        "sections/0034-3-7-1-2-quick-access"
+        "sections/0041-3-13-version-detection",
+        "sections/0001-the-risc-v-debug-specification",
+        "sections/0129-6-1-4-dtm-control-and-status-dtmcs-at-0x10"
       ]
     },
     {
       "id": "debug-025",
-      "rank": 9,
+      "rank": null,
       "top": [
         "sections/0081-4-5-1-step-bit-in-dcsr",
-        "sections/0103-5-5-4-1-invalid-addresses",
-        "sections/0066-3-14-24-system-bus-address-63-32-sbaddress1-at-0x3a"
+        "sections/0086-4-9-core-debug-registers",
+        "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0"
+      ]
+    },
+    {
+      "id": "debug-028",
+      "rank": 6,
+      "top": [
+        "sections/0087-4-9-1-debug-control-and-status-dcsr-at-0x7b0",
+        "sections/0097-5-4-native-triggers",
+        "sections/0119-5-7-14-interrupt-trigger-itrigger-at-0x7a1"
       ]
     },
     {
       "id": "debug-033",
       "rank": null,
       "top": [
-        "sections/0081-4-5-1-step-bit-in-dcsr",
         "sections/0163-b-3-1-single-step",
-        "sections/0080-4-5-single-step"
-      ]
-    },
-    {
-      "id": "debug-041",
-      "rank": 6,
-      "top": [
-        "sections/0023-3-1-debug-module-interface-dmi",
-        "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11",
-        "sections/0002-table-of-contents"
-      ]
-    },
-    {
-      "id": "debug-042",
-      "rank": 10,
-      "top": [
-        "sections/0023-3-1-debug-module-interface-dmi",
-        "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11",
-        "sections/0055-3-14-13-next-debug-module-nextdm-at-0x1d"
+        "sections/0081-4-5-1-step-bit-in-dcsr",
+        "sections/0025-3-3-selecting-harts"
       ]
     },
     {
       "id": "debug-043",
-      "rank": 20,
+      "rank": 6,
       "top": [
         "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11",
         "sections/0023-3-1-debug-module-interface-dmi",
@@ -348,7 +168,7 @@
     },
     {
       "id": "debug-044",
-      "rank": 13,
+      "rank": 6,
       "top": [
         "sections/0023-3-1-debug-module-interface-dmi",
         "sections/0055-3-14-13-next-debug-module-nextdm-at-0x1d",
@@ -356,30 +176,12 @@
       ]
     },
     {
-      "id": "debug-045",
-      "rank": 11,
-      "top": [
-        "sections/0023-3-1-debug-module-interface-dmi",
-        "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11",
-        "sections/0002-table-of-contents"
-      ]
-    },
-    {
       "id": "debug-055",
-      "rank": 11,
+      "rank": 15,
       "top": [
         "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11",
         "sections/0023-3-1-debug-module-interface-dmi",
-        "sections/0129-6-1-4-dtm-control-and-status-dtmcs-at-0x10"
-      ]
-    },
-    {
-      "id": "debug-057",
-      "rank": 12,
-      "top": [
-        "sections/0160-b-2-10-handling-exceptions",
-        "sections/0087-4-9-1-debug-control-and-status-dcsr-at-0x7b0",
-        "sections/0162-b-3-native-debugger-implementation"
+        "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0"
       ]
     }
   ]

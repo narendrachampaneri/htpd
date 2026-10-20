@@ -1,0 +1,70 @@
+{
+  "system": "htpd-words",
+  "label": "HTPD: words + tree (no model)",
+  "phase": "Phase 3 - retriever and packer",
+  "split": "tune",
+  "only_checked": false,
+  "bundles": [
+    "riscv-priv"
+  ],
+  "when": "2026-10-20",
+  "machine": "Linux x86_64, Python 3.13.16",
+  "metrics": {
+    "questions": 73,
+    "answerable": 57,
+    "not_in_document": 16,
+    "recall@1": 0.7894736842105263,
+    "recall@5": 0.9473684210526315,
+    "recall@10": 0.9824561403508771,
+    "mrr": 0.8500354421407053,
+    "page_accuracy": 0.7543859649122807,
+    "not_found_accuracy": 0.9375,
+    "false_not_found": 0.0,
+    "tokens_mean": 1187.2465753424658,
+    "tokens_vs_whole": 0.012619810958379916,
+    "ms_per_question": 10.19042357534059,
+    "by_kind": {
+      "1": {
+        "n": 44,
+        "recall@5": 0.9772727272727273
+      },
+      "2": {
+        "n": 7,
+        "recall@5": 0.7142857142857143
+      },
+      "3": {
+        "n": 6,
+        "recall@5": 1.0
+      }
+    }
+  },
+  "misses": [
+    {
+      "id": "priv-015",
+      "rank": 11,
+      "top": [
+        "sections/0128-10-4-1-addressing-and-memory-protection",
+        "sections/0124-10-3-sv32-page-based-32-bit-virtual-memory-systems",
+        "sections/0031-3-1-6-4-endianness-control-in-mstatus-and-mstatush-registers"
+      ]
+    },
+    {
+      "id": "priv-020",
+      "rank": 6,
+      "top": [
+        "sections/0121-10-1-11-supervisor-address-translation-and-protection-satp-r",
+        "sections/0017-2-5-implicit-reads-of-csrs",
+        "sections/0164-18-2-10-hypervisor-guest-address-translation-and-protection-r"
+      ]
+    },
+    {
+      "id": "priv-022",
+      "rank": 9,
+      "top": [
+        "sections/0164-18-2-10-hypervisor-guest-address-translation-and-protection-r",
+        "sections/0185-18-5-3-memory-management-fences",
+        "sections/0182-18-5-two-stage-address-translation"
+      ]
+    }
+  ]
+}

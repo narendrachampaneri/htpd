@@ -25,6 +25,24 @@ Bundles: aapcs64, riscv-debug. Run on 2026-10-20, Linux x86_64, Python 3.13.16.
 
 | System | Questions | R@1 | R@5 | R@10 | MRR | Page | Not found | False not found | Tokens | Of whole | ms/question |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| HTPD: words + tree (no model) | 133 | 0.423 | 0.658 | 0.748 | 0.539 | 0.297 | 1.000 | 0.369 | 774 | 1.9 % | 5.6 |
+| HTPD: words + tree (no model) | 133 | 0.577 | 0.856 | 0.937 | 0.691 | 0.459 | 0.955 | 0.009 | 1231 | 3.0 % | 7.3 |
 
 Bundles: aapcs64, riscv-debug. Run on 2026-10-20, Linux x86_64, Python 3.13.16.
+
+## Split: tune
+
+### Phase 2 - baselines
+
+| System | Questions | R@1 | R@5 | R@10 | MRR | Page | Not found | False not found | Tokens | Of whole | ms/question |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| B3 HTPD sections, BM25 | 73 | 0.772 | 0.947 | 0.982 | 0.845 | 0.719 | 0.000 | 0.000 | 3472 | 3.7 % | 0.4 |
+
+Bundles: riscv-priv. Run on 2026-10-20, Linux x86_64, Python 3.13.16.
+
+### Phase 3 - retriever and packer
+
+| System | Questions | R@1 | R@5 | R@10 | MRR | Page | Not found | False not found | Tokens | Of whole | ms/question |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| HTPD: words + tree (no model) | 73 | 0.789 | 0.947 | 0.982 | 0.850 | 0.754 | 0.938 | 0.000 | 1187 | 1.3 % | 10.2 |
+
+Bundles: riscv-priv. Run on 2026-10-20, Linux x86_64, Python 3.13.16.

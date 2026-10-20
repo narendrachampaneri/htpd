@@ -23,7 +23,7 @@
     "false_not_found": 0.0,
     "tokens_mean": 2194.4436090225563,
     "tokens_vs_whole": 0.053567074365371954,
-    "ms_per_question": 0.31064647367585213,
+    "ms_per_question": 0.26874490225779474,
     "by_kind": {
       "1": {
         "n": 66,
