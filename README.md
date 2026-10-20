@@ -257,7 +257,7 @@ HTPD is version 0.1. It works today; these are the known next steps.
 - [x] Converter: sections, pages, tables, code, headers/footers, sideways pages, damaged files
 - [x] Single-file `.htpd` with reading rules for AI models
 - [x] Reader, word search, "not found" rule, `ask`, MCP server, skill for AI apps
-- [ ] **Better search on very large manuals** - a saved index next to the file (today each question re-indexes, about 7 s on 5600 pages) and better ranking for register and table questions
+- [ ] **Better search on very large manuals** - better ranking for register and table questions; a question on 5600 pages takes about 2 s from the command line (was 7 s), 0.02 s in the MCP server
 - [ ] Optional meaning search (small open embedding model, CPU only) - measured, then kept only if it helps
 - [x] Evaluation on public test sets, with the numbers in `eval/report.md` (questions still to be checked by a person)
 - [ ] **Fewer false "not found"** answers and better ranking than plain BM25 (see the report)

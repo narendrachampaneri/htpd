@@ -154,6 +154,17 @@ class Manual(unittest.TestCase):
         self.assertEqual(r.retrieve("At which temperature must the controller reduce the current?").missing, [])
         self.assertIn("Bluetooth", r.retrieve("Does it support Bluetooth?").missing)
 
+    def test_vocabulary_from_the_index_is_the_full_vocabulary(self) -> None:
+        from htpd_reader.tokens import main_tokens, technical_tokens
+
+        for b in (self.b, open_bundle(SAMPLE)):
+            full = set(main_tokens(b.title))
+            for s in b.sections:
+                for text in (s.title, s.text):
+                    full.update(main_tokens(text))
+                    full.update(technical_tokens(text))
+            self.assertEqual(Retriever(b, Settings(meaning=False)).vocabulary, full)
+
     def test_tree_counts_less_than_words(self) -> None:
         self.assertEqual(Settings().tree_weight, 0.1)
         only_tree = Retriever(self.b, Settings(meaning=False, words=False, numbers=False))

@@ -61,6 +61,8 @@ def technical_tokens(text: str, drop_stopwords: bool = False) -> list[str]:
             out.append(SHORT_FORMS[tok])
         if tok.startswith("0x"):
             continue
+        if "_" not in raw and (raw.islower() or raw.isupper() or raw[1:].islower()):
+            continue  # most words: no parts (fast path; same result)
         parts: list[str] = []
         if "_" in raw.strip("_"):
             parts = [p.lower() for p in raw.split("_") if p]

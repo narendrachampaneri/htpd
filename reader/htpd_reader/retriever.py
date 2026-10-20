@@ -222,6 +222,10 @@ class Retriever:
     def vocabulary(self) -> set[str]:
         """Every whole word of the document, lower case, and the joined form
         of words broken at a hyphen."""
+        if self._vocabulary is None and self.settings.technical:
+            # the word index already holds every technical token of every section,
+            # and those include the whole words: no second pass over the text
+            self._vocabulary = set(self.word_index.postings) | set(main_tokens(self.bundle.title))
         if self._vocabulary is None:
             vocab: set[str] = set(main_tokens(self.bundle.title))
             for s in self.sections:
