@@ -40,12 +40,13 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+.venv-models/
 *.egg-info/
 
 # model files (large; described in model/README.md, stored elsewhere)
 /model/checkpoints/
 # training data: made again any time by python -m model.make_data (check.md is kept)
-/model/data/*.jsonl
+/model/data/
 *.safetensors
 *.gguf
 *.onnx

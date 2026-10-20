@@ -33,7 +33,15 @@ and HTPD works without any model at all (`htpd-words`).
 
 ## How to train
 
-On any PC (CPU):
+On any PC (CPU), one command does everything - install, data, training,
+tuning, measuring - and writes `eval/report.md`:
+
+```sh
+./scripts/train_decider.sh            # about 30-60 min
+./scripts/train_decider.sh --quick    # a short try, a few minutes
+```
+
+The same steps by hand:
 
 ```sh
 python3 -m pip install -e . sentence-transformers
