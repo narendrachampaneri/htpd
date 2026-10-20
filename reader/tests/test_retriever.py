@@ -166,10 +166,12 @@ class Manual(unittest.TestCase):
             self.assertEqual(Retriever(b, Settings(meaning=False)).vocabulary, full)
 
     def test_tree_counts_less_than_words(self) -> None:
-        self.assertEqual(Settings().tree_weight, 0.1)
+        self.assertEqual(Settings().tree_weight, 0.01)
         only_tree = Retriever(self.b, Settings(meaning=False, words=False, numbers=False))
         c = only_tree.retrieve("debug abstract command").candidates[0]
-        self.assertAlmostEqual(c.score, 0.1 / 61)
+        self.assertAlmostEqual(c.score, 0.01 / 61)
+        # a tree vote is smaller than the gap between two neighbouring word ranks
+        self.assertLess(0.01 / 61, 1 / 61 - 1 / 62)
 
     def test_specific_terms(self) -> None:
         from htpd_reader.retriever import specific_terms
@@ -193,13 +195,14 @@ class Manual(unittest.TestCase):
 
 class DefaultBudget(unittest.TestCase):
     def test_one_default_budget_everywhere(self) -> None:
-        """2500 tokens: on the tuning split the answer stood in the text for 0.877
-        of the questions (0.825 at 1500); more did not help."""
+        """3000 tokens from up to 8 sections: on the tuning split the answer stood in
+        the text for 0.918 of the questions (0.876 at 2500 from 5)."""
         from htpd_reader.cli import build_parser
         from htpd_reader.mcp import Server
-        from htpd_reader.packer import DEFAULT_BUDGET
+        from htpd_reader.packer import DEFAULT_BUDGET, DEFAULT_SECTIONS
 
-        self.assertEqual(DEFAULT_BUDGET, 2500)
+        self.assertEqual((DEFAULT_BUDGET, DEFAULT_SECTIONS), (3000, 8))
+        self.assertEqual(Asker(open_bundle(SAMPLE), Settings(meaning=False)).max_sections, DEFAULT_SECTIONS)
         self.assertEqual(Asker(open_bundle(SAMPLE), Settings(meaning=False)).budget, DEFAULT_BUDGET)
         self.assertEqual(Server([]).budget, DEFAULT_BUDGET)
         self.assertEqual(build_parser().parse_args(["ask", "f", "q"]).budget, DEFAULT_BUDGET)

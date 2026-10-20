@@ -11,9 +11,12 @@ Three ranked lists, merged by reciprocal rank fusion (RRF):
             > subsection). This is what the structure of a bundle adds: a
             question about "the abstract command in the debug module" matches
             the place in the tree, even when the section text says neither.
-            It counts only a tenth of the other lists (`tree_weight`): on the
-            tuning questions it decides between close candidates, but at
-            full weight it pushes the right section down.
+            It counts only a hundredth of the other lists (`tree_weight`), so
+            it can only decide between candidates the words rank alike: on
+            the tuning questions every weight from 0.02 up pushed the right
+            section down (Recall@1 0.804 at 0.01, 0.691 at 0.1, Arm ELF
+            manual 0.825 -> 0.550), because neighbouring ranks of the fusion
+            differ by less than 0.001.
 
 A section number in the question ("section 3.14.2", "see 4.1") puts that
 section first.
@@ -76,7 +79,7 @@ class Settings:
     not_found_below: float = 0.0  # 0 disables "not found"
     coverage_of: int = 3  # how many top candidates count for the coverage
     unknown_terms: bool = True  # "not found" when the question names a term or word the document never uses
-    tree_weight: float = 0.1  # weight of the tree list in the fusion (words and meaning count 1)
+    tree_weight: float = 0.01  # weight of the tree list in the fusion (words and meaning count 1)
 
 
 @dataclass
