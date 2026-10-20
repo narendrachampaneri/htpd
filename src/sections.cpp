@@ -632,9 +632,10 @@ std::vector<Section> build_sections(std::span<const Line> lines, std::span<const
     const float pitch = typical_line_pitch(lines);
 
     const auto add = [&](std::string title, std::string number, int level, HeadingSource source,
-                         int heading_page, std::size_t begin, std::size_t end) {
+                         int heading_page, std::size_t begin, std::size_t end, std::size_t first_line) {
         Section s;
         s.order = sections.size();
+        s.first_line = std::min(first_line, lines.size());
         s.title = std::move(title);
         s.number = std::move(number);
         s.level = std::max(level, 1);
@@ -655,14 +656,14 @@ std::vector<Section> build_sections(std::span<const Line> lines, std::span<const
             std::size_t end = begin;
             while (end < lines.size() && lines[end].page == lines[begin].page) ++end;
             add(std::format("Page {}", lines[begin].page + 1), {}, 1, HeadingSource::None,
-                lines[begin].page, begin, end);
+                lines[begin].page, begin, end, begin);
             begin = end;
         }
         return sections;
     }
 
     const std::size_t first = std::min(headings.front().line_index, lines.size());
-    if (first > 0) add("Front matter", {}, 1, HeadingSource::None, lines.front().page, 0, first);
+    if (first > 0) add("Front matter", {}, 1, HeadingSource::None, lines.front().page, 0, first, 0);
 
     std::size_t title_end = 0;   // end of the previous heading's own title lines
     for (std::size_t i = 0; i < headings.size(); ++i) {
@@ -670,7 +671,7 @@ std::vector<Section> build_sections(std::span<const Line> lines, std::span<const
         // A heading never starts inside the title lines of the one before it.
         const std::size_t begin = std::max(h.line_index + h.line_count, title_end);
         const std::size_t end = i + 1 < headings.size() ? headings[i + 1].line_index : lines.size();
-        add(h.title, h.number, h.level, h.source, h.page, begin, end);
+        add(h.title, h.number, h.level, h.source, h.page, begin, end, std::min(h.line_index, begin));
         title_end = begin;
     }
 

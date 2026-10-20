@@ -42,6 +42,7 @@ struct BundleInfo {
     std::size_t skipped_rotated = 0;
     std::size_t unmapped = 0;
     std::size_t pages_without_text = 0;
+    std::size_t links = 0;               // links from one section to another
 };
 
 struct WriteOptions {

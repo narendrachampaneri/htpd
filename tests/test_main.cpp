@@ -24,6 +24,7 @@
 #include "htpd/furniture.hpp"
 #include "htpd/headings.hpp"
 #include "htpd/layout.hpp"
+#include "htpd/links.hpp"
 #include "htpd/pdf_reader.hpp"
 #include "htpd/sections.hpp"
 #include "htpd/sha256.hpp"
@@ -1940,6 +1941,77 @@ TEST(end_to_end_single_file) {
     CHECK_EQ(read_file(other), std::string("my notes"));
     options.output_dir = dir;   // a folder
     CHECK(!convert(options).has_value());
+}
+
+TEST(reader_reads_links_to_other_places_of_the_document) {
+    auto doc = PdfDocument::open(fs::path(HTPD_TEST_DATA) / "links.pdf");
+    REQUIRE(doc.has_value());
+    const auto first = doc->read_page(0);
+    REQUIRE(first.has_value());
+    // The jump to 2.1; the web link is not a place in the document.
+    REQUIRE(first->links.size() == 1);
+    CHECK_EQ(first->links[0].text, std::string("dmcontrol"));
+    CHECK_EQ(first->links[0].target_page, 1);
+    CHECK(first->links[0].has_target_point);
+    CHECK_EQ(first->links[0].target_y, 416.0f);   // 16 points above the heading at 400
+    const auto third = doc->read_page(2);
+    REQUIRE(third.has_value() && third->links.size() == 1);
+    CHECK_EQ(third->links[0].text, std::string("Registers"));
+    CHECK(!third->links[0].has_target_point);     // the page as a whole
+}
+
+TEST(links_lead_from_section_to_section) {
+    // Page 0: section A with a link; page 1: section B at the top, C in the middle.
+    std::vector<Line> lines;
+    lines.push_back(make_line(0, "A heading", 100));
+    lines.push_back(make_line(0, "See the control register here.", 120));
+    lines.push_back(make_line(1, "B heading", 100));
+    lines.push_back(make_line(1, "Text of B.", 120));
+    lines.push_back(make_line(1, "C heading", 400));
+    lines.push_back(make_line(1, "Text of C, see A.", 420));
+    std::vector<Section> sections(3);
+    for (std::size_t i = 0; i < 3; ++i) sections[i].order = i;
+    sections[0].first_line = 0;
+    sections[1].first_line = 2;
+    sections[2].first_line = 4;
+    std::vector<std::vector<PageLink>> links(2);
+    const Affine flip{1, 0, 0, -1, 0, 792};   // user space -> display space of a letter page
+    // "control register" on line 1 jumps to a point just above the heading of C (user y = 792 - 390).
+    links[0].push_back({140, 110, 230, 122, "control  register", 1, true, 72, 402});
+    links[0].push_back({140, 110, 230, 122, "control register", 1, true, 72, 402});   // the same again
+    // "A" in C jumps to page 0 as a whole; a link inside B to B itself is left out.
+    links[1].push_back({160, 410, 170, 422, "A", 0, false, 0, 0});
+    links[1].push_back({72, 110, 120, 122, "B", 1, true, 72, 700});
+    // A page number of a list of contents, and a box without words: nothing to read, left out.
+    links[0].push_back({140, 110, 230, 122, "45", 1, true, 72, 402});
+    links[0].push_back({140, 110, 230, 122, "", 1, false, 0, 0});
+    attach_links(sections, lines, links, std::vector<Affine>{flip, flip});
+    REQUIRE(sections[0].links.size() == 1);
+    CHECK_EQ(sections[0].links[0].text, std::string("control register"));
+    CHECK_EQ(sections[0].links[0].target, std::size_t{2});
+    CHECK_EQ(sections[0].links[0].page, 1);
+    CHECK(sections[1].links.empty());
+    REQUIRE(sections[2].links.size() == 1);
+    CHECK_EQ(sections[2].links[0].target, std::size_t{0});
+}
+
+TEST(end_to_end_links) {
+    ConvertOptions options;
+    options.input = fs::path(HTPD_TEST_DATA) / "links.pdf";
+    options.output_dir = fresh_temp_dir("e2e_links");
+    REQUIRE(convert(options).has_value());
+    const std::string overview = read_file(options.output_dir / "sections/0001-1-overview.md");
+    CHECK(overview.contains("# Links\n\n* `dmcontrol` \u2192 [2.1 dmcontrol](0003-2-1-dmcontrol.md) - page 2\n"));
+    CHECK(read_file(options.output_dir / "sections/0004-3-appendix.md")
+              .contains("* `Registers` \u2192 [2 Registers](0002-2-registers.md) - page 2\n"));
+    CHECK(read_file(options.output_dir / "document.md").contains("* 3 links of the PDF from one section to another"));
+
+    options.single_file = true;
+    options.output_dir = fresh_temp_dir("e2e_links_single") / "links.htpd";
+    REQUIRE(convert(options).has_value());
+    const std::string f = read_file(options.output_dir);
+    CHECK(f.contains("<!-- htpd links -->\n* `dmcontrol` \u2192 [S3] 2.1 dmcontrol - page 2\n"));
+    CHECK(f.contains("<!-- htpd links -->\n* `Overview` \u2192 [S1] 1 Overview - page 1\n"));
 }
 
 TEST(end_to_end_without_bookmarks) {

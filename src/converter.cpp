@@ -5,6 +5,7 @@
 
 #include "htpd/bundle_writer.hpp"
 #include "htpd/layout.hpp"
+#include "htpd/links.hpp"
 #include "htpd/pdf_reader.hpp"
 #include "htpd/sections.hpp"
 #include "htpd/sha256.hpp"
@@ -19,6 +20,7 @@ struct Analysis {
     DocumentMeta meta;
     std::vector<Line> lines;              // whole document, reading order
     std::vector<Affine> page_transforms;
+    std::vector<std::vector<PageLink>> page_links;   // per page
     std::vector<FontFacts> fonts;         // indexed by Line::font
     HeadingResult headings;
     FurnitureReport furniture;
@@ -50,6 +52,7 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
     std::vector<std::vector<Line>> pages(static_cast<std::size_t>(page_count));
     std::vector<float> heights(pages.size(), 0.0f);
     a.page_transforms.resize(pages.size());
+    a.page_links.resize(pages.size());
     for (int p = 0; p < page_count; ++p) {
         const auto index = static_cast<std::size_t>(p);
         if (auto page = doc.read_page(p)) {
@@ -58,6 +61,7 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
             a.skipped_rotated += page->skipped_rotated;
             a.unmapped += page->unmapped;
             pages[index] = build_lines(*page);
+            a.page_links[index] = std::move(page->links);
         }
         if (pages[index].empty()) ++a.pages_without_text;
         if (options.on_progress) options.on_progress(p + 1, page_count);
@@ -108,6 +112,7 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     section_options.dehyphenate = options.dehyphenate;
     section_options.fonts = std::move(a.fonts);
     std::vector<Section> sections = build_sections(a.lines, a.headings.headings, section_options);
+    attach_links(sections, a.lines, a.page_links, a.page_transforms);
 
     BundleInfo info;
     info.meta = a.meta;
@@ -125,6 +130,7 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     info.skipped_rotated = a.skipped_rotated;
     info.unmapped = a.unmapped;
     info.pages_without_text = a.pages_without_text;
+    for (const Section& s : sections) info.links += s.links.size();
 
     std::filesystem::path out_dir = options.output_dir;
     if (out_dir.empty()) out_dir = options.input.stem().string() + ".htpd";

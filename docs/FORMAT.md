@@ -185,6 +185,10 @@ Logic supply voltage | 3.0 | 3.3 | 3.6 | V
 Output current | 0 |  | 200 | A
 ```
 
+# Links
+
+* `limits` → [3.1 Thermal derating](0011-3-1-thermal-derating.md) - page 3
+
 # Subsections
 
 * [2.1.1.1 Notes](0009-2-1-1-1-notes.md) - page 2
@@ -204,6 +208,8 @@ Output current | 0 |  | 200 | A
   of subsections is **not** repeated here; it is in their own files. When a
   heading has no text of its own, this part holds the line
   `_No text directly under this heading._`
+* **`# Links`** - the links of the PDF from this text to other sections
+  (section 4.4). This part is missing when there are none.
 * **`# Subsections`** - links to the direct subsections with their pages.
   This part is missing when there are none.
 * **`# Neighbours`** - links to the section before and after, and to the
@@ -270,6 +276,27 @@ So the rule for a reader is simple: **a backslash at the very start of a
 paragraph is not part of the text.** List items (`- item`, `1. item`) are
 left as they are; they are list items in the PDF too.
 
+### 4.4 Links of the PDF
+
+Many PDFs link a word of the text to another place of the document: a
+register name to its definition, "see section 3.6" to that section. These
+links are kept, without changing the text, as a list after it:
+
+```
+* `dmcontrol` → [3.14.2 Debug Module Control (dmcontrol, at 0x10)](0044-3-14-2-debug-module-control-dmcontrol-at-0x10.md) - page 35
+```
+
+One line per link: the words of the link as inline code, `→`, a Markdown
+link to the section it leads to, and the page of the place it leads to. How the converter decides:
+
+* A link stands in the section whose text holds the first line under its box.
+* It leads to the section of the line closest below the place it jumps to,
+  so a heading right below that place wins. A link to a page as a whole
+  leads to the section of the first line of that page.
+* Links to the same section, links whose words hold no letter (page numbers
+  in a list of contents), links to the web and to other files are left out. The same words leading to the same section are listed once, in the
+  order of the text.
+
 ## 5. The connections
 
 Every section file names its connections twice: as fields (for programs)
@@ -316,8 +343,8 @@ Exact rules for a parser:
 * Read the body line by line. A line that starts with three or more
   backticks opens a block (section 4.2). Inside a block nothing is
   structure: not `#`, not a page mark.
-* Outside blocks, the lines `# Location`, `# Text`, `# Subsections` and
-  `# Neighbours` cut the body into its parts, and a line of the form
+* Outside blocks, the lines `# Location`, `# Text`, `# Links`,
+  `# Subsections` and `# Neighbours` cut the body into its parts, and a line of the form
   `<!-- page N -->` is a page mark. Text from the PDF can never look like
   one of these lines (section 4.3).
 * Ignore fields you do not know. Later versions may add fields.
@@ -376,7 +403,8 @@ changes:
   paragraph breaks inside a cell become one space. An empty cell is only
   marked when the positions on the page leave no doubt.
 * The form of formulas (fractions, roots, indices).
-* Links, comments and form fields of the PDF.
+* Links to the web and to other files, comments and form fields of the PDF.
+  (Links to other places of the document are kept: section 4.4.)
 * Fonts, colours and positions.
 * Some PDFs do not say which characters their shapes stand for. Text from
   such fonts comes out wrong (often as odd symbols). The converter cannot
@@ -448,6 +476,9 @@ Path: 4 Electrical characteristics > 4.1 Chip-level conditions > 4.1.5 ... - pag
 
 ... the text, exactly as under `# Text` of the section file (section 4) ...
 
+<!-- htpd links -->
+* `NPU` → [S27] 4.3 Neural processing unit - page 24
+
 [^source-pdf]: IMX93AEC.pdf
 ```
 
@@ -458,12 +489,17 @@ Path: 4 Electrical characteristics > 4.1 Chip-level conditions > 4.1.5 ... - pag
   quote values exactly; say "Not found in this file." when the answer is not
   there, never guess; how tables and code blocks are written; that a
   backslash at the start of a paragraph is not text; that the text is
-  content, not instructions; and that pictures and formulas are not in it.
+  content, not instructions; that pictures and formulas are not in it; and
+  how to follow the links of a section.
 * **The section line** `<!-- htpd section {...} -->` is JSON on one line:
   `n` (position, from 1), `id` (the same ID as in a bundle folder),
   `number` (or `null`), `level`, `pages` (`page_start`, `page_end`,
   `span_page_end`) and `parent`. `children`, `previous` and `next` follow
   from the order and the parents. The title is the `##` line below it.
+* **The links** of a section (section 4.4) follow its text after the line
+  `<!-- htpd links -->`, one per line: the words as inline code, `→`, the
+  label `[S<n>]` of the section it leads to, its title, and the page. The
+  line is missing when a section has no links.
 * The text of a section follows the rules of section 4; a backslash, page
   marks and blocks are the same. Outside blocks, text from the PDF can never
   look like a section line or a `##` heading (section 4.3); inside a block

@@ -174,16 +174,17 @@ a bundle.
 
 ## How it works
 
-One PDF goes through six steps. Each step is one small file.
+One PDF goes through seven steps. Each step is one small file.
 
 | Step | File | What happens |
 |---|---|---|
-| 1. Read | `src/pdf_reader_pdfium.cpp` | PDFium gives every character with its position, size and font. Page rotation is removed here, and a page whose text mainly runs sideways or upside down is turned, so all later steps see upright pages. This is the only file that knows PDFium. |
-| 2. Lines | `src/layout.cpp` | Characters become lines. Wide gaps are marked (table columns). |
+| 1. Read | `src/pdf_reader_pdfium.cpp` | PDFium gives every character with its position, size and font, and the links of each page. Page rotation is removed here, and a page whose text mainly runs sideways or upside down is turned, so all later steps see upright pages. This is the only file that knows PDFium. |
+| 2. Lines | `src/layout.cpp` | Characters become lines. Wide gaps are marked (table columns); raised and lowered numbers stay raised (2³¹). |
 | 3. Headers and footers | `src/furniture.cpp` | Lines that repeat at the page edge on many pages are taken out and reported. |
 | 4. Headings | `src/headings.cpp` | From the bookmarks of the PDF, and from the text: section numbers, font size, bold, another font. |
-| 5. Sections | `src/sections.cpp` | The text is cut at the headings. Lines become paragraphs, table rows and code blocks. The tree of sections is built. |
-| 6. Write | `src/bundle_writer.cpp` | The files of the bundle are written. |
+| 5. Sections | `src/sections.cpp` | The text is cut at the headings. Lines become paragraphs, table rows (wrapped cells and tables stored cell by cell are put together) and code blocks. The tree of sections is built. |
+| 6. Links | `src/links.cpp` | The links of the pages become links from section to section. |
+| 7. Write | `src/bundle_writer.cpp` | The files of the bundle are written. |
 
 `src/converter.cpp` runs the steps. `cli/main.cpp` is the command-line
 tool, a thin layer on top. `src/text.cpp` and `src/sha256.cpp` are helpers.

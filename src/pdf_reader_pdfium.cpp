@@ -260,6 +260,81 @@ struct FontState {
 
 }  // namespace
 
+namespace {
+
+// The words under a box of the page, in the order of the text: what a link
+// says. `by_height` holds (centre y, index) of every glyph that is not a space,
+// sorted, so only the glyphs at the height of the box are looked at.
+std::string words_in(const std::vector<Glyph>& glyphs, const std::vector<std::pair<float, std::size_t>>& by_height,
+                     float x0, float y0, float x1, float y1) {
+    auto it = std::ranges::lower_bound(by_height, std::pair<float, std::size_t>{y0 - 1, 0});
+    std::vector<std::size_t> inside;
+    for (; it != by_height.end() && it->first <= y1 + 1; ++it) {
+        const Glyph& g = glyphs[it->second];
+        const float cx = (g.x0 + g.x1) / 2;
+        if (cx >= x0 - 1 && cx <= x1 + 1) inside.push_back(it->second);
+    }
+    std::ranges::sort(inside);
+    std::string text;
+    for (std::size_t k = 0; k < inside.size(); ++k) {
+        // anything between two glyphs of the link (a space, a glyph outside the box) is a gap
+        if (k > 0 && inside[k] != inside[k - 1] + 1) text.push_back(' ');
+        text::append_utf8(text, glyphs[inside[k]].cp);
+    }
+    return text;
+}
+
+// The links of a page that jump to another place of the same document. Links
+// to the web, to other files and actions are not kept.
+void read_links(FPDF_DOCUMENT doc, FPDF_PAGE page, PageText& out) {
+    int position = 0;
+    FPDF_LINK link = nullptr;
+    std::vector<std::pair<float, std::size_t>> by_height;
+    bool indexed = false;
+    while (FPDFLink_Enumerate(page, &position, &link)) {
+        FPDF_DEST dest = FPDFLink_GetDest(doc, link);
+        if (dest == nullptr) {
+            const FPDF_ACTION action = FPDFLink_GetAction(link);
+            if (action != nullptr && FPDFAction_GetType(action) == PDFACTION_GOTO) dest = FPDFAction_GetDest(doc, action);
+        }
+        if (dest == nullptr) continue;
+        const int target = FPDFDest_GetDestPageIndex(doc, dest);
+        if (target < 0) continue;
+        FS_RECTF rect;
+        if (!FPDFLink_GetAnnotRect(link, &rect)) continue;
+        PageLink pl;
+        float xs[4], ys[4];
+        out.user_to_display.apply(rect.left, rect.bottom, xs[0], ys[0]);
+        out.user_to_display.apply(rect.right, rect.bottom, xs[1], ys[1]);
+        out.user_to_display.apply(rect.left, rect.top, xs[2], ys[2]);
+        out.user_to_display.apply(rect.right, rect.top, xs[3], ys[3]);
+        pl.x0 = std::min({xs[0], xs[1], xs[2], xs[3]});
+        pl.x1 = std::max({xs[0], xs[1], xs[2], xs[3]});
+        pl.y0 = std::min({ys[0], ys[1], ys[2], ys[3]});
+        pl.y1 = std::max({ys[0], ys[1], ys[2], ys[3]});
+        if (!indexed) {
+            for (std::size_t i = 0; i < out.glyphs.size(); ++i) {
+                const Glyph& g = out.glyphs[i];
+                if (!g.is_space) by_height.emplace_back((g.y0 + g.y1) / 2, i);
+            }
+            std::ranges::sort(by_height);
+            indexed = true;
+        }
+        pl.text = words_in(out.glyphs, by_height, pl.x0, pl.y0, pl.x1, pl.y1);
+        pl.target_page = target;
+        FPDF_BOOL has_x = 0, has_y = 0, has_zoom = 0;
+        FS_FLOAT x = 0, y = 0, zoom = 0;
+        if (FPDFDest_GetLocationInPage(dest, &has_x, &has_y, &has_zoom, &x, &y, &zoom) && has_y) {
+            pl.has_target_point = true;
+            pl.target_x = has_x ? x : 0;
+            pl.target_y = y;
+        }
+        out.links.push_back(std::move(pl));
+    }
+}
+
+}  // namespace
+
 struct PdfDocument::Impl {
     FPDF_DOCUMENT doc = nullptr;
     // Font name -> position in `fonts`, filled while pages are read. Position
@@ -472,6 +547,7 @@ Result<PageText> PdfDocument::read_page(int index) const {
 
         out.glyphs.push_back(g);
     }
+    read_links(impl_->doc, page.get(), out);
     return out;
 }
 

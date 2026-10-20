@@ -53,6 +53,15 @@ struct Glyph {
     float size = 0;           // effective font size in points
 };
 
+// A link of a page that jumps to another place in the same document.
+struct PageLink {
+    float x0 = 0, y0 = 0, x1 = 0, y1 = 0;   // its box on its page (display space)
+    std::string text;                       // the words under the box, as on the page
+    int target_page = -1;                   // 0-based page it jumps to
+    bool has_target_point = false;          // false: it jumps to the page as a whole
+    float target_x = 0, target_y = 0;       // the point it jumps to (PDF user space of that page)
+};
+
 struct PageText {
     int index = 0;                       // 0-based page index
     float width = 0, height = 0;         // display size in points
@@ -61,6 +70,7 @@ struct PageText {
     std::size_t skipped_rotated = 0;     // glyphs dropped: not upright on the page
     int turned = 0;                      // quarter turns applied so that the main text is upright
     std::size_t unmapped = 0;            // glyphs without a Unicode mapping
+    std::vector<PageLink> links;         // jumps to other places of the document
 };
 
 // One visual line of text.
@@ -144,6 +154,13 @@ struct Paragraph {
     std::string text;
 };
 
+// A link from the text of a section to another section.
+struct SectionLink {
+    std::string text;                    // the words of the link, as on the page
+    std::size_t target = 0;              // index into the section vector
+    int page = 0;                        // 0-based page of the place it jumps to
+};
+
 struct Section {
     std::size_t order = 0;               // position in document order, 0-based
     std::string title;
@@ -157,6 +174,8 @@ struct Section {
     int span_page_end = 0;               // including all subsections
     std::vector<Paragraph> paragraphs;   // own text only (not the subsections')
     std::string file;                    // bundle-relative path, set by the writer
+    std::size_t first_line = 0;          // first line of the section (its heading), index into the lines
+    std::vector<SectionLink> links;      // links in its text to other sections
 };
 
 }  // namespace htpd

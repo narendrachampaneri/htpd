@@ -4,7 +4,7 @@ title: "2.2 Contactor"
 description: "The output contactor is rated for 200 A. It is controlled by the control board, which receives its commands from the MCU."
 resource: "sample.pdf#page=2"
 tags: [htpd, section]
-generated: { by: htpd/0.1.0, at: 2026-10-07T03:37:13Z }
+generated: { by: htpd/0.1.0, at: 2026-10-20T09:41:14Z }
 sources:
   - id: source-pdf
     resource: "sample.pdf#page=2"

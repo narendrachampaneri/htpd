@@ -84,13 +84,14 @@ internet; a test that needs a model uses a small stand-in.
   headings found in the text below them. It does not "pick the best mode".
 * `src/layout.cpp` does not work out columns. It keeps the order in which
   the PDF stores the text. Only a page stored from bottom to top, or in no
-  order at all, is sorted.
+  order at all, is sorted. (Inside a table, `src/sections.cpp` puts cells
+  together by position: FORMAT.md 4.2.)
 * A table row needs three or more cells. An empty cell is only written
   when the columns are certain (`rows_text` in `src/sections.cpp`).
 * Whether a font is monospace is measured from the widths of its
   characters. It is not taken from the font name.
 
-## The converter in six steps
+## The converter in seven steps
 
 | Step | File |
 |---|---|
@@ -99,7 +100,8 @@ internet; a test that needs a model uses a small stand-in.
 | 3. Headers and footers | `src/furniture.cpp` |
 | 4. Headings | `src/headings.cpp` |
 | 5. Sections, paragraphs, tables, code | `src/sections.cpp` |
-| 6. Write the bundle | `src/bundle_writer.cpp` |
+| 6. Links between sections | `src/links.cpp` |
+| 7. Write the bundle | `src/bundle_writer.cpp` |
 
 `src/converter.cpp` runs the steps. `cli/main.cpp` is the command-line
 tool. The public header is `include/htpd/converter.hpp`.

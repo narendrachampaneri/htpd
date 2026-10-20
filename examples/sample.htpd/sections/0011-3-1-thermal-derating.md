@@ -4,7 +4,7 @@ title: "3.1 Thermal derating"
 description: "If the temperature exceeds 85 °C, the controller shall reduce the charging current unless emergency mode is enabled."
 resource: "sample.pdf#page=3"
 tags: [htpd, section]
-generated: { by: htpd/0.1.0, at: 2026-10-07T03:37:13Z }
+generated: { by: htpd/0.1.0, at: 2026-10-20T09:41:14Z }
 sources:
   - id: source-pdf
     resource: "sample.pdf#page=3"

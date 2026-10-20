@@ -4,7 +4,7 @@ title: "ACME DC Charger Controller Reference Manual"
 description: "5 pages converted into 14 sections. Source: sample.pdf."
 resource: "sample.pdf"
 tags: [htpd, document]
-generated: { by: htpd/0.1.0, at: 2026-10-07T03:37:13Z }
+generated: { by: htpd/0.1.0, at: 2026-10-20T09:41:14Z }
 sources:
   - id: source-pdf
     resource: "sample.pdf"
@@ -55,7 +55,7 @@ htpd:
 * Removed 8 running header/footer lines (2 patterns):
   * header, 4 pages: `ACME DC Charger Controller Reference Manual Rev 1.2`
   * footer, 4 pages: `ACME Confidential Page 2`
-* Table rows are kept as lines of text with ` | ` between cells (blocks marked `text`). An empty cell is only shown where the positions on the page leave no doubt; a cell with several lines of text is not put together again.
+* Table rows are kept as lines of text with ` | ` between cells (blocks marked `text`). A cell with several lines is joined, and a table stored cell by cell is put together by position, where the columns are certain; otherwise the lines stay as they stand. An empty cell is only shown where the positions on the page leave no doubt.
 * Text in a monospace font (code, listings) is kept line by line with its spacing (blocks without a mark).
 * Figures and images are not converted.
 

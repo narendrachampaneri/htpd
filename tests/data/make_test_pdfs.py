@@ -246,6 +246,54 @@ def sideways(path):
     c.save()
 
 
+def links(path):
+    """Internal links, as manuals use them to jump to a register or a section.
+
+      page 1  "1 Overview": "dmcontrol" links to 2.1 on page 2 (to a point just
+              above that heading); a web link that is not a jump in the document.
+      page 2  "2 Registers" at the top, "2.1 dmcontrol" in the middle; "Overview"
+              links back to page 1.
+      page 3  "3 Appendix": "Registers" links to page 2 as a whole (no point).
+    """
+    c = canvas.Canvas(path, pagesize=letter)
+
+    def heading(text, y, key, level=0):
+        c.setFont('Helvetica-Bold', 14 if level == 0 else 12)
+        c.drawString(72, y, text)
+        c.bookmarkHorizontalAbsolute(key, y + 16)
+        c.addOutlineEntry(text, key, level)
+
+    def link_words(before, words, y, key):
+        x = 72 + c.stringWidth(before, 'Helvetica', 10)
+        c.linkRect('', key, (x, y - 3, x + c.stringWidth(words, 'Helvetica', 10), y + 9), relative=0)
+
+    heading('1 Overview', 720, 'ov')
+    c.setFont('Helvetica', 10)
+    c.drawString(72, 690, 'The reset bit is in dmcontrol, see there.')
+    link_words('The reset bit is in ', 'dmcontrol', 690, 'dm')
+    c.drawString(72, 676, 'More is at example.com on the web.')
+    x = 72 + c.stringWidth('More is at ', 'Helvetica', 10)
+    c.linkURL('https://example.com', (x, 673, x + 60, 685), relative=0)
+    c.showPage()
+
+    c.bookmarkPage('page2', fit='Fit')
+    heading('2 Registers', 720, 'reg')
+    c.setFont('Helvetica', 10)
+    c.drawString(72, 690, 'The registers of the module follow.')
+    heading('2.1 dmcontrol', 400, 'dm', 1)
+    c.setFont('Helvetica', 10)
+    c.drawString(72, 370, 'Controls the module. Back to the Overview.')
+    link_words('Controls the module. Back to the ', 'Overview', 370, 'ov')
+    c.showPage()
+
+    heading('3 Appendix', 720, 'app')
+    c.setFont('Helvetica', 10)
+    c.drawString(72, 690, 'All of them are listed in Registers.')
+    link_words('All of them are listed in ', 'Registers', 690, 'page2')
+    c.showPage()
+    c.save()
+
+
 def raw_pdf(path, objects):
     """Writes a PDF file from the bodies of its objects (object 1 is the catalog)."""
     out = bytearray(b'%PDF-1.4\n')
@@ -316,4 +364,5 @@ if __name__ == '__main__':
     lowlevel(os.path.join(OUT, 'lowlevel.pdf'))
     fonts(os.path.join(OUT, 'fonts.pdf'))
     sideways(os.path.join(OUT, 'sideways.pdf'))
-    print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf, sideways.pdf to', OUT)
+    links(os.path.join(OUT, 'links.pdf'))
+    print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf, sideways.pdf, links.pdf to', OUT)
