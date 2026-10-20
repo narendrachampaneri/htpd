@@ -24,7 +24,7 @@
     "answer_in_text": 1.0,
     "tokens_mean": 64663.520661157025,
     "tokens_vs_whole": 1.0,
-    "ms_per_question": 0.014236289261160823,
+    "ms_per_question": 0.015083256203596204,
     "by_kind": {}
   },
   "misses": [
