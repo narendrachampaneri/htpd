@@ -293,7 +293,9 @@ def _threshold(name: str) -> float:
     try:
         return float(json.loads(f.read_text(encoding="utf-8")).get(name, {}).get("not_found_below", 0.0))
     except (OSError, ValueError, AttributeError):
-        return 0.0
+        from .retriever import TUNED_NOT_FOUND_BELOW
+
+        return TUNED_NOT_FOUND_BELOW if name == "htpd-words" else 0.0
 
 
 def make_decider(name: str) -> Any:

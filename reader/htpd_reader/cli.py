@@ -96,14 +96,15 @@ def cmd_search(b: Bundle, args: argparse.Namespace) -> int:
 def cmd_ask(b: Bundle, args: argparse.Namespace) -> int:
     from .answer import answer
     from .ask import Asker
-    from .retriever import Settings
+    from .retriever import TUNED_NOT_FOUND_BELOW, Settings
 
     embedder = None
     if args.meaning:
         from .embed import SentenceTransformerEmbedder
 
         embedder = SentenceTransformerEmbedder()
-    asker = Asker(b, Settings(meaning=args.meaning), embedder=embedder, budget=args.budget)
+    asker = Asker(b, Settings(meaning=args.meaning, not_found_below=TUNED_NOT_FOUND_BELOW),
+                  embedder=embedder, budget=args.budget)
     a = answer(asker, " ".join(args.question), lines=args.lines)
     if args.json:
         data = a.to_dict()

@@ -47,6 +47,11 @@ from .tokens import SHORT_FORMS, STOPWORDS, main_tokens, plain_words, technical_
 
 RRF_K = 60
 
+# The "not found" coverage threshold of htpd-words, tuned on the tuning split by
+# `python -m eval tune htpd-words` (eval/tuned.json; a test keeps both equal).
+# htpd-read ask, the skill and the MCP server use it.
+TUNED_NOT_FOUND_BELOW = 0.17
+
 # Words that phrase a question but do not name what it is about. A question may
 # use them even when the document never does.
 QUESTION_WORDS = frozenset(

@@ -322,3 +322,13 @@ class AgentCheck(unittest.TestCase):
             self.assertEqual((m["questions"], m["page_accuracy"], m["not_found_accuracy"]), (3, 0.5, 1.0))
             text = harness.write_report(t / "results", t / "report.md")
             self.assertIn("Phase 6 - end to end", text)
+
+
+class ShippedThreshold(unittest.TestCase):
+    def test_the_reader_ships_the_tuned_threshold(self) -> None:
+        """htpd-read ask, the skill and the MCP server run with the threshold the
+        evaluation tuned, so users get the system that was measured."""
+        from htpd_reader.retriever import TUNED_NOT_FOUND_BELOW
+
+        tuned_file = Path(__file__).resolve().parents[1] / "tuned.json"
+        self.assertEqual(json.loads(tuned_file.read_text())["htpd-words"]["not_found_below"], TUNED_NOT_FOUND_BELOW)
