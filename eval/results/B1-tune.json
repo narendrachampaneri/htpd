@@ -5,41 +5,114 @@
   "split": "tune",
   "only_checked": false,
   "bundles": [
+    "aaelf64",
     "riscv-priv"
   ],
   "when": "2026-10-20",
   "machine": "Linux x86_64, Python 3.13.16",
   "metrics": {
-    "questions": 73,
-    "answerable": 57,
-    "not_in_document": 16,
-    "recall@1": 0.40350877192982454,
-    "recall@5": 0.8771929824561403,
-    "recall@10": 0.9298245614035088,
-    "mrr": 0.5978881894774568,
-    "page_accuracy": 0.6491228070175439,
+    "questions": 121,
+    "answerable": 97,
+    "not_in_document": 24,
+    "recall@1": 0.3402061855670103,
+    "recall@5": 0.845360824742268,
+    "recall@10": 0.9381443298969072,
+    "mrr": 0.5429394655178205,
+    "page_accuracy": 0.6701030927835051,
     "not_found_accuracy": 0.0,
     "false_not_found": 0.0,
-    "answer_in_text": 0.8596491228070176,
-    "tokens_mean": 2758.328767123288,
-    "tokens_vs_whole": 0.02931959402966993,
-    "ms_per_question": 0.3868564931539592,
+    "answer_in_text": 0.8865979381443299,
+    "tokens_mean": 2711.8429752066118,
+    "tokens_vs_whole": 0.07130280784364007,
+    "ms_per_question": 0.5837445950412774,
     "by_kind": {
       "1": {
-        "n": 44,
-        "recall@5": 0.9090909090909091
+        "n": 72,
+        "recall@5": 0.8472222222222222
       },
       "2": {
-        "n": 7,
-        "recall@5": 0.5714285714285714
+        "n": 15,
+        "recall@5": 0.7333333333333333
       },
       "3": {
-        "n": 6,
+        "n": 10,
         "recall@5": 1.0
       }
     }
   },
   "misses": [
+    {
+      "id": "elf-001",
+      "rank": 10,
+      "top": [
+        "sections/0075-5-7-16-private-and-platform-specific-relocations",
+        "sections/0076-5-7-17-unallocated-relocations",
+        "sections/0077-5-7-18-pauthabi-relocations"
+      ]
+    },
+    {
+      "id": "elf-003",
+      "rank": 6,
+      "top": [
+        "sections/0061-5-7-7-call-and-jump-relocations",
+        "sections/0062-5-7-8-group-relocations",
+        "sections/0014-2-1-1-current-status-and-anticipated-changes"
+      ]
+    },
+    {
+      "id": "elf-006",
+      "rank": 41,
+      "top": [
+        "sections/0023-4-1-linux-platform-abi-example-only",
+        "sections/0024-4-1-1-symbol-versioning",
+        "sections/0025-4-1-2-program-linkage-table-plt-sequences-and-usage-models"
+      ]
+    },
+    {
+      "id": "elf-012",
+      "rank": 9,
+      "top": [
+        "sections/0075-5-7-16-private-and-platform-specific-relocations",
+        "sections/0076-5-7-17-unallocated-relocations",
+        "sections/0077-5-7-18-pauthabi-relocations"
+      ]
+    },
+    {
+      "id": "elf-026",
+      "rank": 6,
+      "top": [
+        "sections/0075-5-7-16-private-and-platform-specific-relocations",
+        "sections/0076-5-7-17-unallocated-relocations",
+        "sections/0077-5-7-18-pauthabi-relocations"
+      ]
+    },
+    {
+      "id": "elf-027",
+      "rank": 6,
+      "top": [
+        "sections/0075-5-7-16-private-and-platform-specific-relocations",
+        "sections/0076-5-7-17-unallocated-relocations",
+        "sections/0077-5-7-18-pauthabi-relocations"
+      ]
+    },
+    {
+      "id": "elf-028",
+      "rank": 6,
+      "top": [
+        "sections/0081-6-1-1-platform-architecture-compatibility-data",
+        "sections/0082-6-2-program-property",
+        "sections/0083-6-3-program-loading"
+      ]
+    },
+    {
+      "id": "elf-036",
+      "rank": 12,
+      "top": [
+        "sections/0070-5-7-11-5-thread-local-storage-descriptors",
+        "sections/0071-5-7-12-thread-local-storage-data-relocations",
+        "sections/0060-5-7-6-static-aarch64-relocations"
+      ]
+    },
     {
       "id": "priv-003",
       "rank": 18,

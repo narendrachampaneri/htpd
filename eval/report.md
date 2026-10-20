@@ -17,8 +17,8 @@ share of the whole document.
 | System | Questions | R@1 | R@5 | R@10 | MRR | Page | Not found | False not found | Answer in text | Tokens | Of whole | ms/question |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | B0 whole document | 133 | - | - | - | - | - | 0.000 | 0.000 | 1.000 | 45556 | 100.0 % | 0.0 |
-| B1 chunks, BM25 | 133 | 0.360 | 0.712 | 0.829 | 0.512 | 0.505 | 0.000 | 0.000 | 0.829 | 2610 | 6.4 % | 0.3 |
-| B3 HTPD sections, BM25 | 133 | 0.649 | 0.874 | 0.928 | 0.748 | 0.541 | 0.000 | 0.000 | 0.838 | 2194 | 5.4 % | 0.3 |
+| B1 chunks, BM25 | 133 | 0.360 | 0.712 | 0.829 | 0.512 | 0.505 | 0.000 | 0.000 | 0.829 | 2610 | 6.4 % | 0.6 |
+| B3 HTPD sections, BM25 | 133 | 0.649 | 0.874 | 0.928 | 0.748 | 0.541 | 0.000 | 0.000 | 0.838 | 2194 | 5.4 % | 0.7 |
 
 Bundles: aapcs64, riscv-debug. Run on 2026-10-20, Linux x86_64, Python 3.13.16.
 
@@ -26,7 +26,7 @@ Bundles: aapcs64, riscv-debug. Run on 2026-10-20, Linux x86_64, Python 3.13.16.
 
 | System | Questions | R@1 | R@5 | R@10 | MRR | Page | Not found | False not found | Answer in text | Tokens | Of whole | ms/question |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| HTPD: words + tree (no model) | 133 | 0.577 | 0.856 | 0.937 | 0.691 | 0.459 | 0.955 | 0.009 | 0.784 | 1781 | 4.4 % | 4.8 |
+| HTPD: words + tree (no model) | 133 | 0.667 | 0.892 | 0.928 | 0.763 | 0.568 | 0.955 | 0.009 | 0.856 | 2457 | 6.1 % | 17.2 |
 
 Bundles: aapcs64, riscv-debug. Run on 2026-10-20, Linux x86_64, Python 3.13.16.
 
@@ -36,16 +36,16 @@ Bundles: aapcs64, riscv-debug. Run on 2026-10-20, Linux x86_64, Python 3.13.16.
 
 | System | Questions | R@1 | R@5 | R@10 | MRR | Page | Not found | False not found | Answer in text | Tokens | Of whole | ms/question |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| B0 whole document | 73 | - | - | - | - | - | 0.000 | 0.000 | 1.000 | 94078 | 100.0 % | 0.0 |
-| B1 chunks, BM25 | 73 | 0.404 | 0.877 | 0.930 | 0.598 | 0.649 | 0.000 | 0.000 | 0.860 | 2758 | 2.9 % | 0.4 |
-| B3 HTPD sections, BM25 | 73 | 0.772 | 0.947 | 0.982 | 0.845 | 0.719 | 0.000 | 0.000 | 0.930 | 3472 | 3.7 % | 0.4 |
+| B0 whole document | 121 | - | - | - | - | - | 0.000 | 0.000 | 1.000 | 64510 | 100.0 % | 0.0 |
+| B1 chunks, BM25 | 121 | 0.340 | 0.845 | 0.938 | 0.543 | 0.670 | 0.000 | 0.000 | 0.887 | 2712 | 7.1 % | 0.6 |
+| B3 HTPD sections, BM25 | 121 | 0.763 | 0.938 | 0.979 | 0.839 | 0.691 | 0.000 | 0.000 | 0.907 | 2795 | 5.8 % | 0.7 |
 
-Bundles: riscv-priv. Run on 2026-10-20, Linux x86_64, Python 3.13.16.
+Bundles: aaelf64, riscv-priv. Run on 2026-10-20, Linux x86_64, Python 3.13.16.
 
 ### Phase 3 - retriever and packer
 
 | System | Questions | R@1 | R@5 | R@10 | MRR | Page | Not found | False not found | Answer in text | Tokens | Of whole | ms/question |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| HTPD: words + tree (no model) | 73 | 0.789 | 0.947 | 0.982 | 0.850 | 0.754 | 0.938 | 0.000 | 0.877 | 1938 | 2.1 % | 9.6 |
+| HTPD: words + tree (no model) | 121 | 0.804 | 0.918 | 0.969 | 0.862 | 0.763 | 0.958 | 0.000 | 0.918 | 2324 | 6.1 % | 18.2 |
 
-Bundles: riscv-priv. Run on 2026-10-20, Linux x86_64, Python 3.13.16.
+Bundles: aaelf64, riscv-priv. Run on 2026-10-20, Linux x86_64, Python 3.13.16.

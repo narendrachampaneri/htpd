@@ -5,41 +5,69 @@
   "split": "tune",
   "only_checked": false,
   "bundles": [
+    "aaelf64",
     "riscv-priv"
   ],
   "when": "2026-10-20",
   "machine": "Linux x86_64, Python 3.13.16",
   "metrics": {
-    "questions": 73,
-    "answerable": 57,
-    "not_in_document": 16,
-    "recall@1": 0.7719298245614035,
-    "recall@5": 0.9473684210526315,
-    "recall@10": 0.9824561403508771,
-    "mrr": 0.8450292397660818,
-    "page_accuracy": 0.7192982456140351,
+    "questions": 121,
+    "answerable": 97,
+    "not_in_document": 24,
+    "recall@1": 0.7628865979381443,
+    "recall@5": 0.9381443298969072,
+    "recall@10": 0.979381443298969,
+    "mrr": 0.8387655300026434,
+    "page_accuracy": 0.6907216494845361,
     "not_found_accuracy": 0.0,
     "false_not_found": 0.0,
-    "answer_in_text": 0.9298245614035088,
-    "tokens_mean": 3472.123287671233,
-    "tokens_vs_whole": 0.03690685694499493,
-    "ms_per_question": 0.39252206848898713,
+    "answer_in_text": 0.9072164948453608,
+    "tokens_mean": 2795.0,
+    "tokens_vs_whole": 0.05809909205288446,
+    "ms_per_question": 0.6658863966975309,
     "by_kind": {
       "1": {
-        "n": 44,
-        "recall@5": 1.0
+        "n": 72,
+        "recall@5": 0.9583333333333334
       },
       "2": {
-        "n": 7,
-        "recall@5": 0.5714285714285714
+        "n": 15,
+        "recall@5": 0.8
       },
       "3": {
-        "n": 6,
+        "n": 10,
         "recall@5": 1.0
       }
     }
   },
   "misses": [
+    {
+      "id": "elf-001",
+      "rank": 6,
+      "top": [
+        "sections/0054-5-7-3-relocation-types",
+        "sections/0003-1-1-ilp32-beta",
+        "sections/0017-2-3-terms-and-abbreviations"
+      ]
+    },
+    {
+      "id": "elf-004",
+      "rank": 6,
+      "top": [
+        "sections/0020-3-1-1-64-bit-pointers-elf64",
+        "sections/0021-3-1-2-32-bit-pointers-elf32-beta",
+        "sections/0032-5-2-1-elf-identification"
+      ]
+    },
+    {
+      "id": "elf-006",
+      "rank": 13,
+      "top": [
+        "sections/0032-5-2-1-elf-identification",
+        "sections/0075-5-7-16-private-and-platform-specific-relocations",
+        "sections/0027-4-1-2-2-overview-of-plt-entry-code-generation"
+      ]
+    },
     {
       "id": "priv-020",
       "rank": 10,

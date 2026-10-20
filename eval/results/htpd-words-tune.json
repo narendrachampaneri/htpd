@@ -5,66 +5,112 @@
   "split": "tune",
   "only_checked": false,
   "bundles": [
+    "aaelf64",
     "riscv-priv"
   ],
   "when": "2026-10-20",
   "machine": "Linux x86_64, Python 3.13.16",
   "metrics": {
-    "questions": 73,
-    "answerable": 57,
-    "not_in_document": 16,
-    "recall@1": 0.7894736842105263,
-    "recall@5": 0.9473684210526315,
-    "recall@10": 0.9824561403508771,
-    "mrr": 0.8500354421407053,
-    "page_accuracy": 0.7543859649122807,
-    "not_found_accuracy": 0.9375,
+    "questions": 121,
+    "answerable": 97,
+    "not_in_document": 24,
+    "recall@1": 0.8041237113402062,
+    "recall@5": 0.9175257731958762,
+    "recall@10": 0.9690721649484536,
+    "mrr": 0.8623629520536737,
+    "page_accuracy": 0.7628865979381443,
+    "not_found_accuracy": 0.9583333333333334,
     "false_not_found": 0.0,
-    "answer_in_text": 0.8771929824561403,
-    "tokens_mean": 1937.6575342465753,
-    "tokens_vs_whole": 0.020596287487473962,
-    "ms_per_question": 9.586259232886022,
+    "answer_in_text": 0.9175257731958762,
+    "tokens_mean": 2323.528925619835,
+    "tokens_vs_whole": 0.06074172981679644,
+    "ms_per_question": 18.227200586778032,
     "by_kind": {
       "1": {
-        "n": 44,
-        "recall@5": 0.9772727272727273
+        "n": 72,
+        "recall@5": 0.9444444444444444
       },
       "2": {
-        "n": 7,
-        "recall@5": 0.7142857142857143
+        "n": 15,
+        "recall@5": 0.7333333333333333
       },
       "3": {
-        "n": 6,
+        "n": 10,
         "recall@5": 1.0
       }
     }
   },
   "misses": [
     {
+      "id": "elf-001",
+      "rank": 12,
+      "top": [
+        "sections/0003-1-1-ilp32-beta",
+        "sections/0054-5-7-3-relocation-types",
+        "sections/0017-2-3-terms-and-abbreviations"
+      ]
+    },
+    {
+      "id": "elf-004",
+      "rank": 6,
+      "top": [
+        "sections/0020-3-1-1-64-bit-pointers-elf64",
+        "sections/0021-3-1-2-32-bit-pointers-elf32-beta",
+        "sections/0032-5-2-1-elf-identification"
+      ]
+    },
+    {
+      "id": "elf-006",
+      "rank": 14,
+      "top": [
+        "sections/0075-5-7-16-private-and-platform-specific-relocations",
+        "sections/0032-5-2-1-elf-identification",
+        "sections/0027-4-1-2-2-overview-of-plt-entry-code-generation"
+      ]
+    },
+    {
       "id": "priv-015",
-      "rank": 11,
+      "rank": 9,
       "top": [
         "sections/0128-10-4-1-addressing-and-memory-protection",
-        "sections/0124-10-3-sv32-page-based-32-bit-virtual-memory-systems",
-        "sections/0031-3-1-6-4-endianness-control-in-mstatus-and-mstatush-registers"
+        "sections/0031-3-1-6-4-endianness-control-in-mstatus-and-mstatush-registers",
+        "sections/0004-preface"
       ]
     },
     {
       "id": "priv-020",
-      "rank": 6,
+      "rank": 10,
       "top": [
         "sections/0121-10-1-11-supervisor-address-translation-and-protection-satp-r",
-        "sections/0017-2-5-implicit-reads-of-csrs",
-        "sections/0164-18-2-10-hypervisor-guest-address-translation-and-protection-r"
+        "sections/0164-18-2-10-hypervisor-guest-address-translation-and-protection-r",
+        "sections/0190-18-6-4-trap-return"
+      ]
+    },
+    {
+      "id": "priv-021",
+      "rank": 6,
+      "top": [
+        "sections/0010-2-1-csr-address-mapping-conventions",
+        "sections/0152-chapter-18-h-extension-for-hypervisor-support-version-1-0",
+        "sections/0184-18-5-2-guest-page-faults"
       ]
     },
     {
       "id": "priv-022",
-      "rank": 9,
+      "rank": 12,
       "top": [
         "sections/0164-18-2-10-hypervisor-guest-address-translation-and-protection-r",
-        "sections/0185-18-5-3-memory-management-fences",
-        "sections/0182-18-5-two-stage-address-translation"
+        "sections/0175-18-3-2-hypervisor-memory-management-fence-instructions",
+        "sections/0185-18-5-3-memory-management-fences"
+      ]
+    },
+    {
+      "id": "priv-023",
+      "rank": 6,
+      "top": [
+        "sections/0120-10-1-10-supervisor-environment-configuration-register-senvcf",
+        "sections/0154-18-2-hypervisor-and-virtual-supervisor-csrs",
+        "sections/0002-table-of-contents"
       ]
     }
   ]

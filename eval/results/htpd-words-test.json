@@ -14,93 +14,75 @@
     "questions": 133,
     "answerable": 111,
     "not_in_document": 22,
-    "recall@1": 0.5765765765765766,
-    "recall@5": 0.8558558558558559,
-    "recall@10": 0.9369369369369369,
-    "mrr": 0.691091091091091,
-    "page_accuracy": 0.4594594594594595,
+    "recall@1": 0.6666666666666666,
+    "recall@5": 0.8918918918918919,
+    "recall@10": 0.9279279279279279,
+    "mrr": 0.7634676884676884,
+    "page_accuracy": 0.5675675675675675,
     "not_found_accuracy": 0.9545454545454546,
     "false_not_found": 0.009009009009009009,
-    "answer_in_text": 0.7837837837837838,
-    "tokens_mean": 1780.5413533834587,
-    "tokens_vs_whole": 0.04353678907860991,
-    "ms_per_question": 4.793592263156729,
+    "answer_in_text": 0.8558558558558559,
+    "tokens_mean": 2456.6466165413535,
+    "tokens_vs_whole": 0.06068564808465267,
+    "ms_per_question": 17.177079571431527,
     "by_kind": {
       "1": {
         "n": 66,
-        "recall@5": 0.8333333333333334
+        "recall@5": 0.8787878787878788
       },
       "2": {
         "n": 29,
-        "recall@5": 0.8620689655172413
+        "recall@5": 0.9310344827586207
       },
       "3": {
         "n": 16,
-        "recall@5": 0.9375
+        "recall@5": 0.875
       }
     }
   },
   "misses": [
     {
       "id": "aapcs-001",
-      "rank": 15,
+      "rank": 14,
       "top": [
+        "sections/0125-15-footnotes",
         "sections/0015-2-1-3-references",
-        "sections/0051-6-4-2-properties-of-a-thread",
-        "sections/0125-15-footnotes"
+        "sections/0074-6-7-1-pstate-sm-interfaces"
       ]
     },
     {
       "id": "aapcs-003",
       "rank": null,
       "top": [
-        "sections/0092-8-1-5-arm-get-current-vg",
         "sections/0027-5-6-scalable-vectors",
+        "sections/0092-8-1-5-arm-get-current-vg",
         "sections/0118-12-appendix-support-for-scalable-vectors"
-      ]
-    },
-    {
-      "id": "aapcs-004",
-      "rank": 6,
-      "top": [
-        "sections/0102-10-1-2-types-varying-by-data-model",
-        "sections/0040-6-the-base-procedure-call-standard",
-        "sections/0104-10-1-4-additional-types"
       ]
     },
     {
       "id": "aapcs-005",
       "rank": 12,
       "top": [
-        "sections/0096-8-2-dynamic-symbols-for-supported-state",
         "sections/0047-6-2-sme-state",
-        "sections/0125-15-footnotes"
-      ]
-    },
-    {
-      "id": "aapcs-021",
-      "rank": 6,
-      "top": [
-        "sections/0041-6-1-machine-registers",
-        "sections/0042-6-1-1-general-purpose-registers",
-        "sections/0043-6-1-2-simd-and-floating-point-registers"
+        "sections/0125-15-footnotes",
+        "sections/0094-8-1-7-arm-sme-save"
       ]
     },
     {
       "id": "aapcs-029",
-      "rank": 9,
+      "rank": 8,
       "top": [
         "sections/0024-5-3-half-precision-floating-point",
-        "sections/0040-6-the-base-procedure-call-standard",
-        "sections/0041-6-1-machine-registers"
+        "sections/0017-3-scope",
+        "sections/0040-6-the-base-procedure-call-standard"
       ]
     },
     {
       "id": "aapcs-038",
       "rank": 10,
       "top": [
-        "sections/0082-7-1-half-precision-format-compatibility",
         "sections/0024-5-3-half-precision-floating-point",
+        "sections/0082-7-1-half-precision-format-compatibility",
         "sections/0036-5-10-5-homogeneous-aggregates"
       ]
     },
@@ -123,30 +105,21 @@
       ]
     },
     {
-      "id": "debug-005",
-      "rank": 6,
-      "top": [
-        "sections/0041-3-13-version-detection",
-        "sections/0001-the-risc-v-debug-specification",
-        "sections/0129-6-1-4-dtm-control-and-status-dtmcs-at-0x10"
-      ]
-    },
-    {
       "id": "debug-025",
       "rank": null,
       "top": [
-        "sections/0081-4-5-1-step-bit-in-dcsr",
         "sections/0086-4-9-core-debug-registers",
-        "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0"
+        "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0",
+        "sections/0081-4-5-1-step-bit-in-dcsr"
       ]
     },
     {
       "id": "debug-028",
-      "rank": 6,
+      "rank": 11,
       "top": [
-        "sections/0087-4-9-1-debug-control-and-status-dcsr-at-0x7b0",
         "sections/0097-5-4-native-triggers",
-        "sections/0119-5-7-14-interrupt-trigger-itrigger-at-0x7a1"
+        "sections/0119-5-7-14-interrupt-trigger-itrigger-at-0x7a1",
+        "sections/0111-5-7-6-trigger-control-tcontrol-at-0x7a5"
       ]
     },
     {
@@ -154,35 +127,26 @@
       "rank": null,
       "top": [
         "sections/0163-b-3-1-single-step",
-        "sections/0081-4-5-1-step-bit-in-dcsr",
-        "sections/0025-3-3-selecting-harts"
-      ]
-    },
-    {
-      "id": "debug-043",
-      "rank": 6,
-      "top": [
-        "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11",
-        "sections/0023-3-1-debug-module-interface-dmi",
-        "sections/0064-3-14-22-system-bus-access-control-and-status-sbcs-at-0x38"
-      ]
-    },
-    {
-      "id": "debug-044",
-      "rank": 6,
-      "top": [
-        "sections/0023-3-1-debug-module-interface-dmi",
-        "sections/0055-3-14-13-next-debug-module-nextdm-at-0x1d",
-        "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11"
+        "sections/0025-3-3-selecting-harts",
+        "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0"
       ]
     },
     {
       "id": "debug-055",
-      "rank": 15,
+      "rank": 11,
       "top": [
         "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11",
         "sections/0023-3-1-debug-module-interface-dmi",
         "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0"
+      ]
+    },
+    {
+      "id": "debug-059",
+      "rank": 6,
+      "top": [
+        "sections/0144-b-2-2-checking-for-halted-harts",
+        "sections/0020-1-5-supported-features",
+        "sections/0056-3-14-14-abstract-data-0-data0-at-0x04"
       ]
     }
   ]
