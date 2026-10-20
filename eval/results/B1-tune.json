@@ -1,0 +1,107 @@
+{
+  "system": "B1",
+  "label": "B1 chunks, BM25",
+  "phase": "Phase 2 - baselines",
+  "split": "tune",
+  "only_checked": false,
+  "bundles": [
+    "riscv-priv"
+  ],
+  "when": "2026-10-20",
+  "machine": "Linux x86_64, Python 3.13.16",
+  "metrics": {
+    "questions": 73,
+    "answerable": 57,
+    "not_in_document": 16,
+    "recall@1": 0.40350877192982454,
+    "recall@5": 0.8771929824561403,
+    "recall@10": 0.9298245614035088,
+    "mrr": 0.5978881894774568,
+    "page_accuracy": 0.6491228070175439,
+    "not_found_accuracy": 0.0,
+    "false_not_found": 0.0,
+    "answer_in_text": 0.8596491228070176,
+    "tokens_mean": 2758.328767123288,
+    "tokens_vs_whole": 0.02931959402966993,
+    "ms_per_question": 0.3868564931539592,
+    "by_kind": {
+      "1": {
+        "n": 44,
+        "recall@5": 0.9090909090909091
+      },
+      "2": {
+        "n": 7,
+        "recall@5": 0.5714285714285714
+      },
+      "3": {
+        "n": 6,
+        "recall@5": 1.0
+      }
+    }
+  },
+  "misses": [
+    {
+      "id": "priv-003",
+      "rank": 18,
+      "top": [
+        "sections/0190-18-6-4-trap-return",
+        "sections/0191-chapter-19-risc-v-privileged-instruction-set-listings",
+        "sections/0125-10-3-1-addressing-and-memory-protection"
+      ]
+    },
+    {
+      "id": "priv-015",
+      "rank": 11,
+      "top": [
+        "sections/0128-10-4-1-addressing-and-memory-protection",
+        "sections/0031-3-1-6-4-endianness-control-in-mstatus-and-mstatush-registers",
+        "sections/0125-10-3-1-addressing-and-memory-protection"
+      ]
+    },
+    {
+      "id": "priv-020",
+      "rank": 17,
+      "top": [
+        "sections/0123-10-2-1-supervisor-memory-management-fence-instruction",
+        "sections/0124-10-3-sv32-page-based-32-bit-virtual-memory-systems",
+        "sections/0125-10-3-1-addressing-and-memory-protection"
+      ]
+    },
+    {
+      "id": "priv-022",
+      "rank": 27,
+      "top": [
+        "sections/0174-18-3-1-hypervisor-virtual-machine-load-and-store-instruction",
+        "sections/0175-18-3-2-hypervisor-memory-management-fence-instructions",
+        "sections/0181-18-4-5-machine-trap-instruction-register-mtinst"
+      ]
+    },
+    {
+      "id": "priv-023",
+      "rank": 10,
+      "top": [
+        "sections/0119-10-1-9-supervisor-trap-value-stval-register",
+        "sections/0120-10-1-10-supervisor-environment-configuration-register-senvcf",
+        "sections/0121-10-1-11-supervisor-address-translation-and-protection-satp-r"
+      ]
+    },
+    {
+      "id": "priv-041",
+      "rank": 7,
+      "top": [
+        "sections/0075-4-3-usage",
+        "sections/0076-chapter-5-smcsrind-sscsrind-indirect-csr-access-version-1-0-0",
+        "sections/0077-5-1-introduction"
+      ]
+    },
+    {
+      "id": "priv-065",
+      "rank": 9,
+      "top": [
+        "sections/0052-3-3-3-wait-for-interrupt",
+        "sections/0053-3-3-4-custom-system-instructions",
+        "sections/0054-3-4-reset"
+      ]
+    }
+  ]
+}

@@ -244,9 +244,10 @@ with known answers the right section came first for 7, and both questions
 about things the data sheet does not contain (PCIe, HDMI) were answered
 *"Not found in this file."* Measured numbers on public manuals (133 test
 questions) are in [`eval/report.md`](eval/report.md), written by the
-evaluation harness in [`eval/`](eval/README.md). They show what to improve
-next: the reader still says "not found" too often for questions the file
-does answer.
+evaluation harness in [`eval/`](eval/README.md). The reader says "Not
+found in this file." for almost every question the manuals do not answer,
+and almost never for one they do; plain word search over HTPD sections
+still ranks the first section a little better - that is the next step.
 
 ---
 
@@ -260,7 +261,8 @@ HTPD is version 0.1. It works today; these are the known next steps.
 - [ ] **Better search on very large manuals** - better ranking for register and table questions; a question on 5600 pages takes about 2 s from the command line (was 7 s), 0.02 s in the MCP server
 - [ ] Optional meaning search (small open embedding model, CPU only) - measured, then kept only if it helps
 - [x] Evaluation on public test sets, with the numbers in `eval/report.md` (questions still to be checked by a person)
-- [ ] **Fewer false "not found"** answers and better ranking than plain BM25 (see the report)
+- [x] **Fewer false "not found"** answers (see the report)
+- [ ] Rank the first section at least as well as plain BM25 over HTPD sections (see the report)
 - [ ] OCR for scanned pages (Tesseract, local)
 - [ ] Windows build
 

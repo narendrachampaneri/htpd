@@ -20,9 +20,10 @@
     "page_accuracy": 0.7543859649122807,
     "not_found_accuracy": 0.9375,
     "false_not_found": 0.0,
-    "tokens_mean": 1187.2465753424658,
-    "tokens_vs_whole": 0.012619810958379916,
-    "ms_per_question": 10.19042357534059,
+    "answer_in_text": 0.8771929824561403,
+    "tokens_mean": 1937.6575342465753,
+    "tokens_vs_whole": 0.020596287487473962,
+    "ms_per_question": 9.586259232886022,
     "by_kind": {
       "1": {
         "n": 44,

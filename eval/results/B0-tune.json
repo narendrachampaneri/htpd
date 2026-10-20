@@ -1,0 +1,281 @@
+{
+  "system": "B0",
+  "label": "B0 whole document",
+  "phase": "Phase 2 - baselines",
+  "split": "tune",
+  "only_checked": false,
+  "bundles": [
+    "riscv-priv"
+  ],
+  "when": "2026-10-20",
+  "machine": "Linux x86_64, Python 3.13.16",
+  "metrics": {
+    "questions": 73,
+    "answerable": 57,
+    "not_in_document": 16,
+    "recall@1": null,
+    "recall@5": null,
+    "recall@10": null,
+    "mrr": null,
+    "page_accuracy": null,
+    "not_found_accuracy": 0.0,
+    "false_not_found": 0.0,
+    "answer_in_text": 1.0,
+    "tokens_mean": 94078.0,
+    "tokens_vs_whole": 1.0,
+    "ms_per_question": 0.006084630144121622,
+    "by_kind": {}
+  },
+  "misses": [
+    {
+      "id": "priv-001",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-002",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-003",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-004",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-005",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-006",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-007",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-008",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-009",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-010",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-011",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-012",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-013",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-014",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-015",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-016",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-017",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-018",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-019",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-020",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-021",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-022",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-023",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-024",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-025",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-026",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-027",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-028",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-041",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-042",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-043",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-044",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-045",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-046",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-047",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-048",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-049",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-050",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-051",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-052",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-053",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-054",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-055",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-056",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-057",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-058",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-059",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-060",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-061",
+      "rank": null,
+      "top": []
+    },
+    {
+      "id": "priv-062",
+      "rank": null,
+      "top": []
+    }
+  ]
+}
