@@ -426,14 +426,19 @@ std::size_t rebuild_table(std::span<const Line> lines, std::size_t start, std::s
     std::vector<float> lefts = left;
     {
         std::vector<float> found;
-        for (std::size_t i = 0; i < pieces.size(); ++i) {
-            for (std::size_t j = 0; j < i; ++j) {
-                if (pieces[j].line == pieces[i].line && pieces[j].column == pieces[i].column &&
-                    pieces[i].x0 > pieces[j].x1) {
-                    found.push_back(pieces[i].x0);
-                    break;
+        // The pieces of one line stand next to each other in `pieces`.
+        for (std::size_t first = 0; first < pieces.size();) {
+            std::size_t last = first;
+            while (last + 1 < pieces.size() && pieces[last + 1].line == pieces[first].line) ++last;
+            for (std::size_t i = first + 1; i <= last; ++i) {
+                for (std::size_t j = first; j < i; ++j) {
+                    if (pieces[j].column == pieces[i].column && pieces[i].x0 > pieces[j].x1) {
+                        found.push_back(pieces[i].x0);
+                        break;
+                    }
                 }
             }
+            first = last + 1;
         }
         std::ranges::sort(found);
         for (std::size_t k = 0; k < found.size();) {
