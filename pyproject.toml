@@ -24,6 +24,9 @@ htpd-mcp = "htpd_reader.mcp:main"
 where = ["reader"]
 include = ["htpd_reader*"]
 
+[tool.setuptools.package-data]
+htpd_reader = ["rerank.json"]  # the weights of the re-ranker
+
 [tool.pytest.ini_options]
 # The Python tests of part B. They are plain unittest tests, so
 # `python -m unittest discover -s reader/tests -t .` runs them as well.

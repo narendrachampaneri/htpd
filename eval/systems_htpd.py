@@ -1,7 +1,8 @@
 """Phase 3 systems: the HTPD retriever and packer, and one row per part switched off.
 
   htpd             words + meaning + tree + section numbers, packed
-  htpd-words       without meaning search (needs no model; runs anywhere)
+  htpd-words       without meaning search and without the re-ranker
+  htpd-rerank      words + tree + the trained re-ranker: what the reader and skill use by default
   htpd-no-words    without word search
   htpd-no-meaning  same as htpd-words, named for the ablation table
   htpd-no-tree     without the path-of-titles list
@@ -29,7 +30,8 @@ PHASE = "Phase 3 - retriever and packer"
 
 VARIANTS: dict[str, tuple[str, dict[str, Any]]] = {
     "htpd": ("HTPD: words + meaning + tree", {}),
-    "htpd-words": ("HTPD: words + tree (no model)", {"meaning": False}),
+    "htpd-words": ("HTPD: words + tree (no model)", {"meaning": False, "rerank": False}),
+    "htpd-rerank": ("HTPD: words + tree + re-ranker (no model)", {"meaning": False, "rerank": True}),
     "htpd-no-words": ("HTPD without word search", {"words": False}),
     "htpd-no-meaning": ("HTPD without meaning search", {"meaning": False}),
     "htpd-no-tree": ("HTPD without the tree", {"tree": False}),

@@ -34,6 +34,7 @@ eval/get_docs.sh --from ~/pdfs        # or fill in the URLs in docs.list
 python -m eval validate               # keeps only questions whose answer is in the file
 python -m eval tune htpd-words        # "not found" threshold, on the tuning split
 python -m eval run htpd-words         # the test split -> eval/report.md
+python -m eval run htpd-rerank        # the same with the trained re-ranker (the reader's default)
 python -m eval systems                # all systems that can be compared
 ```
 

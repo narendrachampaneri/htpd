@@ -1,4 +1,29 @@
-# The HTPD decider - model card
+# The HTPD models - model card
+
+## The re-ranker (used by default)
+
+A small logistic model (`reader/htpd_reader/rerank.py`, weights in
+`reader/htpd_reader/rerank.json`, 14 numbers plus a bias) that re-orders the
+20 sections the retriever finds. It looks at what a person would look at:
+the ranks of word search and the tree, how much of the question the section
+and its best single line or table row hold, the specific terms and word
+pairs of the question, the title, length and depth. It needs only the
+Python standard library and adds a few milliseconds per question, so the
+skill and the MCP server use it too. It never changes the "not found" rule,
+and a section the question names stays first.
+
+* Trained with `python -m model.train_reranker eval/bundles/riscv-isa.htpd`
+  (numpy only, about 15 s on a CPU) on about 1 500 questions made by rules
+  from the **training document only**; test and tuning documents are refused.
+* Its one setting (the L2 penalty, 0.1) and the weight of title questions
+  (0.3) were chosen on the tuning split, then the test split was measured
+  once: on 133 test questions R@1 0.667 -> 0.685, R@5 0.892 -> 0.919, MRR
+  0.763 -> 0.793, page 0.622 -> 0.631, the answer in the text and "not found"
+  unchanged (`htpd-words` -> `htpd-rerank` in `eval/report.md`).
+* Without `rerank.json` (or with `Settings(rerank=False)`) the reader keeps
+  the order of the retriever.
+
+## The decider (optional)
 
 The decider re-orders the sections the retriever finds and says "not found"
 when no section answers the question (docs/PART-B.md, phase 5). This page
@@ -14,7 +39,7 @@ says what the models are, what they learn from, and where their numbers are.
 The models are not stored in git (`model/checkpoints/` is ignored). A trained
 model is saved to `model/checkpoints/cross-encoder-htpd`, or its place is
 given with `HTPD_CE_TRAINED`. Everything runs on a normal PC without a GPU,
-and HTPD works without any model at all (`htpd-words`).
+and HTPD works without them (`htpd-rerank`, the default).
 
 ## The data
 

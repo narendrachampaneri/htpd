@@ -264,6 +264,7 @@ HTPD is version 0.1. It works today; these are the known next steps.
 - [x] Evaluation on public test sets, with the numbers in `eval/report.md` (questions still to be checked by a person)
 - [x] **Fewer false "not found"** answers (see the report)
 - [x] Rank the first section at least as well as plain BM25 over HTPD sections (see the report)
+- [x] A small trained re-ranker (14 numbers, standard library, no GPU) that puts the right section first more often; trained on a training manual only ([`model/README.md`](model/README.md))
 - [ ] OCR for scanned pages (Tesseract, local)
 - [ ] Windows build
 
@@ -284,7 +285,7 @@ include/ src/ cli/      the converter (C++23, PDFium is used in one file only)
 reader/htpd_reader/     the reader: bundle, check, search, retriever, packer, ask, MCP server
 skills/htpd/            the skill for AI apps (scripts/build_skill.py packs it)
 eval/                   evaluation harness, baselines, report
-model/                  training data and the optional decider model
+model/                  the re-ranker's training (used by default) and the optional decider model
 tests/                  C++ tests, test PDFs, the stress test
 docs/                   FORMAT.md · CONVERTER.md · PART-B.md · BACKGROUND.md
 examples/               a converted document in both forms

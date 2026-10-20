@@ -26,6 +26,7 @@ Bundles: aapcs64, riscv-debug. Run on 2026-10-20, Linux x86_64, Python 3.13.16.
 
 | System | Questions | R@1 | R@5 | R@10 | MRR | Page | Not found | False not found | Answer in text | Tokens | Of whole | ms/question |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
+| HTPD: words + tree + re-ranker (no model) | 133 | 0.685 | 0.919 | 0.955 | 0.793 | 0.631 | 0.955 | 0.009 | 0.856 | 2493 | 6.1 % | 16.3 |
 | HTPD: words + tree (no model) | 133 | 0.667 | 0.892 | 0.928 | 0.763 | 0.622 | 0.955 | 0.009 | 0.856 | 2455 | 6.0 % | 10.6 |
 
 Bundles: aapcs64, riscv-debug. Run on 2026-10-20, Linux x86_64, Python 3.13.16.
@@ -46,6 +47,7 @@ Bundles: aaelf64, riscv-priv. Run on 2026-10-20, Linux x86_64, Python 3.13.16.
 
 | System | Questions | R@1 | R@5 | R@10 | MRR | Page | Not found | False not found | Answer in text | Tokens | Of whole | ms/question |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| HTPD: words + tree (no model) | 121 | 0.804 | 0.918 | 0.969 | 0.862 | 0.773 | 0.958 | 0.000 | 0.918 | 2323 | 6.1 % | 16.8 |
+| HTPD: words + tree + re-ranker (no model) | 121 | 0.825 | 0.979 | 0.979 | 0.887 | 0.794 | 0.958 | 0.000 | 0.928 | 2408 | 6.5 % | 25.5 |
+| HTPD: words + tree (no model) | 121 | 0.804 | 0.918 | 0.969 | 0.862 | 0.773 | 0.958 | 0.000 | 0.918 | 2323 | 6.1 % | 13.3 |
 
 Bundles: aaelf64, riscv-priv. Run on 2026-10-20, Linux x86_64, Python 3.13.16.

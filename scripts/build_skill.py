@@ -8,6 +8,7 @@ The zip holds one folder, `htpd/`, as its root:
     htpd/SKILL.md                    what the skill does and how the model uses it
     htpd/scripts/htpd.py             the command the model runs
     htpd/scripts/htpd_reader/*.py    the reader, standard library only
+    htpd/scripts/htpd_reader/rerank.json  the weights of the re-ranker
 
 Upload it in the Claude app (Customize > Skills; code execution must be on),
 or unpack it into the skills folder of any agent that reads SKILL.md files.
@@ -64,6 +65,7 @@ def build(out: Path) -> Path:
                                      (SKILL / "scripts" / "htpd.py", "htpd/scripts/htpd.py")]
     for py in sorted(PACKAGE.glob("*.py")):
         files.append((py, f"htpd/scripts/htpd_reader/{py.name}"))
+    files.append((PACKAGE / "rerank.json", "htpd/scripts/htpd_reader/rerank.json"))  # the re-ranker's weights
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         for src, arc in files:
             info = zipfile.ZipInfo(arc, date_time=(2026, 1, 1, 0, 0, 0))   # same bytes on every build

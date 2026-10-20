@@ -142,7 +142,7 @@ class Server:
             decider = None
             if self.decider_name:
                 decider = make_decider(self.decider_name)
-            self._askers[key] = Asker(b, Settings(meaning=self.meaning, not_found_below=_threshold("htpd" if self.meaning else "htpd-words")),
+            self._askers[key] = Asker(b, Settings(meaning=self.meaning, not_found_below=_threshold("htpd" if self.meaning else "htpd-rerank")),
                                       embedder=embedder, decider=decider, budget=self.budget)
         return self._askers[key]
 
@@ -300,7 +300,7 @@ def _threshold(name: str) -> float:
     except (OSError, ValueError, AttributeError):
         from .retriever import TUNED_NOT_FOUND_BELOW
 
-        return TUNED_NOT_FOUND_BELOW if name == "htpd-words" else 0.0
+        return TUNED_NOT_FOUND_BELOW if name in ("htpd-words", "htpd-rerank") else 0.0
 
 
 def make_decider(name: str) -> Any:

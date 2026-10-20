@@ -80,6 +80,7 @@ class Settings:
     coverage_of: int = 3  # how many top candidates count for the coverage
     unknown_terms: bool = True  # "not found" when the question names a term or word the document never uses
     tree_weight: float = 0.01  # weight of the tree list in the fusion (words and meaning count 1)
+    rerank: bool = True  # re-order the candidates with the trained re-ranker (rerank.py, rerank.json)
 
 
 @dataclass
@@ -175,6 +176,7 @@ class Retriever:
         clone = object.__new__(Retriever)
         clone.__dict__.update(self.__dict__)
         clone.settings = replace(self.settings, **changes)
+        clone.__dict__.pop("_features", None)  # the features use the tokenizer of their retriever
         return clone
 
     # ------------------------------------------------------------------
@@ -215,11 +217,29 @@ class Retriever:
         order = sorted(fused, key=lambda i: (-fused[i], i))[:k]
         cands = [Candidate(self.sections[i], fused[i], ranks.get(i, {})) for i in order]
         coverage = self.coverage(question, [c.node for c in cands[: st.coverage_of]])
+        reranker = self.reranker_for() if st.rerank and not named and len(cands) > 1 else None
+        if reranker is not None:
+            # after the coverage: "not found" keeps the rule it was tuned with
+            cands = reranker.rerank(self.rerank_features(), question, cands)
         missing = self.missing_terms(question) if st.unknown_terms and not named else []
         # a question that names a section of the document is never "not found"
         low = not named and st.not_found_below > 0 and coverage < st.not_found_below
         not_found = not cands or bool(missing) or low
         return Retrieval(question, cands, coverage, not_found, missing)
+
+    def reranker_for(self) -> Any:
+        from .rerank import Reranker
+
+        if not hasattr(self, "_reranker"):
+            self._reranker = Reranker.load()  # None without rerank.json: the fused order stays
+        return self._reranker
+
+    def rerank_features(self) -> Any:
+        from .rerank import Features
+
+        if getattr(self, "_features", None) is None:
+            self._features = Features(self)
+        return self._features
 
     @property
     def vocabulary(self) -> set[str]:

@@ -1,0 +1,126 @@
+{
+  "system": "htpd-rerank",
+  "label": "HTPD: words + tree + re-ranker (no model)",
+  "phase": "Phase 3 - retriever and packer",
+  "split": "test",
+  "only_checked": false,
+  "bundles": [
+    "aapcs64",
+    "riscv-debug"
+  ],
+  "when": "2026-10-20",
+  "machine": "Linux x86_64, Python 3.13.16",
+  "metrics": {
+    "questions": 133,
+    "answerable": 111,
+    "not_in_document": 22,
+    "recall@1": 0.6846846846846847,
+    "recall@5": 0.918918918918919,
+    "recall@10": 0.954954954954955,
+    "mrr": 0.7927552552552553,
+    "page_accuracy": 0.6306306306306306,
+    "not_found_accuracy": 0.9545454545454546,
+    "false_not_found": 0.009009009009009009,
+    "answer_in_text": 0.8558558558558559,
+    "tokens_mean": 2493.127819548872,
+    "tokens_vs_whole": 0.06126260378165375,
+    "ms_per_question": 16.304673676691955,
+    "by_kind": {
+      "1": {
+        "n": 66,
+        "recall@5": 0.8939393939393939
+      },
+      "2": {
+        "n": 29,
+        "recall@5": 0.9655172413793104
+      },
+      "3": {
+        "n": 16,
+        "recall@5": 0.9375
+      }
+    }
+  },
+  "misses": [
+    {
+      "id": "aapcs-001",
+      "rank": 16,
+      "top": [
+        "sections/0125-15-footnotes",
+        "sections/0016-2-2-terms-and-abbreviations",
+        "sections/0015-2-1-3-references"
+      ]
+    },
+    {
+      "id": "aapcs-003",
+      "rank": null,
+      "top": [
+        "sections/0092-8-1-5-arm-get-current-vg",
+        "sections/0027-5-6-scalable-vectors",
+        "sections/0118-12-appendix-support-for-scalable-vectors"
+      ]
+    },
+    {
+      "id": "aapcs-005",
+      "rank": 6,
+      "top": [
+        "sections/0047-6-2-sme-state",
+        "sections/0094-8-1-7-arm-sme-save",
+        "sections/0064-6-6-3-za-states"
+      ]
+    },
+    {
+      "id": "aapcs-029",
+      "rank": 10,
+      "top": [
+        "sections/0024-5-3-half-precision-floating-point",
+        "sections/0017-3-scope",
+        "sections/0016-2-2-terms-and-abbreviations"
+      ]
+    },
+    {
+      "id": "debug-003",
+      "rank": null,
+      "top": [
+        "sections/0089-4-9-3-debug-scratch-register-0-dscratch0-at-0x7b2",
+        "sections/0090-4-9-4-debug-scratch-register-1-dscratch1-at-0x7b3",
+        "sections/0108-5-7-3-trigger-data-2-tdata2-at-0x7a2"
+      ]
+    },
+    {
+      "id": "debug-025",
+      "rank": null,
+      "top": [
+        "sections/0086-4-9-core-debug-registers",
+        "sections/0116-5-7-11-match-control-mcontrol-at-0x7a1",
+        "sections/0081-4-5-1-step-bit-in-dcsr"
+      ]
+    },
+    {
+      "id": "debug-028",
+      "rank": 6,
+      "top": [
+        "sections/0097-5-4-native-triggers",
+        "sections/0119-5-7-14-interrupt-trigger-itrigger-at-0x7a1",
+        "sections/0087-4-9-1-debug-control-and-status-dcsr-at-0x7b0"
+      ]
+    },
+    {
+      "id": "debug-033",
+      "rank": null,
+      "top": [
+        "sections/0163-b-3-1-single-step",
+        "sections/0025-3-3-selecting-harts",
+        "sections/0116-5-7-11-match-control-mcontrol-at-0x7a1"
+      ]
+    },
+    {
+      "id": "debug-055",
+      "rank": 6,
+      "top": [
+        "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11",
+        "sections/0023-3-1-debug-module-interface-dmi",
+        "sections/0129-6-1-4-dtm-control-and-status-dtmcs-at-0x10"
+      ]
+    }
+  ]
+}
