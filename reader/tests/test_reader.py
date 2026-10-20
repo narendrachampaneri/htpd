@@ -16,7 +16,7 @@ import unittest
 from pathlib import Path
 
 from htpd_reader import Bundle, BundleError, check, open_bundle, search
-from htpd_reader.bundle import Block, parse_body
+from htpd_reader.bundle import PARTS, Block, parse_body
 from htpd_reader.check import errors
 from htpd_reader.cli import main
 from htpd_reader.render import render_text_part
@@ -33,7 +33,8 @@ def text_part(path: Path) -> str:
     body = path.read_text(encoding="utf-8")
     start = body.index("\n# Text\n") + 1
     rest = body[start:]
-    ends = [rest.find(f"\n{p}\n") + 1 for p in ("# Subsections", "# Neighbours") if rest.find(f"\n{p}\n") != -1]
+    after = PARTS[PARTS.index("# Text") + 1:]  # the parts that can follow # Text (FORMAT.md 4)
+    ends = [rest.find(f"\n{p}\n") + 1 for p in after if rest.find(f"\n{p}\n") != -1]
     return rest[: min(ends)] if ends else rest
 
 

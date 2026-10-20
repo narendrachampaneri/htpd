@@ -58,7 +58,7 @@ def cmd_section(b: Bundle, args: argparse.Namespace) -> int:
     if args.json:
         data = n.summary()
         data.update({"path": [x for x in b.path_titles(n)], "description": n.description,
-                     "blocks": [blk.to_dict() for blk in n.blocks]})
+                     "blocks": [blk.to_dict() for blk in n.blocks], "links": [r.to_dict() for r in n.refs]})
         _print_json(data)
         return 0
     print(" > ".join(b.path_titles(n)))
@@ -72,6 +72,11 @@ def cmd_section(b: Bundle, args: argparse.Namespace) -> int:
         print(blk.text)
     if not n.blocks:
         print("\n(no text directly under this heading)")
+    if n.refs:
+        print("\nLinks:")
+        for r in n.refs:
+            t = b.nodes.get(r.target)
+            print(f"  {r.text or '-'} -> {t.title if t else r.target} (page {r.page})  [{r.target}]")
     kids = b.children(n)
     if kids:
         print("\nSubsections:")

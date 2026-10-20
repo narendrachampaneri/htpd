@@ -193,9 +193,13 @@ class Server:
             if node is not None and node.id != "document":
                 rel.append(f"{label}: {node.title} [{node.id}]")
         rel += [f"Subsection: {c.title} [{c.id}]" for c in b.children(n)]
+        for r in n.refs:
+            t = b.nodes.get(r.target)
+            rel.append(f"Link: {r.text or '-'} -> {t.title if t else r.target} (page {r.page}) [{r.target}]")
         if rel:
             lines += [""] + rel
-        data = dict(n.summary(), path=path, blocks=[x.to_dict() for x in n.blocks])
+        data = dict(n.summary(), path=path, blocks=[x.to_dict() for x in n.blocks],
+                    links=[r.to_dict() for r in n.refs])
         return "\n".join(lines).rstrip(), data
 
     def t_search(self, a: dict[str, Any]) -> tuple[str, Any]:

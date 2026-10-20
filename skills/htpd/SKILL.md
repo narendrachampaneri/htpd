@@ -41,7 +41,9 @@ python3 <...>/scripts/htpd.py check    "<file>"              # is the file intac
 
 For a question that needs several things (for example a value and its
 condition), run `ask` for each part, or open the parent section and the next
-section with `section`.
+section with `section`. `section` also lists the links of the PDF from that
+section (`Links:` - a register name to its definition, "see 3.6" to that
+section); open a linked section with `section` when the answer needs it.
 
 **b) The htpd MCP tools are connected** (`ask`, `open_section`, `contents`,
 `search`): use `ask` with the question, and `open_section` for more context.
@@ -49,7 +51,8 @@ section with `section`.
 **c) Neither** (a chat without code): read the file itself. A single `.htpd`
 file starts with `# How to read this file` - follow those rules. Find the
 section in `# Contents`; each section starts with a line
-`<!-- htpd section ... -->` and a heading `## [S<n>] <title>`.
+`<!-- htpd section ... -->` and a heading `## [S<n>] <title>`. After its
+text, a line `<!-- htpd links -->` may list where its links lead (`[S<n>]`).
 
 ## 2. Answer
 

@@ -53,7 +53,7 @@ def _field_error_line(e: Exception) -> int | None:
 
 FORMAT_VERSIONS = ("0.1",)
 DOCUMENT_ID = "document"
-PARTS = ("# Location", "# Text", "# Subsections", "# Neighbours")
+PARTS = ("# Location", "# Text", "# Links", "# Subsections", "# Neighbours")
 NO_TEXT_LINE = "_No text directly under this heading._"
 
 _PAGE_MARK = re.compile(r"^<!-- page ([0-9]+) -->$")
@@ -118,6 +118,18 @@ class Block:
 
 
 @dataclass
+class Ref:
+    """A link of the PDF from the text of a section to another section (FORMAT.md 4.4)."""
+
+    text: str  # the words of the link, as on the page ("" when it has none)
+    target: str  # ID of the section it leads to
+    page: int | None  # page of the place it leads to
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"text": self.text, "target": self.target, "page": self.page}
+
+
+@dataclass
 class Node:
     """The document or one section, with its fields and its body."""
 
@@ -128,6 +140,7 @@ class Node:
     blocks: list[Block] = field(default_factory=list)
     links: list[tuple[int, str]] = field(default_factory=list)  # (line, target) outside # Text
     body: str = ""
+    refs: list[Ref] = field(default_factory=list)  # links of the PDF to other sections
 
     # --- the fields, read the way FORMAT.md defines them ---
 
@@ -347,6 +360,35 @@ def parse_body(body: str, first_line: int, file: str) -> tuple[str, list[Block],
     return "\n".join(location_lines), blocks, links, problems
 
 
+# "* `dmcontrol` → [2.1 dmcontrol](0003-2-1-dmcontrol.md) - page 2" (folder form)
+# "* `dmcontrol` → [S3] 2.1 dmcontrol - page 2"                    (single file)
+_REF_WORDS = r"^\* (?:(`+) ?(.*?) ?\1|-) \u2192 "
+_REF_FOLDER = re.compile(_REF_WORDS + r"\[(?:[^\]\\]|\\.)*\]\(([^)\s]+)\) - page (\d+)$")
+_REF_SINGLE = re.compile(_REF_WORDS + r"\[S(\d+)\] .* - page (\d+)$")
+
+
+def parse_refs(body: str) -> list[tuple[str, str, int]]:
+    """The items of the # Links part of a section file: (words, target file, page)."""
+    out: list[tuple[str, str, int]] = []
+    part = None
+    fence: str | None = None
+    for line in body.split("\n"):
+        if fence is not None:
+            if line == fence:
+                fence = None
+            continue
+        m = _FENCE_OPEN.match(line)
+        if m:
+            fence = m.group(1)
+            continue
+        if line in PARTS:
+            part = line
+            continue
+        if part == "# Links" and (m := _REF_FOLDER.match(line)):
+            out.append((m.group(2) or "", m.group(3), int(m.group(4))))
+    return out
+
+
 def node_id_for(path: str) -> str:
     return path[:-3] if path.endswith(".md") else path
 
@@ -376,8 +418,10 @@ def read_node(root: Path, path: str) -> tuple[Node | None, list[Problem]]:
     if not isinstance(fields, dict):
         return None, problems + [Problem("error", "bad-fields", path, "fields are not a mapping")]
     location, blocks, links, body_problems = parse_body(body, first_line, path)
+    folder = path.rsplit("/", 1)[0] + "/" if "/" in path else ""
+    refs = [Ref(words, node_id_for(folder + target), page) for words, target, page in parse_refs(body)]
     node = Node(id=node_id_for(path), path=path, fields=fields, location=location,
-                blocks=blocks, links=links, body=body)
+                blocks=blocks, links=links, body=body, refs=refs)
     return node, problems + body_problems
 
 
@@ -542,6 +586,7 @@ def _file_order(f: Path) -> tuple[int, str]:
 
 
 SINGLE_FILE_MAGIC = "---\nhtpd_file: "
+LINKS_MARK = "<!-- htpd links -->"
 _SECTION_MARK = re.compile(r"^<!-- htpd section (\{.*\}) -->$")
 _SECTION_HEADING = re.compile(r"^## \[S(\d+)\] (.*)$")
 _FOOTNOTE = re.compile(r"^\[\^source-pdf\]: ")
@@ -596,6 +641,7 @@ def read_single_file(path: Path) -> Bundle:
 
     source = {"source_file": head.get("source_file"), "source_sha256": head.get("source_sha256")}
     sections: list[Node] = []
+    pending_refs: list[list[tuple[str, int, int]]] = []
     for k, (i, f) in enumerate(marks):
         end = marks[k + 1][0] if k + 1 < len(marks) else len(lines)
         chunk = lines[i + 1:end]
@@ -613,6 +659,24 @@ def read_single_file(path: Path) -> Bundle:
         if k + 1 == len(marks):  # the file ends with the footnote of the source
             while text_lines and (text_lines[-1] == "" or _FOOTNOTE.match(text_lines[-1])):
                 text_lines.pop()
+        # The links of the section follow its text, after "<!-- htpd links -->"
+        # (outside a block: inside one nothing is a mark).
+        ref_lines: list[str] = []
+        fence = None
+        for t, line in enumerate(text_lines):
+            if fence is not None:
+                if line == fence:
+                    fence = None
+                continue
+            m = _FENCE_OPEN.match(line)
+            if m:
+                fence = m.group(1)
+            elif line == LINKS_MARK:
+                ref_lines = text_lines[t + 1:]
+                text_lines = text_lines[:t]
+                break
+        pending_refs.append([(m.group(2) or "", int(m.group(3)), int(m.group(4)))
+                             for line in ref_lines if (m := _REF_SINGLE.match(line))])
         node_id = str(f.get("id", f"sections/{k + 1:04d}"))
         pages = f.get("pages") if isinstance(f.get("pages"), list) and len(f.get("pages")) == 3 else [None] * 3
         htpd = {"version": head.get("htpd_file"), "node": "section", "id": node_id, "order": f.get("n"),
@@ -626,6 +690,15 @@ def read_single_file(path: Path) -> Bundle:
         sections.append(Node(id=node_id, path=node_id + ".md", fields={"type": "Section", "title": title,
                                                                        "htpd": htpd}, blocks=blocks,
                              body=text_body))
+    # The links name their targets by [S<n>].
+    by_n = {s.htpd.get("order"): s.id for s in sections}
+    for node, refs in zip(sections, pending_refs):
+        for words, n, page in refs:
+            if n in by_n:
+                node.refs.append(Ref(words, by_n[n], page))
+            else:
+                problems.append(Problem("error", "broken-link", fname, f"a link of {node.id} leads to [S{n}], "
+                                        "which is not in the file"))
     # The order and the tree, as a bundle folder writes them.
     by_id = {s.id: s for s in sections}
     top: list[str] = []
