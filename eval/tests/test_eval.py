@@ -190,6 +190,13 @@ class Harness(unittest.TestCase):
         self.assertIsNone(m["recall@5"])
         self.assertAlmostEqual(m["tokens_vs_whole"], 1.0)
 
+    def test_answer_in_text(self) -> None:
+        """Does the text handed to the AI hold the answer? The whole document always does."""
+        self.assertEqual(self.ev("B0")["metrics"]["answer_in_text"], 1.0)
+        m = self.ev("B3")["metrics"]
+        self.assertIsNotNone(m["answer_in_text"])
+        self.assertLessEqual(m["answer_in_text"], 1.0)
+
     def test_b1_and_b2_run(self) -> None:
         for name in ("B1", "B2"):
             m = self.ev(name)["metrics"]
@@ -207,6 +214,7 @@ class Harness(unittest.TestCase):
         self.assertIn("| B0 whole document | 5 | - |", text)
         # a system that refuses answerable questions must show it next to its "not found" score
         self.assertIn("| Not found | False not found |", text)
+        self.assertIn("| Answer in text |", text)
 
     def test_splits(self) -> None:
         docs = {"a": "test", "b": "train"}

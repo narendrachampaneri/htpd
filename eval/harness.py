@@ -19,7 +19,7 @@ from typing import Any
 from htpd_reader import Bundle, open_bundle
 from htpd_reader.tokens import count_tokens
 
-from .questions import KINDS, Question, load
+from .questions import KINDS, Question, load, norm
 from .systems import REGISTRY, Context, System, whole_text
 
 EVAL = Path(__file__).resolve().parent
@@ -61,6 +61,7 @@ class Row:
     tokens: int
     seconds: float
     extra: dict[str, Any] | None = None
+    has_answer: bool = False  # the text handed to the AI holds every part of the answer
 
     def rank(self) -> int | None:
         for i, s in enumerate(self.ranked, 1):
@@ -80,7 +81,9 @@ def run(system: System, questions: list[Question], bundles_dir: Path, ctx: Conte
         t0 = time.perf_counter()
         a = system.answer(states[q.bundle], q.question)
         dt = time.perf_counter() - t0
-        rows.append(Row(q, a.ranked, a.top_page, a.not_found, count_tokens(a.context), dt, a.extra))
+        text = norm(a.context)
+        has = q.kind != 4 and not a.not_found and all(norm(x) in text for x in q.answers)
+        rows.append(Row(q, a.ranked, a.top_page, a.not_found, count_tokens(a.context), dt, a.extra, has))
     return rows
 
 
@@ -105,6 +108,7 @@ def measure(system: System, rows: list[Row], whole_tokens: dict[str, int]) -> di
         m["mrr"] = m["page_accuracy"] = None
     m["not_found_accuracy"] = _mean([1.0 if r.not_found else 0.0 for r in absent]) if absent else None
     m["false_not_found"] = _mean([1.0 if r.not_found else 0.0 for r in answerable]) if answerable else None
+    m["answer_in_text"] = _mean([1.0 if r.has_answer else 0.0 for r in answerable]) if answerable else None
     m["tokens_mean"] = _mean([float(r.tokens) for r in rows])
     m["tokens_vs_whole"] = _mean([r.tokens / whole_tokens[r.q.bundle] for r in rows if whole_tokens.get(r.q.bundle)])
     m["ms_per_question"] = _mean([r.seconds * 1000 for r in rows])
@@ -262,7 +266,8 @@ def write_report(results_dir: Path = RESULTS, out: Path = REPORT) -> str:
              "Recall@k: a gold section is among the first k. MRR: mean of 1/rank of the first gold section.",
              "Page: the first page the system points to is a gold page. Not found: share of questions",
              "about things the document does not hold that get \"not found\". False not found: share of",
-             "questions the document does answer that still get \"not found\" (lower is better). Tokens: words and",
+             "questions the document does answer that still get \"not found\" (lower is better). Answer in text:",
+             "share of answerable questions whose exact answer stands in the text handed to the AI. Tokens: words and",
              "punctuation marks handed to the AI (one measure for all systems); \"of whole\" is the",
              "share of the whole document.", ""]
     for split in ("test", "tune", "train", "all"):
@@ -273,15 +278,15 @@ def write_report(results_dir: Path = RESULTS, out: Path = REPORT) -> str:
         for phase in sorted({r["phase"] for r in rs}):
             group = [r for r in rs if r["phase"] == phase]
             lines += [f"### {phase}", "",
-                      "| System | Questions | R@1 | R@5 | R@10 | MRR | Page | Not found | False not found | Tokens | Of whole | ms/question |",
-                      "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+                      "| System | Questions | R@1 | R@5 | R@10 | MRR | Page | Not found | False not found | Answer in text | Tokens | Of whole | ms/question |",
+                      "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
             for r in sorted(group, key=lambda r: r["system"]):
                 m = r["metrics"]
                 checked = " (checked only)" if r.get("only_checked") else ""
                 lines.append(
                     f"| {r['label']}{checked} | {m['questions']} | {_f(m['recall@1'])} | {_f(m['recall@5'])} | "
                     f"{_f(m['recall@10'])} | {_f(m['mrr'])} | {_f(m['page_accuracy'])} | "
-                    f"{_f(m['not_found_accuracy'])} | {_f(m.get('false_not_found'))} | {m['tokens_mean']:.0f} | {_f(m['tokens_vs_whole'], True)} | "
+                    f"{_f(m['not_found_accuracy'])} | {_f(m.get('false_not_found'))} | {_f(m.get('answer_in_text'))} | {m['tokens_mean']:.0f} | {_f(m['tokens_vs_whole'], True)} | "
                     f"{m['ms_per_question']:.1f} |")
             bundles = sorted({b for r in group for b in r["bundles"]})
             when = sorted({r["when"] for r in group})
