@@ -8,3 +8,4 @@ riscv-debug     test   ce2787b25233a6109c9bc767b2bc497798148b721390f72fb9b48ff0e
 aapcs64         test   a9990923129732ed0714dae2d9dfeaf5f438ba6e56f65e96306b1feae3dab5e3  https://github.com/ARM-software/abi-aa/releases/download/2025Q4/aapcs64.pdf
 riscv-priv      tune   538f3b17e1990ffabde30a6b96aaa2a0111afb63c174a6ef02b55a7aeb0e701d  https://github.com/riscv/riscv-isa-manual/releases/download/20240411/priv-isa-asciidoc.pdf
 riscv-isa       train  82f88088f1a159062f0dee6b8fc1f43afb9c889d6eea69083c21f1e79f55d83d  https://github.com/riscv/riscv-isa-manual/releases/download/20240411/unpriv-isa-asciidoc.pdf
+aaelf64         tune   0f203e6b07216e84dde98bb28dbebef385fe7d911e4e82c2cec5eecdfee9c1e4  https://github.com/ARM-software/abi-aa/releases/download/2025Q4/aaelf64.pdf

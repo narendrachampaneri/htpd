@@ -12,11 +12,12 @@ itself.
 
 The first numbers are in [`report.md`](report.md).
 
-* `docs.list` pins four public manuals (download link and SHA-256):
+* `docs.list` pins five public manuals (download link and SHA-256):
   the RISC-V Debug Specification and the Arm AAPCS64 for **test**, the
-  RISC-V privileged manual for **tuning** the "not found" threshold, the
-  RISC-V unprivileged manual for **training** only.
-* `questions/` holds 173 questions (133 test, 40 tuning) of four kinds:
+  RISC-V privileged manual and the Arm ELF manual for **tuning** (the
+  "not found" threshold and every default of the reader), the RISC-V
+  unprivileged manual for **training** only.
+* `questions/` holds 254 questions (133 test, 121 tuning) of four kinds:
   a fact, a value from a table, an answer from two sections, and a question
   the document does not answer. Every answer is copied from the document
   and checked by `validate` against its section and page. They were
