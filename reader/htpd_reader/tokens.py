@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
 _PLAIN = re.compile(r"\w+", re.UNICODE)
 _TECH = re.compile(
@@ -40,16 +41,24 @@ STOPWORDS = frozenset(
 _HYPHENATED = re.compile(r"\b([A-Za-z]+)-([A-Za-z0-9]+)\b")
 
 
+def fold(text: str) -> str:
+    """The text as search sees it: compatibility forms made plain (NFKC), so a
+    raised or lowered number of the file (I²C, 2³¹, x₀) matches the plain one of
+    a question (I2C, 2^31, x0), and a ligature matches its letters."""
+    return text if text.isascii() else unicodedata.normalize("NFKC", text)
+
+
 def main_tokens(text: str) -> list[str]:
     """The whole technical words of a text, lower case, without their parts."""
-    return [m.group(0).lower() for m in _TECH.finditer(text)]
+    return [m.group(0).lower() for m in _TECH.finditer(fold(text))]
 
 
 def plain_words(text: str) -> list[str]:
-    return [w.lower() for w in _PLAIN.findall(text)]
+    return [w.lower() for w in _PLAIN.findall(fold(text))]
 
 
 def technical_tokens(text: str, drop_stopwords: bool = False) -> list[str]:
+    text = fold(text)
     out: list[str] = []
     for m in _TECH.finditer(text):
         raw = m.group(0)

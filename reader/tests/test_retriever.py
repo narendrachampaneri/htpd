@@ -165,6 +165,20 @@ class Manual(unittest.TestCase):
                     full.update(technical_tokens(text))
             self.assertEqual(Retriever(b, Settings(meaning=False)).vocabulary, full)
 
+    def test_raised_numbers_match_plain_ones(self) -> None:
+        """The converter writes raised numbers as they stand (I²C, 2³¹); a question
+        typed with plain digits finds them, and is not "not found"."""
+        with tempfile.TemporaryDirectory() as t:
+            root = make_bundle(Path(t) / "r.htpd", [
+                Sec("1 Buses", number="1", blocks=[P(1, "The I²C bus runs at a rate of 400 kHz.")]),
+                Sec("2 Ranges", number="2", blocks=[P(2, "Check that -2³¹ <= X < 2³².")]),
+            ], pages=2)
+            r = Retriever(open_bundle(root), Settings(meaning=False))
+            x = r.retrieve("At what rate does the I2C bus run?")
+            self.assertFalse(x.not_found, x.reason)
+            self.assertEqual(x.candidates[0].node.title, "1 Buses")
+            self.assertEqual(r.retrieve("Which range does -2^31 check?").candidates[0].node.title, "2 Ranges")
+
     def test_tree_counts_less_than_words(self) -> None:
         self.assertEqual(Settings().tree_weight, 0.01)
         only_tree = Retriever(self.b, Settings(meaning=False, words=False, numbers=False))
