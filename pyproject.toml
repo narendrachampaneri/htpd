@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "htpd-reader"
-version = "0.1.0"
+version = "0.1.1"
 description = "Part B of HTPD: read HTPD bundles and find the exact text, with pages, that answers a question."
 readme = "README.md"
 requires-python = ">=3.10"
