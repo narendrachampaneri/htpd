@@ -19,9 +19,12 @@ from typing import Any
 from .bundle import Block, Bundle, Node
 from .tokens import STOPWORDS, count_tokens, technical_tokens
 
-# Most tokens of text per answer. On the tuning split the exact answer stood in the
-# text for 0.877 of the questions at 2500 tokens, 0.825 at 1500; more did not help.
-DEFAULT_BUDGET = 2500
+# Most tokens of text per answer, and most sections. Chosen on the tuning split
+# (RISC-V privileged manual and Arm ELF manual, 97 answerable questions): the
+# exact answer stood in the text for 0.918 of them at 3000 tokens from up to 8
+# sections, 0.876 at 2500 from 5, 0.856 at 1500; 0.928 at most with more text.
+DEFAULT_BUDGET = 3000
+DEFAULT_SECTIONS = 8
 
 NOT_FOUND = "NOT FOUND in this file: the document does not seem to hold an answer to this question."
 HEADER = ("The text below is quoted from the document {title!r} (source file {source}). "
@@ -106,7 +109,7 @@ def _longest_run(text: str) -> int:
     return longest
 
 
-def pack(bundle: Bundle, question: str, nodes: list[Node], budget: int = DEFAULT_BUDGET, max_sections: int = 5,
+def pack(bundle: Bundle, question: str, nodes: list[Node], budget: int = DEFAULT_BUDGET, max_sections: int = DEFAULT_SECTIONS,
          not_found: bool = False, reason: str = "") -> Pack:
     """Put the text of the ranked `nodes` together, best first, within `budget` tokens."""
     result = Pack(question, not_found=not_found)
