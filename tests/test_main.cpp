@@ -251,8 +251,51 @@ TEST(layout_keeps_superscript_on_the_line) {
     put_text(page, " total", 72 + 9 * 5.5f, 100);
     const auto lines = build_lines(page);
     REQUIRE(lines.size() == 1);
-    CHECK_EQ(lines[0].text, std::string("Area 5 m2 total"));
+    CHECK_EQ(lines[0].text, std::string("Area 5 m\u00B2 total"));   // m²: the 2 stays raised
     CHECK(lines[0].size == 10.0f);
+}
+
+TEST(layout_writes_raised_and_lowered_numbers_as_such) {
+    // "-2^31 <= X" as an Arm manual sets it: the 31 is 80 % high and raised.
+    PageText page;
+    put_text(page, "-2", 72, 129.27f, 9);
+    put_text(page, "31", 72 + 2 * 4.95f, 124.77f, 7.2f);
+    put_text(page, " <= X", 72 + 2 * 4.95f + 2 * 3.96f, 129.27f, 9);
+    auto lines = build_lines(page);
+    REQUIRE(lines.size() == 1);
+    CHECK_EQ(lines[0].text, std::string("-2\u00B3\u00B9 <= X"));   // -2³¹ <= X
+
+    // A negative exponent; and a lowered index: H₂O.
+    PageText page2;
+    put_text(page2, "s", 72, 100);
+    put_text(page2, "-1", 72 + 5.5f, 96, 6);
+    put_text(page2, " and H", 72 + 5.5f + 6.6f, 100);
+    put_text(page2, "2", 72 + 5.5f + 6.6f + 6 * 5.5f, 102, 6);
+    put_text(page2, "O", 72 + 5.5f + 6.6f + 6 * 5.5f + 3.3f, 100);
+    lines = build_lines(page2);
+    REQUIRE(lines.size() == 1);
+    CHECK_EQ(lines[0].text, std::string("s\u207B\u00B9 and H\u2082O"));   // s⁻¹ and H₂O
+
+    // A raised group with a letter that has no raised form stays as it is.
+    PageText page3;
+    put_text(page3, "Brand", 72, 100);
+    put_text(page3, "TM", 72 + 5 * 5.5f, 96, 6);
+    put_text(page3, " and 4", 72 + 5 * 5.5f + 6.6f, 100);
+    put_text(page3, "th", 72 + 5 * 5.5f + 6.6f + 6 * 5.5f, 96, 6);
+    lines = build_lines(page3);
+    REQUIRE(lines.size() == 1);
+    CHECK_EQ(lines[0].text, std::string("BrandTM and 4th"));
+
+    // A sign alone in the small font of the indices is an operator, not an index:
+    // "tSCKD - tSCKDQS" (the letters lowered, the minus lowered too).
+    PageText page4;
+    put_text(page4, "t", 72, 100);
+    put_text(page4, "SCKD - ", 77.5f, 102, 6);                // spaces before and after the minus
+    put_text(page4, "t", 77.5f + 7 * 3.3f, 100);
+    lines = build_lines(page4);
+    REQUIRE(lines.size() == 1);
+    CHECK(lines[0].text.contains("-"));
+    CHECK(!lines[0].text.contains("\u208B"));
 }
 
 TEST(layout_keeps_a_high_raised_mark_on_the_line) {
@@ -1755,7 +1798,7 @@ TEST(reader_gives_upright_text_in_reading_order) {
         "Plain twelve point line.",         //
         "Scaled heading eighteen",          // font size 1, scaled 18x by the text matrix
         "Kerned words here",                // word gaps made by kerning only
-        "Area is 5 m2 in total.",           // superscript 2
+        "Area is 5 m\u00B2 in total.",     // superscript 2 stays raised
         "Slanted synthetic italic line.",   // sheared text matrix
         "1111 and 11.11 stay together."};
     REQUIRE(texts(lines) == expected);
@@ -1935,7 +1978,7 @@ TEST(end_to_end_rotation_scaling_and_spacing) {
     REQUIRE(convert(options).has_value());
     const std::string text = all_section_text(options.output_dir);
     CHECK(text.contains("Kerned words here"));                 // spaces made only by kerning
-    CHECK(text.contains("Area is 5 m2 in total."));            // superscript stays in its line
+    CHECK(text.contains("Area is 5 m\u00B2 in total."));      // superscript stays raised, in its line
     CHECK(text.contains("1111 and 11.11 stay together."));
     CHECK(text.contains("Slanted synthetic italic line."));
     CHECK(text.contains("Left column line 6 continues here Right column line 1 continues here"));

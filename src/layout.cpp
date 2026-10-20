@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string>
 #include <utility>
 
 #include "htpd/text.hpp"
@@ -21,6 +22,37 @@ const char* ligature_expansion(char32_t cp) {
         case 0xFB05: return "st";
         case 0xFB06: return "st";
         default:     return nullptr;
+    }
+}
+
+// The raised (superscript) and lowered (subscript) form of a character, or 0.
+// Only digits, signs and brackets (and a raised n or i): enough for exponents
+// and indices (2³¹, m², s⁻¹, H₂O) without guessing about letters.
+char32_t raised_form(char32_t c) {
+    switch (c) {
+        case U'0': return 0x2070;
+        case U'1': return 0x00B9;
+        case U'2': return 0x00B2;
+        case U'3': return 0x00B3;
+        case U'+': return 0x207A;
+        case U'-': case 0x2212: return 0x207B;
+        case U'=': return 0x207C;
+        case U'(': return 0x207D;
+        case U')': return 0x207E;
+        case U'n': return 0x207F;
+        case U'i': return 0x2071;
+        default: return c >= U'4' && c <= U'9' ? 0x2074 + (c - U'4') : 0;
+    }
+}
+
+char32_t lowered_form(char32_t c) {
+    switch (c) {
+        case U'+': return 0x208A;
+        case U'-': case 0x2212: return 0x208B;
+        case U'=': return 0x208C;
+        case U'(': return 0x208D;
+        case U')': return 0x208E;
+        default: return c >= U'0' && c <= U'9' ? 0x2080 + (c - U'0') : 0;
     }
 }
 
@@ -50,6 +82,13 @@ public:
     }
 
     void add(const Glyph& g, bool space_before) {
+        // A smaller glyph set clearly higher or lower than the line: part of a
+        // raised or lowered group (an exponent, an index).
+        int script = 0;
+        if (!empty() && g.size <= 0.85f * main_size_) {
+            if (g.baseline <= line_.baseline - 0.25f * main_size_) script = 1;
+            else if (g.baseline >= line_.baseline + 0.12f * main_size_) script = 2;
+        }
         if (empty()) {
             line_.x0 = g.x0;
             line_.y0 = g.y0;
@@ -62,12 +101,14 @@ public:
             const float ref = std::max(main_size_, g.size);
             const float gap = g.x0 - last_x1_;
             const bool column_gap = gap > options_->column_gap * ref;
+            const bool spaced = column_gap || space_before || gap > options_->forced_space_gap * ref;
+            if (spaced || script != pending_kind_) flush_pending();
             if (column_gap) {
                 line_.gaps.push_back(static_cast<std::uint32_t>(line_.text.size()));
                 line_.gap_begin.push_back(last_x1_);
                 line_.gap_end.push_back(g.x0);
             }
-            if (column_gap || space_before || gap > options_->forced_space_gap * ref) {
+            if (spaced) {
                 line_.text.push_back(' ');
                 line_.space_spans.push_back(std::max(0.0f, g.origin_x - last_origin_x_));
             }
@@ -82,10 +123,11 @@ public:
                 line_.baseline = g.baseline;
             }
         }
-        if (const char* expanded = ligature_expansion(g.cp)) {
-            line_.text += expanded;
+        if (script != 0) {
+            pending_.push_back(g.cp);
+            pending_kind_ = script;
         } else {
-            text::append_utf8(line_.text, g.cp);
+            append(g.cp);
         }
         last_x1_ = g.x1;
         last_origin_x_ = g.origin_x;
@@ -96,6 +138,7 @@ public:
     }
 
     Line finish() {
+        flush_pending();
         line_.size = static_cast<float>(most_common(sizes_)) / 4.0f;
         line_.font = static_cast<std::uint16_t>(most_common(fonts_));
         line_.bold = bold_count_ * 10 >= glyph_count_ * 6;   // at least 60 % bold
@@ -103,6 +146,34 @@ public:
     }
 
 private:
+    void append(char32_t cp) {
+        if (const char* expanded = ligature_expansion(cp)) {
+            line_.text += expanded;
+        } else {
+            text::append_utf8(line_.text, cp);
+        }
+    }
+
+    // A raised or lowered group is written in raised or lowered characters
+    // when every character of it has such a form (2³¹, H₂O); otherwise as it
+    // stands (a ™ written as "TM", the "th" of "4th").
+    void flush_pending() {
+        if (pending_.empty()) return;
+        const auto form = pending_kind_ == 1 ? raised_form : lowered_form;
+        // ... and when it holds a digit (or a raised n or i: xⁿ): a sign alone in
+        // the small font of the indices is an operator ("tSCKD - tSCKDQS").
+        const bool all = std::ranges::all_of(pending_, [&](char32_t c) { return form(c) != 0; }) &&
+                         std::ranges::any_of(pending_, [&](char32_t c) {
+                             return (c >= U'0' && c <= U'9') || (pending_kind_ == 1 && (c == U'n' || c == U'i'));
+                         });
+        for (const char32_t c : pending_) append(all ? form(c) : c);
+        pending_.clear();
+        pending_kind_ = 0;
+    }
+
+    std::u32string pending_;   // glyphs of a raised or lowered group, not yet written
+    int pending_kind_ = 0;     // 1 raised, 2 lowered
+
     using Tally = std::vector<std::pair<int, std::size_t>>;   // value -> number of glyphs
 
     static void count(Tally& tally, int value) {

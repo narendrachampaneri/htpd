@@ -346,8 +346,13 @@ changes:
   spaces become one. In monospace blocks the spaces are kept as they are.
 * **Ligatures** are written as letters (`ﬁ` becomes `fi`). Soft hyphens and
   characters without width are dropped.
-* **Raised and lowered characters** stay in their line as ordinary
-  characters: m² may come out as `m2`.
+* **Raised and lowered characters** stay in their line. A raised or
+  lowered group of digits (with signs, brackets, or a raised n or i) is
+  written in Unicode superscript or subscript characters, as it stands in
+  the PDF: `2³¹`, `m²`, `s⁻¹`, `x₀`. Any other raised or lowered text (a ™,
+  the "th" of "4th", the "DD" of V<sub>DD</sub>) is written as ordinary
+  characters, and so is a sign alone. A reader that searches should treat
+  `²` and `2` alike (Unicode NFKC).
 * **Pages whose text runs sideways or upside down** (a wide table printed
   sideways, a page turned by /Rotate) are turned first, so that their main
   text is read upright, in order.

@@ -25,6 +25,7 @@ import shutil
 import subprocess
 import sys
 import time
+import unicodedata
 from collections import Counter
 from pathlib import Path
 
@@ -39,7 +40,8 @@ _WORD = re.compile(r"[^\W_]+", re.UNICODE)
 
 
 def words(text: str) -> Counter[str]:
-    return Counter(w.lower() for w in _WORD.findall(text))
+    # NFKC: the bundle keeps raised numbers raised (m², 2³¹), pdftotext writes them plain
+    return Counter(w.lower() for w in _WORD.findall(unicodedata.normalize("NFKC", text)))
 
 
 def bundle_words(root: Path) -> Counter[str]:
