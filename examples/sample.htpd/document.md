@@ -4,7 +4,7 @@ title: "ACME DC Charger Controller Reference Manual"
 description: "5 pages converted into 14 sections. Source: sample.pdf."
 resource: "sample.pdf"
 tags: [htpd, document]
-generated: { by: htpd/0.1.0, at: 2026-10-20T09:41:14Z }
+generated: { by: htpd/0.1.1, at: 2026-10-20T11:36:50Z }
 sources:
   - id: source-pdf
     resource: "sample.pdf"

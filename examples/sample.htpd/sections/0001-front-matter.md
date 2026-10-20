@@ -4,7 +4,7 @@ title: "Front matter"
 description: "ACME DC Charger Controller"
 resource: "sample.pdf#page=1"
 tags: [htpd, section]
-generated: { by: htpd/0.1.0, at: 2026-10-20T09:41:14Z }
+generated: { by: htpd/0.1.1, at: 2026-10-20T11:36:50Z }
 sources:
   - id: source-pdf
     resource: "sample.pdf#page=1"
