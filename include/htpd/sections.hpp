@@ -2,6 +2,7 @@
 // and join the lines of each section into paragraphs.
 #pragma once
 
+#include <cstdint>
 #include <span>
 #include <string>
 #include <vector>
@@ -43,5 +44,8 @@ std::string row_text(const Line& line);
 // missing cells are written as empty cells ("Output current | 0 |  | 200 | A"),
 // so every value stays under its own column heading.
 std::string rows_text(std::span<const Line* const> rows);
+// The same, where rest[i] = 1 marks a line that holds the rest of a cell of the
+// row above it (a cell that wraps onto more lines); it is joined to that cell.
+std::string rows_text(std::span<const Line* const> rows, std::span<const std::uint8_t> rest);
 
 }  // namespace htpd

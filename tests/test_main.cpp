@@ -1214,6 +1214,131 @@ TEST(empty_table_cells_keep_their_place) {
                                              "| 1.5 |  | 2.5 | W"));
 }
 
+TEST(a_cell_that_wraps_stays_in_its_row) {
+    std::vector<Line> lines;
+    lines.push_back(row_line({{"Name", 72}, {"Mask", 250}, {"Comment", 320}}, 100));
+    lines.push_back(row_line({{"VARIANT_PCS", 72}, {"0x80", 250}, {"The function may follow a", 320}}, 113));
+    lines.push_back(row_line({{"variant procedure call standard.", 320}}, 126));   // rest of the comment
+    lines.push_back(row_line({{"OTHER_FLAG", 72}, {"0x40", 250}, {"Short.", 320}}, 139));
+    lines.push_back(make_line(0, "Text after the table.", 170));
+
+    const auto paragraphs = build_paragraphs(lines, 1.3f);
+    REQUIRE(paragraphs.size() == 2);
+    CHECK(paragraphs[0].kind == ParagraphKind::Rows);
+    CHECK_EQ(paragraphs[0].text, std::string("Name | Mask | Comment\n"
+                                             "VARIANT_PCS | 0x80 | The function may follow a variant procedure call standard.\n"
+                                             "OTHER_FLAG | 0x40 | Short."));
+    CHECK(paragraphs[1].kind == ParagraphKind::Text);
+
+    // The rest of a cell in a middle column, over two lines.
+    std::vector<Line> middle;
+    middle.push_back(row_line({{"Bit", 72}, {"Description", 150}, {"Reset", 400}}, 100));
+    middle.push_back(row_line({{"0", 72}, {"Set when the module", 150}, {"0", 400}}, 113));
+    middle.push_back(row_line({{"is ready to take a", 150}}, 126));
+    middle.push_back(row_line({{"command.", 150}}, 139));
+    const auto joined = build_paragraphs(middle, 1.3f);
+    REQUIRE(joined.size() == 1);
+    CHECK_EQ(joined[0].text, std::string("Bit | Description | Reset\n0 | Set when the module is ready to take a command. | 0"));
+
+    // A line at the left margin right under a row is not the rest of a cell.
+    std::vector<Line> margin = {lines[0], lines[1], make_line(0, "Note: masks may be combined.", 126)};
+    const auto apart = build_paragraphs(margin, 1.3f);
+    REQUIRE(apart.size() == 2);
+    CHECK_EQ(apart[1].text, std::string("Note: masks may be combined."));
+
+    // On the next page a line does not continue a cell of the page before.
+    std::vector<Line> pages = {lines[0], lines[1], lines[2]};
+    pages[2].page = 1;
+    pages[2].baseline = 60;
+    CHECK(build_paragraphs(pages, 1.3f).size() == 2);
+}
+
+TEST(a_table_stored_cell_by_cell_is_rebuilt_from_the_positions) {
+    // A register field table as many PDFs store it: the name, then every line of
+    // the description, then Access and Reset - which stand back up on the first line.
+    std::vector<Line> lines;
+    lines.push_back(row_line({{"Field", 72}, {"Description", 150}, {"Access", 400}, {"Reset", 460}}, 100));
+    lines.push_back(row_line({{"haltreq", 72}, {"Writing 0 clears the", 150}}, 113));
+    lines.push_back(row_line({{"halt request bit.", 150}}, 126));
+    lines.push_back(row_line({{"WARZ", 400}, {"-", 460}}, 113));
+    lines.push_back(row_line({{"resumereq", 72}, {"Writing 1 resumes", 150}}, 145));
+    lines.push_back(row_line({{"the selected harts.", 150}}, 158));
+    lines.push_back(row_line({{"W1", 400}, {"-", 460}}, 145));
+    lines.push_back(make_line(0, "Text after the table runs across all of the columns of the page.", 185));
+
+    const auto paragraphs = build_paragraphs(lines, 1.3f);
+    REQUIRE(paragraphs.size() == 2);
+    CHECK(paragraphs[0].kind == ParagraphKind::Rows);
+    CHECK_EQ(paragraphs[0].text, std::string("Field | Description | Access | Reset\n"
+                                             "haltreq | Writing 0 clears the halt request bit. | WARZ | -\n"
+                                             "resumereq | Writing 1 resumes the selected harts. | W1 | -"));
+    CHECK(paragraphs[1].kind == ParagraphKind::Text);
+
+    // The table on the next page, right after another table that ends a page: rebuilt as well.
+    std::vector<Line> after = {row_line({{"31", 72}, {"30", 150}, {"0", 460}}, 700)};
+    for (const Line& l : lines) {
+        after.push_back(l);
+        after.back().page = 1;
+    }
+    const auto both = build_paragraphs(after, 1.3f);
+    REQUIRE(both.size() == 3);
+    CHECK_EQ(both[1].text, paragraphs[0].text);
+
+    // The header prints "Access Reset" as one block, but the rows have two cells
+    // there: the cells stay apart (a column the header did not show).
+    std::vector<Line> merged = lines;
+    merged[0] = row_line({{"Field", 72}, {"Description", 150}, {"Access Reset", 400}}, 100);
+    const auto apart = build_paragraphs(merged, 1.3f);
+    REQUIRE(apart.size() == 2);
+    CHECK_EQ(apart[0].text, std::string("Field | Description | Access Reset |\n"
+                                        "haltreq | Writing 0 clears the halt request bit. | WARZ | -\n"
+                                        "resumereq | Writing 1 resumes the selected harts. | W1 | -"));
+
+    // Text that crosses the columns ends the table; nothing after it is taken in.
+    std::vector<Line> cut = {lines[0], lines[1], lines[2], lines[3], lines[7], lines[4], lines[6]};
+    const auto parts = build_paragraphs(cut, 1.3f);
+    REQUIRE(parts.size() >= 2);
+    CHECK_EQ(parts[0].text, std::string("Field | Description | Access | Reset\n"
+                                        "haltreq | Writing 0 clears the halt request bit. | WARZ | -"));
+}
+
+TEST(a_justified_line_is_text_not_a_table_row) {
+    // Every space of the line is wide, and all of them alike: a justified
+    // paragraph line, not the cells of a table.
+    std::vector<Line> lines;
+    lines.push_back(make_line(0, "The licence of this project is listed below.", 100));
+    Line justified = row_line({{"Apache-2.0", 72}, {"(specifically,", 141}, {"Section", 231}, {"3", 282},
+                               {"of", 297}, {"Apache-2.0", 318}}, 113);
+    // the same width between every word: 14 points
+    for (std::size_t k = 0; k < justified.gaps.size(); ++k) justified.gap_end[k] = justified.gap_begin[k] + 14;
+    lines.push_back(justified);
+    lines.push_back(make_line(0, "as reflected at the web site.", 126));
+    const auto paragraphs = build_paragraphs(lines, 1.3f);
+    for (const Paragraph& p : paragraphs) CHECK(p.kind == ParagraphKind::Text);
+    CHECK(paragraphs.size() >= 1 && paragraphs[0].text.find(" | ") == std::string::npos);
+
+    // A register drawing: lower-case field names, equally spaced - but names, not words.
+    Line drawing = row_line({{"pmp3cfg", 72}, {"pmp2cfg", 130}, {"pmp1cfg", 188}, {"pmp0cfg", 246}, {"pmpcfg0", 304}}, 100);
+    for (std::size_t k = 0; k < drawing.gaps.size(); ++k) drawing.gap_end[k] = drawing.gap_begin[k] + 19.5f;
+    CHECK(build_paragraphs(std::vector<Line>{drawing, drawing}, 1.3f)[0].kind == ParagraphKind::Rows);
+
+    // A row of a real table: its cells sit at the columns, so the gaps differ.
+    const Line row = row_line({{"0", 72}, {"0", 150}, {"R_NONE", 230}, {"None", 400}}, 100);
+    CHECK(build_paragraphs(std::vector<Line>{row, row_line({{"256", 72}, {"-", 150}, {"withdrawn", 230}, {"None", 400}}, 113)},
+                           1.3f)[0].kind == ParagraphKind::Rows);
+}
+
+TEST(the_rest_of_a_cell_stays_on_its_own_line_when_the_columns_are_not_certain) {
+    std::vector<Line> lines;
+    // The columns run into each other: which column the next line belongs to is not certain.
+    lines.push_back(row_line({{"A long first heading", 72}, {"B", 150}, {"C", 200}}, 100));
+    lines.push_back(row_line({{"x", 72}, {"y", 150}, {"z", 200}}, 113));
+    lines.push_back(row_line({{"more text", 160}}, 126));
+    const auto paragraphs = build_paragraphs(lines, 1.3f);
+    REQUIRE(paragraphs.size() == 1);
+    CHECK_EQ(paragraphs[0].text, std::string("A long first heading | B | C\nx | y | z\nmore text"));
+}
+
 TEST(table_rows_are_left_alone_when_the_columns_are_not_certain) {
     std::vector<Line> lines;
     lines.push_back(row_line({{"Bits", 72}, {"Name", 250}, {"Access", 320}, {"Reset", 390}, {"Note", 460}}, 100));

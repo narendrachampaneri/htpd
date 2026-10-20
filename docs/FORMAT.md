@@ -234,7 +234,21 @@ How the converter decides:
 
 * A line is a **table row** when it has at least two wide gaps (wider than
   two font sizes), which means three or more cells. A row with only two
-  cells is written as a plain paragraph.
+  cells is written as a plain paragraph. A line of justified text - every
+  space wide, all about equally wide, mostly ordinary words - is not a row.
+* **A cell with several lines** stays one cell: a line right under a row
+  that starts in a column after the first, and whose pieces each stay in
+  one column, is the rest of a cell and is joined to it with one space.
+* **A table stored cell by cell** (the name, then every line of a long
+  description, then the short cells beside it) is put together by the
+  positions on the page: after a header row with three or more cells, the
+  lines that stay inside the columns belong to the table; each piece in
+  the first column starts a row, and every other piece joins the row it
+  stands beside. Text that crosses the columns ends the table. Pieces of
+  one cell are joined with one space.
+* When the columns are not certain, the lines are written as they stand,
+  one per line, inside the block. No text is moved into a cell it does
+  not stand in, and none is left out.
 * A **monospace block** needs at least two lines in a monospace font. One
   such line between ordinary lines is a term or a file name inside a
   sentence, and stays part of its paragraph. Whether a font is monospace
@@ -352,9 +366,10 @@ changes:
   only a scan has no text at all; the notes count such pages. (There is no
   OCR in version 0.1.)
 * The exact form of tables. Rows and cells are kept as text. Lines around
-  cells, cells that span several columns, and cells with several lines of
-  text are not put together again. An empty cell is only marked when the
-  positions on the page leave no doubt.
+  cells and cells that span several columns are not shown; a cell with
+  several lines is joined when the columns are certain (section 4.2), and
+  paragraph breaks inside a cell become one space. An empty cell is only
+  marked when the positions on the page leave no doubt.
 * The form of formulas (fractions, roots, indices).
 * Links, comments and form fields of the PDF.
 * Fonts, colours and positions.

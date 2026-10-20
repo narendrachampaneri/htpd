@@ -267,12 +267,16 @@ honest about the rest.
   order. This was not tested.
 * **No OCR.** A scanned page has no text for the converter. It counts such
   pages and tells you.
-* **Tables are rows of text.** Cells are split by ` | `. A cell with several
-  lines of text is not put together again, and a row with only two cells
-  is written as a plain paragraph. An empty cell is only marked when
-  another row of the same table (on the same page) has all cells, so that
-  the columns are certain. Always check important numbers from a table
-  against the PDF page.
+* **Tables are rows of text.** Cells are split by ` | `. A cell that wraps
+  onto several lines is joined, and a table that the PDF stores cell by
+  cell (register field tables) is put together by position, when the
+  columns are certain; otherwise the lines stay as they stand. A row with
+  only two cells is written as a plain paragraph, and a cell that spans
+  several columns is not shown as such. Empty cells are only marked
+  when another row of the same table (on the same page) has all cells, so
+  that the columns are certain. Tables whose first column wraps too (change
+  histories, lists of references) can still come out as rows plus loose
+  lines. Always check important numbers from a table against the PDF page.
 * **No pictures.** Figures are not converted. Words inside a drawing that
   are real text in the PDF do come out, as loose lines.
 * **Formulas** lose their form (fractions, indices, roots).

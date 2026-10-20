@@ -268,8 +268,8 @@ HTPD is version 0.1. It works today; these are the known next steps.
 - [ ] Windows build
 
 **Known limits:** no pictures or figures; formulas lose their layout;
-scanned pages have no text yet; tables are rows of text (cells spanning
-several lines are not joined); tested mainly with English technical
+scanned pages have no text yet; tables are rows of text (a table whose
+first column wraps can come apart); tested mainly with English technical
 documents. Details: [`docs/CONVERTER.md`](docs/CONVERTER.md#limits-please-read).
 
 ---
