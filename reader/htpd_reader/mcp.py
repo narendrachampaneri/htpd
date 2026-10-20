@@ -30,6 +30,7 @@ from typing import Any, Callable
 from . import __version__
 from .bundle import Bundle, BundleError, open_bundle
 from .check import check as check_bundle
+from .packer import DEFAULT_BUDGET
 from .search import search as word_search
 
 PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
@@ -66,7 +67,7 @@ TOOLS: list[dict[str, Any]] = [
                     "the text and cite the pages in the answer.",
      "inputSchema": _schema({"bundle": BUNDLE, "question": {"type": "string"},
                              "budget": {"type": "integer", "minimum": 200, "maximum": 20000,
-                                        "description": "Most tokens of text to return (default 1500)."}},
+                                        "description": f"Most tokens of text to return (default {DEFAULT_BUDGET})."}},
                             ["bundle", "question"])},
     {"name": "check", "description": "List every problem of a bundle (broken links, a tree that disagrees, ...).",
      "inputSchema": _schema({"bundle": BUNDLE}, ["bundle"])},
@@ -78,7 +79,7 @@ class ToolError(Exception):
 
 
 class Server:
-    def __init__(self, roots: list[Path], meaning: bool = False, decider: str | None = None, budget: int = 1500):
+    def __init__(self, roots: list[Path], meaning: bool = False, decider: str | None = None, budget: int = DEFAULT_BUDGET):
         self.roots = roots
         self.meaning = meaning
         self.decider_name = decider
@@ -317,7 +318,7 @@ def main(argv: list[str] | None = None) -> int:
                     help="folders that hold *.htpd bundles, or bundle folders (default: $HTPD_BUNDLES or .)")
     ap.add_argument("--meaning", action="store_true", help="also meaning search (needs sentence-transformers)")
     ap.add_argument("--decider", choices=["ce", "ce-trained"], help="re-order with a decider model")
-    ap.add_argument("--budget", type=int, default=1500, help="most tokens of text per answer")
+    ap.add_argument("--budget", type=int, default=DEFAULT_BUDGET, help="most tokens of text per answer")
     args = ap.parse_args(argv)
     Server([Path(p).expanduser() for p in args.bundles], args.meaning, args.decider, args.budget).serve()
     return 0

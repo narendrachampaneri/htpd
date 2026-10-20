@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from .bundle import Bundle, Node
-from .packer import Pack, best_block, pack
+from .packer import DEFAULT_BUDGET, Pack, best_block, pack
 from .retriever import Retrieval, Retriever, Settings
 
 
@@ -50,7 +50,7 @@ class Result:
 
 class Asker:
     def __init__(self, bundle: Bundle, settings: Settings | None = None, embedder: Any = None,
-                 decider: Decider | None = None, budget: int = 1500, max_sections: int = 5,
+                 decider: Decider | None = None, budget: int = DEFAULT_BUDGET, max_sections: int = 5,
                  cache_dir: Any = None):
         self.bundle = bundle
         self.retriever = Retriever(bundle, settings, embedder=embedder, cache_dir=cache_dir)

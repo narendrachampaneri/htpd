@@ -20,6 +20,7 @@ from typing import Any, Sequence
 from . import __version__
 from .bundle import Bundle, BundleError, Node
 from .check import check, errors
+from .packer import DEFAULT_BUDGET
 from .search import search
 
 
@@ -155,9 +156,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_search)
     p = add("ask", "the exact lines of the file that answer a question")
     p.add_argument("question", nargs="+")
-    p.add_argument("--lines", type=int, default=3, help="how many lines to give (default 3)")
+    p.add_argument("--lines", type=int, default=5, help="how many lines to give (default 5)")
     p.add_argument("--context", action="store_true", help="also print the sections the lines come from")
-    p.add_argument("--budget", type=int, default=1500, help="most tokens of context")
+    p.add_argument("--budget", type=int, default=DEFAULT_BUDGET, help=f"most tokens of context (default {DEFAULT_BUDGET})")
     p.add_argument("--meaning", action="store_true", help="also meaning search (needs sentence-transformers)")
     p.set_defaults(func=cmd_ask)
     p = add("check", "list every problem of the bundle")

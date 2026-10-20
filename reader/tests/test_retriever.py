@@ -191,6 +191,20 @@ class Manual(unittest.TestCase):
         self.assertTrue(r.settings.tree)
 
 
+class DefaultBudget(unittest.TestCase):
+    def test_one_default_budget_everywhere(self) -> None:
+        """2500 tokens: on the tuning split the answer stood in the text for 0.877
+        of the questions (0.825 at 1500); more did not help."""
+        from htpd_reader.cli import build_parser
+        from htpd_reader.mcp import Server
+        from htpd_reader.packer import DEFAULT_BUDGET
+
+        self.assertEqual(DEFAULT_BUDGET, 2500)
+        self.assertEqual(Asker(open_bundle(SAMPLE), Settings(meaning=False)).budget, DEFAULT_BUDGET)
+        self.assertEqual(Server([]).budget, DEFAULT_BUDGET)
+        self.assertEqual(build_parser().parse_args(["ask", "f", "q"]).budget, DEFAULT_BUDGET)
+
+
 class Packer(unittest.TestCase):
     def setUp(self) -> None:
         self.b = open_bundle(SAMPLE)

@@ -95,7 +95,7 @@ def score_line(line: Line, terms: dict[str, float]) -> float:
     return got / (1.0 + 0.02 * len(line.text.split()))
 
 
-def answer(asker: Asker, question: str, sections: int = 3, lines: int = 3) -> Answer:
+def answer(asker: Asker, question: str, sections: int = 5, lines: int = 5) -> Answer:
     r = asker.ask(question)
     if r.not_found:
         return Answer(question, False, reason=r.retrieval.reason, result=r)

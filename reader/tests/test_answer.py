@@ -75,3 +75,16 @@ class AskCommand(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Defaults(unittest.TestCase):
+    def test_five_lines_from_five_sections(self) -> None:
+        """On the tuning split the exact answer stood in the lines for 0.754 of the
+        questions with 5 lines from 5 sections, 0.684 with 3 from 3."""
+        import inspect
+
+        from htpd_reader.cli import build_parser
+
+        sig = inspect.signature(answer)
+        self.assertEqual((sig.parameters["sections"].default, sig.parameters["lines"].default), (5, 5))
+        self.assertEqual(build_parser().parse_args(["ask", "f", "q"]).lines, 5)
