@@ -145,6 +145,32 @@ def evaluate(name: str, split: str, questions_paths: list[Path], bundles_dir: Pa
     return result
 
 
+def best_threshold(rows: list[tuple[float, bool, bool]]) -> tuple[float, float]:
+    """(threshold, balanced accuracy) for rows of (score, already not found, absent).
+
+    A question is "not found" when another rule says so or its score is below
+    the threshold. Balanced accuracy is the mean of "not found" said for
+    absent questions and not said for answerable ones. Of the thresholds with
+    the best score, the middle of their range is taken: it keeps the widest
+    margin to the questions on both sides.
+    """
+    absent = [(c, fixed) for c, fixed, is_absent in rows if is_absent]
+    present = [(c, fixed) for c, fixed, is_absent in rows if not is_absent]
+    scores = []
+    for step in range(0, 101):
+        t = step / 100
+        caught = sum(1 for c, fixed in absent if fixed or c < t) / len(absent)
+        kept = sum(1 for c, fixed in present if not fixed and c >= t) / len(present)
+        scores.append((t, (caught + kept) / 2))
+    top = max(s for _, s in scores)
+    best = [t for t, s in scores if s >= top - 1e-12]
+    # the first run of best thresholds (they are contiguous in practice)
+    run_end = 0
+    while run_end + 1 < len(best) and abs(best[run_end + 1] - best[run_end] - 0.01) < 1e-9:
+        run_end += 1
+    return round((best[0] + best[run_end]) / 2, 2), top
+
+
 def tune_not_found(name: str, questions_paths: list[Path], bundles_dir: Path, ctx: Context,
                    docs_list: Path = DOCS_LIST, out: Path | None = None) -> dict[str, Any]:
     """Pick the "not found" threshold on the tuning split and store it.
@@ -158,16 +184,10 @@ def tune_not_found(name: str, questions_paths: list[Path], bundles_dir: Path, ct
     if not any(q.kind == 4 for q in qs) or not any(q.kind != 4 for q in qs):
         raise SystemExit("the tuning split needs answerable and not-found questions")
     rows = run(REGISTRY[name], qs, bundles_dir, ctx)
-    # nf_score: the number a system says "not found" below (coverage, or a decider's best probability)
-    cov = [((r.extra or {}).get("nf_score", 0.0), r.q.kind == 4) for r in rows]
-    best = (0.0, -1.0)
-    for step in range(0, 101):
-        t = step / 100
-        absent = [c < t for c, is4 in cov if is4]
-        present = [c >= t for c, is4 in cov if not is4]
-        score = (sum(absent) / len(absent) + sum(present) / len(present)) / 2
-        if score > best[1]:
-            best = (t, score)
+    # nf_score: the number a system says "not found" below (coverage, or a decider's best probability);
+    # nf_fixed: "not found" by a rule that has no threshold (a word the file never uses)
+    best = best_threshold([((r.extra or {}).get("nf_score", 0.0), bool((r.extra or {}).get("nf_fixed", False)),
+                            r.q.kind == 4) for r in rows])
     out = out or (EVAL / "tuned.json")
     data = json.loads(out.read_text(encoding="utf-8")) if out.is_file() else {}
     data[name] = {"not_found_below": best[0]}

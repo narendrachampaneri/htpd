@@ -292,6 +292,19 @@ class Phase3Systems(unittest.TestCase):
         self.assertEqual(tuned("htpd-words", out), {"not_found_below": saved})
 
 
+    def test_tuning_counts_the_other_not_found_rules(self) -> None:
+        """A question already "not found" by another rule (a word the file never
+        uses) must not push the coverage threshold up; among equally good
+        thresholds the middle one is taken."""
+        rows = [  # (coverage, other rule says not found, question is absent)
+            (0.0, True, True), (0.9, True, True),  # absent: both caught by the other rule
+            (0.4, False, False), (0.8, False, False), (1.0, False, False),  # answerable
+        ]
+        t, score = harness.best_threshold([(c, fixed, absent) for c, fixed, absent in rows])
+        self.assertEqual(score, 1.0)
+        self.assertAlmostEqual(t, 0.2)  # best range 0 .. 0.4, its middle
+
+
 class AgentCheck(unittest.TestCase):
     def test_sheet_and_score(self) -> None:
         with tempfile.TemporaryDirectory() as t:

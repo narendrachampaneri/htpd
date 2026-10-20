@@ -52,7 +52,8 @@ def make(name: str) -> System:
         asker, decider = state
         r = asker.ask(question)
         best = getattr(decider, "last_best", 0.0)
-        return Answer([n.id for n in r.ranked], r.top_page, r.pack.text, r.not_found, {"nf_score": best})
+        return Answer([n.id for n in r.ranked], r.top_page, r.pack.text, r.not_found,
+                      {"nf_score": best, "nf_fixed": bool(r.retrieval.missing)})
 
     return System(name, LABELS[name], PHASE, prepare, answer)
 
