@@ -133,6 +133,33 @@ class Manual(unittest.TestCase):
         self.assertFalse(Retriever(self.b, Settings(meaning=False, unknown_terms=False))
                          .retrieve("Does the PCIe link support Gen3?").not_found)
 
+    def test_plain_words_the_file_never_uses(self) -> None:
+        r = Retriever(self.b, Settings(meaning=False))
+        x = r.retrieve("Can the hart connect over Bluetooth?")
+        self.assertTrue(x.not_found)
+        self.assertIn("Bluetooth", x.missing)
+        self.assertIn("Bluetooth", x.reason)
+        # other forms of a word of the file, and words that only phrase a question, are known
+        for q in ("When is the command register started?", "What does dmcontrol mean?",
+                  "What happens to the reset value of abstractcs?", "Where is DMCONTROL described?"):
+            self.assertEqual(r.retrieve(q).missing, [], q)
+        # the whole "never mentions" rule is switched off with unknown_terms
+        self.assertFalse(Retriever(self.b, Settings(meaning=False, unknown_terms=False))
+                         .retrieve("Can the hart connect over Bluetooth?").not_found)
+
+    def test_short_forms_and_modal_verbs_are_known(self) -> None:
+        r = Retriever(open_bundle(SAMPLE), Settings(meaning=False))
+        # the table of the sample says "Max", the question "maximum"
+        self.assertEqual(r.retrieve("What is the maximum bus voltage?").missing, [])
+        self.assertEqual(r.retrieve("At which temperature must the controller reduce the current?").missing, [])
+        self.assertIn("Bluetooth", r.retrieve("Does it support Bluetooth?").missing)
+
+    def test_tree_counts_less_than_words(self) -> None:
+        self.assertEqual(Settings().tree_weight, 0.1)
+        only_tree = Retriever(self.b, Settings(meaning=False, words=False, numbers=False))
+        c = only_tree.retrieve("debug abstract command").candidates[0]
+        self.assertAlmostEqual(c.score, 0.1 / 61)
+
     def test_specific_terms(self) -> None:
         from htpd_reader.retriever import specific_terms
 

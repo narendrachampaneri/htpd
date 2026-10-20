@@ -11,16 +11,22 @@ Three ranked lists, merged by reciprocal rank fusion (RRF):
             > subsection). This is what the structure of a bundle adds: a
             question about "the abstract command in the debug module" matches
             the place in the tree, even when the section text says neither.
+            It counts only a tenth of the other lists (`tree_weight`): on the
+            tuning questions it decides between close candidates, but at
+            full weight it pushes the right section down.
 
 A section number in the question ("section 3.14.2", "see 4.1") puts that
 section first.
 
 "Not found" has two rules, both without any model:
 
-* the question names a specific term - an acronym, a register or signal
-  name, a part number (PCIe, HDMI, VDD_SOC, I2C, Cortex-A55) - that the
-  document never mentions. A document cannot answer a question about a thing
-  it does not name. The answer says which term is missing.
+* the question names a thing the document never mentions: a specific term
+  (an acronym, a register or signal name, a part number: PCIe, HDMI,
+  VDD_SOC, I2C, Cortex-A55) or a plain word (Bluetooth, price, temperature).
+  A document cannot answer a question about a thing it does not name. Other
+  forms of a word of the document count as known ("started" for "start"),
+  and so do the words that only phrase a question ("mean", "happen",
+  "describe"). The answer says which words are missing.
 * the share of the question's rare words (weighted by IDF) that stand in the
   best candidates is below `not_found_below` (set on the tuning split, never
   on the test split; 0 switches this rule off).
@@ -37,9 +43,18 @@ from typing import Any
 
 from .bm25 import BM25
 from .bundle import Bundle, Node
-from .tokens import STOPWORDS, main_tokens, plain_words, technical_tokens
+from .tokens import SHORT_FORMS, STOPWORDS, main_tokens, plain_words, technical_tokens
 
 RRF_K = 60
+
+# Words that phrase a question but do not name what it is about. A question may
+# use them even when the document never does.
+QUESTION_WORDS = frozenset(
+    "mean meaning stand happen consist describe explain define tell give list show find need "
+    "use work kind sort type way thing exist possible ever always never also just please "
+    "difference compare whether else other used say get set make take know want like "
+    "many much more most less few several each every any all some only same different "
+    "must should could would may might shall".split())
 _WORD_IN_QUESTION = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.+-]*")
 _SECTION_REF = re.compile(r"(?:section|chapter|clause|appendix|table|§)\s*([A-Z]?\d+(?:\.\d+)*|[A-Z](?:\.\d+)*)\b",
                           re.IGNORECASE)
@@ -55,7 +70,8 @@ class Settings:
     candidates: int = 50  # length of each ranked list
     not_found_below: float = 0.0  # 0 disables "not found"
     coverage_of: int = 3  # how many top candidates count for the coverage
-    unknown_terms: bool = True  # "not found" when the question names a term the document never uses
+    unknown_terms: bool = True  # "not found" when the question names a term or word the document never uses
+    tree_weight: float = 0.1  # weight of the tree list in the fusion (words and meaning count 1)
 
 
 @dataclass
@@ -111,6 +127,18 @@ def card_text(bundle: Bundle, node: Node, max_words: int = 120) -> str:
     return f"{path}\n{first}" if first else path
 
 
+def stem(word: str) -> str:
+    """A light stem, so that "started", "starts" and "start" are one word."""
+    w = word.lower()
+    for suffix in ("ing", "ed", "ly", "s"):
+        if w.endswith(suffix) and len(w) - len(suffix) >= 3:
+            w = w[: -len(suffix)]
+            break
+    if w.endswith("e") and len(w) >= 4:  # "saves", "saved", "save" -> "sav"
+        w = w[:-1]
+    return w
+
+
 class Retriever:
     def __init__(self, bundle: Bundle, settings: Settings | None = None, embedder: Any = None,
                  cache_dir: Any = None):
@@ -122,6 +150,7 @@ class Retriever:
         self.tree_index = BM25([tok(" ".join(bundle.path_titles(s)[1:])) for s in self.sections])
         self.by_number = {s.number.lower(): i for i, s in enumerate(self.sections) if s.number}
         self._vocabulary: set[str] | None = None
+        self._stems: set[str] | None = None
         self.embedder = embedder if self.settings.meaning else None
         self.vectors: list[list[float]] | None = None
         if self.embedder is not None:
@@ -163,8 +192,9 @@ class Retriever:
         fused: dict[int, float] = {}
         ranks: dict[int, dict[str, int]] = {}
         for name, order in lists.items():
+            weight = st.tree_weight if name == "tree" else 1.0
             for r, i in enumerate(order, 1):
-                fused[i] = fused.get(i, 0.0) + 1.0 / (RRF_K + r)
+                fused[i] = fused.get(i, 0.0) + weight / (RRF_K + r)
                 ranks.setdefault(i, {})[name] = r
         named = False
         if st.numbers:
@@ -196,8 +226,15 @@ class Retriever:
             self._vocabulary = vocab
         return self._vocabulary
 
+    @property
+    def stems(self) -> set[str]:
+        if getattr(self, "_stems", None) is None:
+            self._stems = {stem(w) for w in self.vocabulary}
+        return self._stems
+
     def missing_terms(self, question: str) -> list[str]:
-        """The specific terms of the question that the document never uses."""
+        """The specific terms and plain words of the question that the document
+        never uses (as the question writes them)."""
         vocab = self.vocabulary
         missing = []
         for term in specific_terms(question):
@@ -209,6 +246,20 @@ class Retriever:
 
             if not (all(known(w) for w in words) or known(joined)):
                 missing.append(term)
+        if missing:  # a missing specific term is the clearest reason; plain words add nothing
+            return missing
+        taken: set[str] = set()
+        question_stems = {stem(w) for w in QUESTION_WORDS}
+        for m in _WORD_IN_QUESTION.finditer(question):
+            word = m.group(0).strip(".+-")
+            low = word.lower()
+            if (len(low) < 3 or not low.isalpha() or low in STOPWORDS or low in taken
+                    or stem(low) in question_stems):
+                continue
+            short = SHORT_FORMS.get(low)  # "maximum" is known when the tables say "max"
+            if low not in vocab and stem(low) not in self.stems and not (short and short in vocab):
+                missing.append(word)
+                taken.add(low)
         return missing
 
     def coverage(self, question: str, nodes: list[Node]) -> float:
