@@ -14,25 +14,25 @@
     "questions": 133,
     "answerable": 111,
     "not_in_document": 22,
-    "recall@1": 0.36036036036036034,
+    "recall@1": 0.32432432432432434,
     "recall@5": 0.7117117117117117,
-    "recall@10": 0.8288288288288288,
-    "mrr": 0.5123581872407982,
+    "recall@10": 0.8198198198198198,
+    "mrr": 0.4865080507694025,
     "page_accuracy": 0.5045045045045045,
     "not_found_accuracy": 0.0,
     "false_not_found": 0.0,
-    "answer_in_text": 0.8288288288288288,
-    "tokens_mean": 2609.5488721804513,
-    "tokens_vs_whole": 0.06365192440564975,
-    "ms_per_question": 0.6363287218024074,
+    "answer_in_text": 0.8378378378378378,
+    "tokens_mean": 2685.6616541353383,
+    "tokens_vs_whole": 0.0646054500237171,
+    "ms_per_question": 0.7826147819550419,
     "by_kind": {
       "1": {
         "n": 66,
-        "recall@5": 0.7424242424242424
+        "recall@5": 0.7272727272727273
       },
       "2": {
         "n": 29,
-        "recall@5": 0.6896551724137931
+        "recall@5": 0.7241379310344828
       },
       "3": {
         "n": 16,
@@ -43,7 +43,7 @@
   "misses": [
     {
       "id": "aapcs-001",
-      "rank": 44,
+      "rank": 47,
       "top": [
         "sections/0096-8-2-dynamic-symbols-for-supported-state",
         "sections/0097-9-pseudo-code-examples",
@@ -52,7 +52,7 @@
     },
     {
       "id": "aapcs-003",
-      "rank": 32,
+      "rank": 29,
       "top": [
         "sections/0026-5-5-short-vectors",
         "sections/0027-5-6-scalable-vectors",
@@ -61,7 +61,7 @@
     },
     {
       "id": "aapcs-005",
-      "rank": 11,
+      "rank": 9,
       "top": [
         "sections/0125-15-footnotes",
         "sections/0094-8-1-7-arm-sme-save",
@@ -70,11 +70,11 @@
     },
     {
       "id": "aapcs-014",
-      "rank": 11,
+      "rank": 14,
       "top": [
         "sections/0125-15-footnotes",
         "sections/0123-14-3-the-va-start-macro",
-        "sections/0124-14-4-the-va-arg-macro"
+        "sections/0020-4-2-conformance"
       ]
     },
     {
@@ -87,17 +87,17 @@
       ]
     },
     {
-      "id": "aapcs-025",
-      "rank": 6,
+      "id": "aapcs-029",
+      "rank": 7,
       "top": [
-        "sections/0123-14-3-the-va-start-macro",
-        "sections/0124-14-4-the-va-arg-macro",
-        "sections/0119-13-appendix-c-mangling"
+        "sections/0016-2-2-terms-and-abbreviations",
+        "sections/0017-3-scope",
+        "sections/0018-4-introduction"
       ]
     },
     {
       "id": "aapcs-034",
-      "rank": 20,
+      "rank": 15,
       "top": [
         "sections/0054-6-4-5-the-stack",
         "sections/0055-6-4-5-1-universal-stack-constraints",
@@ -106,7 +106,7 @@
     },
     {
       "id": "aapcs-040",
-      "rank": 6,
+      "rank": 7,
       "top": [
         "sections/0016-2-2-terms-and-abbreviations",
         "sections/0017-3-scope",
@@ -115,16 +115,16 @@
     },
     {
       "id": "aapcs-048",
-      "rank": 7,
+      "rank": 6,
       "top": [
         "sections/0123-14-3-the-va-start-macro",
-        "sections/0124-14-4-the-va-arg-macro",
-        "sections/0119-13-appendix-c-mangling"
+        "sections/0119-13-appendix-c-mangling",
+        "sections/0120-14-appendix-variable-argument-lists"
       ]
     },
     {
       "id": "debug-001",
-      "rank": 12,
+      "rank": 14,
       "top": [
         "sections/0005-1-1-terminology",
         "sections/0006-1-2-context",
@@ -133,7 +133,7 @@
     },
     {
       "id": "debug-003",
-      "rank": 22,
+      "rank": 20,
       "top": [
         "sections/0088-4-9-2-debug-pc-dpc-at-0x7b1",
         "sections/0089-4-9-3-debug-scratch-register-0-dscratch0-at-0x7b2",
@@ -142,7 +142,7 @@
     },
     {
       "id": "debug-004",
-      "rank": 19,
+      "rank": 17,
       "top": [
         "sections/0116-5-7-11-match-control-mcontrol-at-0x7a1",
         "sections/0117-5-7-12-match-control-type-6-mcontrol6-at-0x7a1",
@@ -151,34 +151,43 @@
     },
     {
       "id": "debug-007",
-      "rank": 25,
+      "rank": 19,
       "top": [
-        "sections/0053-3-14-11-configuration-structure-pointer-2-confstrptr2-at-0x1",
-        "sections/0054-3-14-12-configuration-structure-pointer-3-confstrptr3-at-0x1",
-        "sections/0055-3-14-13-next-debug-module-nextdm-at-0x1d"
+        "sections/0139-a-3-debug-module-interface-signals",
+        "sections/0140-appendix-b-debugger-implementation",
+        "sections/0141-b-1-c-header-file"
       ]
     },
     {
       "id": "debug-013",
       "rank": 11,
       "top": [
+        "sections/0152-b-2-7-1-using-system-bus-access",
         "sections/0153-b-2-7-2-using-program-buffer",
-        "sections/0154-b-2-7-3-using-abstract-memory-access",
-        "sections/0155-b-2-8-writing-memory"
+        "sections/0154-b-2-7-3-using-abstract-memory-access"
       ]
     },
     {
       "id": "debug-018",
-      "rank": 22,
+      "rank": 20,
       "top": [
-        "sections/0148-b-2-6-accessing-registers",
-        "sections/0149-b-2-6-1-using-abstract-command",
-        "sections/0150-b-2-6-2-using-program-buffer"
+        "sections/0154-b-2-7-3-using-abstract-memory-access",
+        "sections/0155-b-2-8-writing-memory",
+        "sections/0156-b-2-8-1-using-system-bus-access"
+      ]
+    },
+    {
+      "id": "debug-021",
+      "rank": 11,
+      "top": [
+        "sections/0036-3-8-program-buffer",
+        "sections/0037-3-9-overview-of-hart-debug-states",
+        "sections/0038-3-10-system-bus-access"
       ]
     },
     {
       "id": "debug-025",
-      "rank": 17,
+      "rank": 14,
       "top": [
         "sections/0088-4-9-2-debug-pc-dpc-at-0x7b1",
         "sections/0089-4-9-3-debug-scratch-register-0-dscratch0-at-0x7b2",
@@ -186,26 +195,35 @@
       ]
     },
     {
+      "id": "debug-027",
+      "rank": 8,
+      "top": [
+        "sections/0077-4-2-load-reserved-store-conditional-instructions",
+        "sections/0078-4-3-wait-for-interrupt-instruction",
+        "sections/0079-4-4-wait-on-reservation-set-instructions"
+      ]
+    },
+    {
       "id": "debug-028",
-      "rank": 26,
+      "rank": 28,
       "top": [
         "sections/0119-5-7-14-interrupt-trigger-itrigger-at-0x7a1",
-        "sections/0120-5-7-15-exception-trigger-etrigger-at-0x7a1",
-        "sections/0097-5-4-native-triggers"
+        "sections/0097-5-4-native-triggers",
+        "sections/0087-4-9-1-debug-control-and-status-dcsr-at-0x7b0"
       ]
     },
     {
       "id": "debug-029",
-      "rank": 7,
+      "rank": 11,
       "top": [
-        "sections/0078-4-3-wait-for-interrupt-instruction",
-        "sections/0079-4-4-wait-on-reservation-set-instructions",
-        "sections/0080-4-5-single-step"
+        "sections/0081-4-5-1-step-bit-in-dcsr",
+        "sections/0082-4-5-2-icount-trigger",
+        "sections/0083-4-6-reset"
       ]
     },
     {
       "id": "debug-033",
-      "rank": 25,
+      "rank": 27,
       "top": [
         "sections/0161-b-2-11-quick-access",
         "sections/0162-b-3-native-debugger-implementation",
@@ -232,7 +250,7 @@
     },
     {
       "id": "debug-042",
-      "rank": 10,
+      "rank": 7,
       "top": [
         "sections/0022-chapter-3-debug-module-dm-non-isa-extension",
         "sections/0023-3-1-debug-module-interface-dmi",
@@ -241,11 +259,11 @@
     },
     {
       "id": "debug-043",
-      "rank": 27,
+      "rank": 21,
       "top": [
+        "sections/0129-6-1-4-dtm-control-and-status-dtmcs-at-0x10",
         "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11",
-        "sections/0131-6-1-6-bypass-at-0x1f",
-        "sections/0132-6-1-7-jtag-connector"
+        "sections/0022-chapter-3-debug-module-dm-non-isa-extension"
       ]
     },
     {
@@ -259,7 +277,7 @@
     },
     {
       "id": "debug-045",
-      "rank": 36,
+      "rank": 22,
       "top": [
         "sections/0129-6-1-4-dtm-control-and-status-dtmcs-at-0x10",
         "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11",
@@ -267,66 +285,48 @@
       ]
     },
     {
-      "id": "debug-050",
-      "rank": 6,
-      "top": [
-        "sections/0068-3-14-26-system-bus-address-127-96-sbaddress3-at-0x37",
-        "sections/0069-3-14-27-system-bus-data-31-0-sbdata0-at-0x3c",
-        "sections/0070-3-14-28-system-bus-data-63-32-sbdata1-at-0x3d"
-      ]
-    },
-    {
-      "id": "debug-051",
-      "rank": 12,
-      "top": [
-        "sections/0038-3-10-system-bus-access",
-        "sections/0039-3-11-minimally-intrusive-debugging",
-        "sections/0040-3-12-security"
-      ]
-    },
-    {
       "id": "debug-055",
-      "rank": 19,
+      "rank": 30,
       "top": [
-        "sections/0105-5-7-trigger-module-registers",
-        "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0",
-        "sections/0107-5-7-2-trigger-data-1-tdata1-at-0x7a1"
+        "sections/0049-3-14-7-abstract-command-command-at-0x17",
+        "sections/0050-3-14-8-abstract-command-autoexec-abstractauto-at-0x18",
+        "sections/0051-3-14-9-configuration-structure-pointer-0-confstrptr0-at-0x19"
       ]
     },
     {
       "id": "debug-058",
-      "rank": 11,
+      "rank": 12,
       "top": [
+        "sections/0067-3-14-25-system-bus-address-95-64-sbaddress2-at-0x3b",
         "sections/0068-3-14-26-system-bus-address-127-96-sbaddress3-at-0x37",
-        "sections/0069-3-14-27-system-bus-data-31-0-sbdata0-at-0x3c",
-        "sections/0070-3-14-28-system-bus-data-63-32-sbdata1-at-0x3d"
+        "sections/0069-3-14-27-system-bus-data-31-0-sbdata0-at-0x3c"
       ]
     },
     {
       "id": "debug-059",
-      "rank": 6,
+      "rank": 16,
       "top": [
-        "sections/0143-b-2-1-debug-module-interface-access",
-        "sections/0144-b-2-2-checking-for-halted-harts",
-        "sections/0145-b-2-3-halting"
+        "sections/0139-a-3-debug-module-interface-signals",
+        "sections/0140-appendix-b-debugger-implementation",
+        "sections/0141-b-1-c-header-file"
       ]
     },
     {
       "id": "debug-061",
       "rank": 9,
       "top": [
-        "sections/0143-b-2-1-debug-module-interface-access",
-        "sections/0144-b-2-2-checking-for-halted-harts",
-        "sections/0145-b-2-3-halting"
+        "sections/0139-a-3-debug-module-interface-signals",
+        "sections/0140-appendix-b-debugger-implementation",
+        "sections/0141-b-1-c-header-file"
       ]
     },
     {
       "id": "debug-062",
-      "rank": 8,
+      "rank": 10,
       "top": [
-        "sections/0017-1-3-3-register-definition-format",
-        "sections/0018-1-3-3-1-long-name-shortname-at-0x123",
-        "sections/0019-1-4-background"
+        "sections/0129-6-1-4-dtm-control-and-status-dtmcs-at-0x10",
+        "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11",
+        "sections/0017-1-3-3-register-definition-format"
       ]
     }
   ]

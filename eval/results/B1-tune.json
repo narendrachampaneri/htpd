@@ -16,23 +16,23 @@
     "not_in_document": 24,
     "recall@1": 0.3402061855670103,
     "recall@5": 0.845360824742268,
-    "recall@10": 0.9381443298969072,
-    "mrr": 0.5429394655178205,
-    "page_accuracy": 0.6701030927835051,
+    "recall@10": 0.9484536082474226,
+    "mrr": 0.5299890163292225,
+    "page_accuracy": 0.6907216494845361,
     "not_found_accuracy": 0.0,
     "false_not_found": 0.0,
-    "answer_in_text": 0.8865979381443299,
-    "tokens_mean": 2711.8429752066118,
-    "tokens_vs_whole": 0.07130280784364007,
-    "ms_per_question": 0.5837445950412774,
+    "answer_in_text": 0.9175257731958762,
+    "tokens_mean": 2705.9834710743803,
+    "tokens_vs_whole": 0.07070113570395146,
+    "ms_per_question": 0.7507254297496361,
     "by_kind": {
       "1": {
         "n": 72,
-        "recall@5": 0.8472222222222222
+        "recall@5": 0.875
       },
       "2": {
         "n": 15,
-        "recall@5": 0.7333333333333333
+        "recall@5": 0.6
       },
       "3": {
         "n": 10,
@@ -42,80 +42,89 @@
   },
   "misses": [
     {
-      "id": "elf-001",
-      "rank": 10,
-      "top": [
-        "sections/0075-5-7-16-private-and-platform-specific-relocations",
-        "sections/0076-5-7-17-unallocated-relocations",
-        "sections/0077-5-7-18-pauthabi-relocations"
-      ]
-    },
-    {
-      "id": "elf-003",
+      "id": "elf-010",
       "rank": 6,
       "top": [
-        "sections/0061-5-7-7-call-and-jump-relocations",
-        "sections/0062-5-7-8-group-relocations",
-        "sections/0014-2-1-1-current-status-and-anticipated-changes"
+        "sections/0027-4-1-2-2-overview-of-plt-entry-code-generation",
+        "sections/0028-5-object-files",
+        "sections/0029-5-1-introduction"
       ]
     },
     {
-      "id": "elf-006",
-      "rank": 41,
+      "id": "elf-011",
+      "rank": 6,
       "top": [
-        "sections/0023-4-1-linux-platform-abi-example-only",
-        "sections/0024-4-1-1-symbol-versioning",
-        "sections/0025-4-1-2-program-linkage-table-plt-sequences-and-usage-models"
+        "sections/0027-4-1-2-2-overview-of-plt-entry-code-generation",
+        "sections/0028-5-object-files",
+        "sections/0029-5-1-introduction"
       ]
     },
     {
       "id": "elf-012",
-      "rank": 9,
+      "rank": 11,
       "top": [
+        "sections/0074-5-7-15-dynamic-relocations",
         "sections/0075-5-7-16-private-and-platform-specific-relocations",
-        "sections/0076-5-7-17-unallocated-relocations",
-        "sections/0077-5-7-18-pauthabi-relocations"
+        "sections/0076-5-7-17-unallocated-relocations"
       ]
     },
     {
-      "id": "elf-026",
-      "rank": 6,
+      "id": "elf-013",
+      "rank": 8,
       "top": [
-        "sections/0075-5-7-16-private-and-platform-specific-relocations",
-        "sections/0076-5-7-17-unallocated-relocations",
-        "sections/0077-5-7-18-pauthabi-relocations"
+        "sections/0032-5-2-1-elf-identification",
+        "sections/0033-5-3-sections",
+        "sections/0034-5-3-1-special-section-indexes"
       ]
     },
     {
-      "id": "elf-027",
-      "rank": 6,
+      "id": "elf-014",
+      "rank": 7,
       "top": [
-        "sections/0075-5-7-16-private-and-platform-specific-relocations",
-        "sections/0076-5-7-17-unallocated-relocations",
-        "sections/0077-5-7-18-pauthabi-relocations"
+        "sections/0032-5-2-1-elf-identification",
+        "sections/0033-5-3-sections",
+        "sections/0034-5-3-1-special-section-indexes"
       ]
     },
     {
       "id": "elf-028",
+      "rank": 7,
+      "top": [
+        "sections/0080-6-1-program-header",
+        "sections/0081-6-1-1-platform-architecture-compatibility-data",
+        "sections/0082-6-2-program-property"
+      ]
+    },
+    {
+      "id": "elf-030",
+      "rank": 7,
+      "top": [
+        "sections/0032-5-2-1-elf-identification",
+        "sections/0033-5-3-sections",
+        "sections/0034-5-3-1-special-section-indexes"
+      ]
+    },
+    {
+      "id": "elf-032",
       "rank": 6,
       "top": [
-        "sections/0081-6-1-1-platform-architecture-compatibility-data",
-        "sections/0082-6-2-program-property",
-        "sections/0083-6-3-program-loading"
+        "sections/0072-5-7-13-relocations-for-pauth-abi-extension",
+        "sections/0073-5-7-14-relocations-for-structure-protection-extension",
+        "sections/0074-5-7-15-dynamic-relocations"
       ]
     },
     {
       "id": "elf-036",
-      "rank": 12,
+      "rank": 11,
       "top": [
         "sections/0070-5-7-11-5-thread-local-storage-descriptors",
         "sections/0071-5-7-12-thread-local-storage-data-relocations",
-        "sections/0060-5-7-6-static-aarch64-relocations"
+        "sections/0072-5-7-13-relocations-for-pauth-abi-extension"
       ]
     },
     {
       "id": "priv-003",
-      "rank": 18,
+      "rank": 20,
       "top": [
         "sections/0190-18-6-4-trap-return",
         "sections/0191-chapter-19-risc-v-privileged-instruction-set-listings",
@@ -123,39 +132,30 @@
       ]
     },
     {
-      "id": "priv-015",
-      "rank": 11,
-      "top": [
-        "sections/0128-10-4-1-addressing-and-memory-protection",
-        "sections/0031-3-1-6-4-endianness-control-in-mstatus-and-mstatush-registers",
-        "sections/0125-10-3-1-addressing-and-memory-protection"
-      ]
-    },
-    {
       "id": "priv-020",
-      "rank": 17,
+      "rank": 14,
       "top": [
+        "sections/0121-10-1-11-supervisor-address-translation-and-protection-satp-r",
         "sections/0123-10-2-1-supervisor-memory-management-fence-instruction",
-        "sections/0124-10-3-sv32-page-based-32-bit-virtual-memory-systems",
-        "sections/0125-10-3-1-addressing-and-memory-protection"
+        "sections/0124-10-3-sv32-page-based-32-bit-virtual-memory-systems"
       ]
     },
     {
       "id": "priv-022",
       "rank": 27,
       "top": [
-        "sections/0174-18-3-1-hypervisor-virtual-machine-load-and-store-instruction",
-        "sections/0175-18-3-2-hypervisor-memory-management-fence-instructions",
-        "sections/0181-18-4-5-machine-trap-instruction-register-mtinst"
+        "sections/0181-18-4-5-machine-trap-instruction-register-mtinst",
+        "sections/0182-18-5-two-stage-address-translation",
+        "sections/0183-18-5-1-guest-physical-address-translation"
       ]
     },
     {
       "id": "priv-023",
-      "rank": 10,
+      "rank": 9,
       "top": [
         "sections/0119-10-1-9-supervisor-trap-value-stval-register",
         "sections/0120-10-1-10-supervisor-environment-configuration-register-senvcf",
-        "sections/0121-10-1-11-supervisor-address-translation-and-protection-satp-r"
+        "sections/0074-4-2-state-enable-0-registers"
       ]
     },
     {

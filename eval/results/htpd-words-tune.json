@@ -18,13 +18,13 @@
     "recall@5": 0.9175257731958762,
     "recall@10": 0.9690721649484536,
     "mrr": 0.8623629520536737,
-    "page_accuracy": 0.7628865979381443,
+    "page_accuracy": 0.7731958762886598,
     "not_found_accuracy": 0.9583333333333334,
     "false_not_found": 0.0,
     "answer_in_text": 0.9175257731958762,
-    "tokens_mean": 2323.528925619835,
-    "tokens_vs_whole": 0.06074172981679644,
-    "ms_per_question": 18.227200586778032,
+    "tokens_mean": 2323.198347107438,
+    "tokens_vs_whole": 0.0606358790042081,
+    "ms_per_question": 20.85427031405074,
     "by_kind": {
       "1": {
         "n": 72,
