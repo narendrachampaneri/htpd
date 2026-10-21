@@ -110,7 +110,7 @@ Fields of HTPD (under `htpd:`):
 | `order` | Position in the document, starting at 1. |
 | `number` | The section number as printed: `"3.1"`, `"A.1"`; for "Appendix B" it is `"B"`. Missing when the heading has no number. |
 | `level` | Depth of the heading: 1 = chapter, 2 = section below a chapter, ... |
-| `heading_from` | How the heading was found: `bookmark` (a bookmark of the PDF), `numbering` (a numbered heading found in the text), `font-size` (a large line without a number), `none` (no heading: text before the first heading, or one page of a document without headings). |
+| `heading_from` | How the heading was found: `bookmark` (a bookmark of the PDF), `numbering` (a numbered heading found in the text), `font-size` (a large line without a number), `running-title` (a document with few headings: the running header of the pages changes here, and its text is the title), `pages` (a part of a long stretch of text, cut by pages: see 3.3), `none` (no heading: text before the first heading, or one page of a document without headings). For `running-title` and `pages` the title is not in the text of the page. |
 | `page_start`, `page_end` | First and last page of the text of this section itself. Pages count from 1, as a PDF viewer shows them. |
 | `span_page_end` | Last page of this section **including all its subsections**. |
 | `parent` | ID of the section one level up, or `"document"`. |
@@ -161,6 +161,18 @@ The body of `document.md` has two parts:
   the titles `Page 1`, `Page 2`, ...
 
 Both have `heading_from: none`.
+
+A long stretch of text gets parts, so that no section is too long for an AI
+to point into: the own text of a section that runs over more than 3 pages
+(8 pages in a document with headings enough, that is with at least 3
+headings and one per 15 pages) is cut into parts of about 2 pages. A part is
+a subsection one level down, with `heading_from: pages` and the title
+`<title of the section> - pages 12-13`; in a document with few headings the
+topics its running header gives those pages follow
+(`... - pages 3-4: Section 3: Methods; Section 4: Results`). A part starts
+where a sentence ends, or at a page that starts with a larger line (a slide
+title), never next to a table row: no paragraph is broken and a table keeps
+its header row.
 
 ## 4. The body of a section file
 

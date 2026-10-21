@@ -9,6 +9,7 @@
 #include "htpd/pdf_reader.hpp"
 #include "htpd/sections.hpp"
 #include "htpd/sha256.hpp"
+#include "htpd/structure.hpp"
 #include "htpd/text.hpp"
 
 namespace htpd {
@@ -23,6 +24,7 @@ struct Analysis {
     std::vector<std::vector<PageLink>> page_links;   // per page
     std::vector<FontFacts> fonts;         // indexed by Line::font
     HeadingResult headings;
+    StructureReport structure;
     FurnitureReport furniture;
     std::size_t outline_entries = 0;
     std::size_t skipped_rotated = 0;
@@ -90,6 +92,11 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
     HeadingOptions heading_options;
     heading_options.mode = options.headings;
     a.headings = detect_headings(a.lines, outline, a.page_transforms, heading_options);
+
+    // 5. Parts for documents with few headings, and for long stretches of text.
+    if (options.headings != HeadingMode::None) {
+        a.structure = add_structure(a.headings.headings, a.lines, a.furniture, page_count);
+    }
     return a;
 }
 
@@ -125,6 +132,8 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     info.bookmarks_total = a.headings.bookmarks_total;
     info.bookmarks_located = a.headings.bookmarks_located;
     info.headings_from_text = a.headings.text_added;
+    info.running_titles = a.structure.running_titles;
+    info.page_parts = a.structure.page_parts;
     info.furniture_removed = !options.keep_furniture;
     info.furniture = a.furniture;
     info.skipped_rotated = a.skipped_rotated;
@@ -152,6 +161,8 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     report.bookmarks_total = a.headings.bookmarks_total;
     report.bookmarks_located = a.headings.bookmarks_located;
     report.headings_from_text = a.headings.text_added;
+    report.running_titles = a.structure.running_titles;
+    report.page_parts = a.structure.page_parts;
     report.furniture = std::move(a.furniture);
     report.skipped_rotated = a.skipped_rotated;
     report.unmapped = a.unmapped;

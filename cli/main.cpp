@@ -123,6 +123,12 @@ int run_convert(Args& args) {
                               r.headings_from_text));
         }
     }
+    if (r.running_titles > 0) {
+        print(std::format("  + running titles {} sections where the page header changes\n", r.running_titles));
+    }
+    if (r.page_parts > 0) {
+        print(std::format("  + page parts    {} parts of long text, cut by pages\n", r.page_parts));
+    }
     print(std::format("  paragraphs      {}\n", r.paragraphs));
     print(std::format("  files written   {} ({}; the PDF is {})\n", r.files, megabytes(r.bundle_bytes),
                       megabytes(r.source_bytes)));

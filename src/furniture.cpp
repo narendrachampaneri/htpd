@@ -229,6 +229,8 @@ FurnitureReport remove_furniture(std::vector<std::vector<Line>>& pages,
             }
             removed_pages.push_back(line.page);
             removed_keys.push_back(line.key);
+            if (pattern.page_text.empty()) pattern.page_text.resize(pages.size());
+            if (pattern.page_text[line.page].empty()) pattern.page_text[line.page] = pages[line.page][line.index].text;
             if (first_removed == nullptr || line.page < first_removed->page) first_removed = &line;
         }
         if (first_removed == nullptr) continue;

@@ -28,6 +28,7 @@
 #include "htpd/pdf_reader.hpp"
 #include "htpd/sections.hpp"
 #include "htpd/sha256.hpp"
+#include "htpd/structure.hpp"
 #include "htpd/text.hpp"
 
 #ifndef HTPD_TEST_DATA
@@ -1469,6 +1470,142 @@ TEST(a_heading_never_takes_the_title_lines_of_the_one_before) {
     CHECK(sections[0].paragraphs.empty());
     REQUIRE(sections[1].paragraphs.size() == 1);
     CHECK_EQ(sections[1].paragraphs[0].text, std::string("Body text."));
+}
+
+// ---- structure for documents with few headings ------------------------------
+
+namespace {
+
+// `pages` pages of body text: two sentences per page, so a cut may fall at
+// the top of every page.
+std::vector<Line> body_pages(int pages, int first_page = 0) {
+    std::vector<Line> lines;
+    for (int p = first_page; p < first_page + pages; ++p) {
+        lines.push_back(make_line(p, "Text at the top of page " + std::to_string(p + 1) + " starts here and", 100));
+        lines.push_back(make_line(p, "ends on the same page.", 114));
+    }
+    return lines;
+}
+
+// A running-header pattern that names the topic of each page.
+FurnitureReport header(const std::vector<std::string>& page_text) {
+    FurnitureReport f;
+    FurniturePattern p;
+    p.page_text = page_text;
+    p.pages = page_text.size();
+    std::vector<std::string> keys;
+    for (const std::string& t : page_text) keys.push_back(furniture_key(t));
+    std::ranges::sort(keys);
+    p.variants = static_cast<std::size_t>(std::unique(keys.begin(), keys.end()) - keys.begin());
+    f.patterns.push_back(std::move(p));
+    return f;
+}
+
+std::vector<Heading> one_title() {
+    return {{"Annual report", "", 1, 0, 0, 0, HeadingSource::FontSize}};
+}
+
+}  // namespace
+
+TEST(structure_starts_sections_where_the_running_header_changes) {
+    const std::vector<Line> lines = body_pages(30);
+    std::vector<std::string> text(30);
+    for (int p = 0; p < 30; ++p) text[static_cast<std::size_t>(p)] = p < 12 ? "Chapter 1: Background" : "Chapter 2: Methods";
+    std::vector<Heading> headings = one_title();
+    const StructureReport r = add_structure(headings, lines, header(text), 30);
+    // page 1 already starts with a heading of its own: only the change is added
+    CHECK_EQ(r.running_titles, std::size_t{1});
+    const std::vector<std::string> t = titles(headings);
+    CHECK(std::ranges::find(t, "Chapter 1: Background") == t.end());
+    REQUIRE(std::ranges::find(t, "Chapter 2: Methods") != t.end());
+    const Heading& methods = *std::ranges::find(headings, "Chapter 2: Methods", &Heading::title);
+    CHECK_EQ(methods.page, 12);
+    CHECK_EQ(methods.line_index, std::size_t{24});   // the first line of page 13
+    CHECK_EQ(methods.line_count, std::size_t{0});    // the title is not in the text
+    CHECK(methods.source == HeadingSource::RunningTitle);
+    CHECK(std::ranges::is_sorted(headings, {}, &Heading::line_index));
+}
+
+TEST(structure_takes_no_header_that_changes_on_every_page_as_chapters) {
+    const std::vector<Line> lines = body_pages(30);
+    std::vector<std::string> text(30);
+    for (int p = 0; p < 30; ++p) text[static_cast<std::size_t>(p)] = p % 2 ? "Chapter 1: Background" : "The Book";
+    std::vector<Heading> headings = one_title();
+    CHECK_EQ(add_structure(headings, lines, header(text), 30).running_titles, std::size_t{0});
+    // and a document with headings enough keeps its own
+    for (int p = 0; p < 30; ++p) text[static_cast<std::size_t>(p)] = p < 15 ? "Part A" : "Part B";
+    std::vector<Heading> many;
+    for (std::size_t i = 0; i < 3; ++i) many.push_back({"H", "", 1, 0, i * 20, 1, HeadingSource::FontSize});
+    CHECK_EQ(add_structure(many, lines, header(text), 30).running_titles, std::size_t{0});
+}
+
+TEST(structure_cuts_long_text_into_parts_of_pages) {
+    const std::vector<Line> lines = body_pages(9);
+    std::vector<Heading> headings = one_title();
+    const StructureReport r = add_structure(headings, lines, {}, 9);
+    // own text of pages 1-9: the title keeps pages 1-2, parts from page 3 on
+    CHECK_EQ(r.page_parts, std::size_t{4});
+    REQUIRE(headings.size() == 5);
+    CHECK_EQ(headings[1].title, std::string("Annual report - pages 3-4"));
+    CHECK_EQ(headings[4].title, std::string("Annual report - page 9"));
+    CHECK_EQ(headings[1].level, 2);
+    CHECK(headings[1].source == HeadingSource::Pages);
+    CHECK_EQ(headings[1].line_index, std::size_t{4});   // the top of page 3, after a full sentence
+    // nothing is lost: every line still belongs to exactly one section
+    const std::vector<Section> sections = build_sections(lines, headings);
+    std::size_t words = 0, all = 0;
+    for (const Section& s : sections) {
+        for (const Paragraph& p : s.paragraphs) words += text::word_count(p.text);
+    }
+    for (const Line& l : lines) all += text::word_count(l.text);
+    CHECK_EQ(words, all);
+}
+
+TEST(structure_never_cuts_a_sentence_or_a_table) {
+    std::vector<Line> lines;
+    for (int p = 0; p < 8; ++p) {   // one sentence that runs over all pages
+        lines.push_back(make_line(p, "a sentence that goes on and on across the page and the next", 100));
+    }
+    std::vector<Heading> headings = one_title();
+    CHECK_EQ(add_structure(headings, lines, {}, 8).page_parts, std::size_t{0});
+
+    std::vector<Line> table;   // table rows that end with a full stop are still rows
+    for (int p = 0; p < 8; ++p) {
+        Line row = make_line(p, "REG0 0x00 Reset value of the register.", 100);
+        row.gaps = {4, 9};
+        table.push_back(std::move(row));
+    }
+    std::vector<Heading> h2 = one_title();
+    CHECK_EQ(add_structure(h2, table, {}, 8).page_parts, std::size_t{0});
+}
+
+TEST(structure_cuts_slides_at_their_titles) {
+    std::vector<Line> lines;   // slides: a large title and short points without full stops
+    for (int p = 0; p < 8; ++p) {
+        lines.push_back(make_line(p, "Slide title " + std::to_string(p + 1), 60, 36));
+        lines.push_back(make_line(p, "short point", 200, 24));
+    }
+    std::vector<Heading> headings = one_title();
+    CHECK_EQ(add_structure(headings, lines, {}, 8).page_parts, std::size_t{3});
+    CHECK_EQ(headings[1].line_index, std::size_t{4});   // the title of slide 3
+}
+
+TEST(structure_names_parts_with_the_topics_of_their_pages) {
+    const std::vector<Line> lines = body_pages(8);
+    std::vector<std::string> text(8);
+    for (int p = 0; p < 8; ++p) text[static_cast<std::size_t>(p)] = "Topic " + std::string(1, static_cast<char>('A' + p)) + " | Page " + std::to_string(p + 1);
+    std::vector<Heading> headings = one_title();
+    add_structure(headings, lines, header(text), 8);
+    REQUIRE(headings.size() >= 2);
+    CHECK_EQ(headings[1].title, std::string("Annual report - pages 3-4: Topic C | Page 3; Topic D | Page 4"));
+    // the same topic on two pages ("... | Page 3", "... | Page 4") is named once
+    for (int p = 0; p < 8; ++p) {
+        text[static_cast<std::size_t>(p)] = "Topic " + std::string(1, static_cast<char>('A' + p / 2)) + " | Page " + std::to_string(p + 1);
+    }
+    std::vector<Heading> h2 = one_title();
+    add_structure(h2, lines, header(text), 8);
+    REQUIRE(h2.size() >= 2);
+    CHECK_EQ(h2[1].title, std::string("Annual report - pages 3-4: Topic B | Page 3"));
 }
 
 // ---- bundle writer ----------------------------------------------------------

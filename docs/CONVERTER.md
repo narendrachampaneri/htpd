@@ -182,6 +182,7 @@ One PDF goes through seven steps. Each step is one small file.
 | 2. Lines | `src/layout.cpp` | Characters become lines. Wide gaps are marked (table columns); raised and lowered numbers stay raised (2³¹). |
 | 3. Headers and footers | `src/furniture.cpp` | Lines that repeat at the page edge on many pages are taken out and reported. |
 | 4. Headings | `src/headings.cpp` | From the bookmarks of the PDF, and from the text: section numbers, font size, bold, another font. |
+| 4b. Structure | `src/structure.cpp` | For documents with few headings: a running header that changes starts a section with its text as title. Text longer than a few pages is cut into parts of about 2 pages, where a sentence ends (FORMAT.md 3.3). |
 | 5. Sections | `src/sections.cpp` | The text is cut at the headings. Lines become paragraphs, table rows (wrapped cells and tables stored cell by cell are put together) and code blocks. The tree of sections is built. |
 | 6. Links | `src/links.cpp` | The links of the pages become links from section to section. |
 | 7. Write | `src/bundle_writer.cpp` | The files of the bundle are written. |
@@ -286,7 +287,9 @@ honest about the rest.
   work out columns by itself.
 * **Headings.** Bookmarks are the best source. Without bookmarks the
   converter needs numbered headings (`2.1 Supply`) or headings in a larger
-  font. A document with neither gets one section per page.
+  font. A document with neither gets one section per page; one with few
+  headings still gets parts: where its running header changes, and parts
+  of about 2 pages, titled by their pages.
 * **Headers and footers** are only searched in documents with four or more
   pages. A header that is different on every page and follows no pattern
   stays in the text. Everything that is removed is listed in

@@ -36,6 +36,8 @@ struct BundleInfo {
     std::size_t bookmarks_total = 0;
     std::size_t bookmarks_located = 0;
     std::size_t headings_from_text = 0; // found in the text below the bookmark level
+    std::size_t running_titles = 0;     // sections started where the running header changes
+    std::size_t page_parts = 0;         // parts of long text, cut by pages
 
     bool furniture_removed = true;      // false when the user kept headers/footers
     FurnitureReport furniture;

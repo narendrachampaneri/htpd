@@ -349,6 +349,18 @@ std::string conversion_notes(const BundleInfo& info) {
         case HeadingSource::None:
             md += "* No headings were found; the text is split by page.\n";
             break;
+        case HeadingSource::RunningTitle:
+        case HeadingSource::Pages:
+            break;   // never the source of the whole document
+    }
+    if (info.running_titles > 0) {
+        md += std::format("* {} sections start where the running header of the pages changes; the header "
+                          "text is their title (`heading_from: running-title`).\n", info.running_titles);
+    }
+    if (info.page_parts > 0) {
+        md += std::format("* {} long stretches of text without headings are cut into parts of a few pages, "
+                          "titled by their pages (`heading_from: pages`), always where a sentence ends.\n",
+                          info.page_parts);
     }
     if (!info.furniture_removed) {
         md += "* Running headers and footers were kept.\n";

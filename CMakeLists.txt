@@ -66,6 +66,7 @@ add_library(htpd_core STATIC
   src/headings.cpp
   src/layout.cpp
   src/links.cpp
+  src/structure.cpp
   src/pdf_reader_pdfium.cpp
   src/sections.cpp
   src/sha256.cpp

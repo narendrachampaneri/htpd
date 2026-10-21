@@ -119,7 +119,9 @@ struct DocumentMeta {
     int page_count = 0;
 };
 
-enum class HeadingSource { Bookmark, Numbering, FontSize, None };
+// RunningTitle: the running header of the pages changes there (a document with
+// few headings); Pages: a long stretch of text cut into parts of a few pages.
+enum class HeadingSource { Bookmark, Numbering, FontSize, None, RunningTitle, Pages };
 
 constexpr const char* to_string(HeadingSource s) {
     switch (s) {
@@ -127,6 +129,8 @@ constexpr const char* to_string(HeadingSource s) {
         case HeadingSource::Numbering: return "numbering";
         case HeadingSource::FontSize:  return "font-size";
         case HeadingSource::None:      return "none";
+        case HeadingSource::RunningTitle: return "running-title";
+        case HeadingSource::Pages:     return "pages";
     }
     return "none";
 }

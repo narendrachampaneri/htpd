@@ -99,6 +99,7 @@ internet; a test that needs a model uses a small stand-in.
 | 2. Characters to lines | `src/layout.cpp` |
 | 3. Headers and footers | `src/furniture.cpp` |
 | 4. Headings | `src/headings.cpp` |
+| 4b. Structure for few headings, parts of long text | `src/structure.cpp` |
 | 5. Sections, paragraphs, tables, code | `src/sections.cpp` |
 | 6. Links between sections | `src/links.cpp` |
 | 7. Write the bundle | `src/bundle_writer.cpp` |

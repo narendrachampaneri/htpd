@@ -39,6 +39,9 @@ struct FurniturePattern {
     std::size_t pages = 0;      // number of pages it was removed from
     std::size_t variants = 1;   // number of different texts (digits ignored)
     bool top = true;            // header (true) or footer (false)
+    // The removed text on each page, by page index ("" where none): a running
+    // header that names the chapter tells where a chapter starts.
+    std::vector<std::string> page_text;
 };
 
 struct FurnitureReport {
