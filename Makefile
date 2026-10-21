@@ -22,7 +22,7 @@ CXXFLAGS += -std=c++23 $(OPT) $(WARNINGS) -Iinclude -isystem $(PDFIUM_INCLUDE) -
 # copy there, so build/htpd and build/libpdfium.so can be moved together to
 # any other folder. No absolute path is stored in the program.
 LDFLAGS  += -L$(PDFIUM_LIB) -Wl,-rpath,'$$ORIGIN'
-LDLIBS   += -lpdfium
+LDLIBS   += -lpdfium -pthread
 
 CORE_SRC := $(wildcard src/*.cpp)
 CORE_OBJ := $(CORE_SRC:src/%.cpp=$(BUILD)/obj/%.o)

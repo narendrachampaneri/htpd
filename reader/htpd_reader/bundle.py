@@ -212,6 +212,12 @@ class Node:
         return None if value is None else str(value)
 
     @property
+    def ocr_pages(self) -> list[int]:
+        """Pages of this section whose text was read from pictures by OCR (it may hold misread words)."""
+        value = self.htpd.get("ocr_pages")
+        return [p for p in value if isinstance(p, int)] if isinstance(value, list) else []
+
+    @property
     def pages(self) -> list[int]:
         """The pages that hold text of this node, in order, without repeats."""
         seen: list[int] = []
@@ -684,6 +690,8 @@ def read_single_file(path: Path) -> Bundle:
                 "span_page_end": pages[2], "parent": f.get("parent"), "children": [], **source}
         if f.get("number") is not None:
             htpd["number"] = f.get("number")
+        if isinstance(f.get("ocr"), list):
+            htpd["ocr_pages"] = f.get("ocr")
         text_body = "# Text\n\n" + "\n".join(text_lines)
         _, blocks, _, p = parse_body(text_body, first_line + i + 1 + j - 2, fname)
         problems += p

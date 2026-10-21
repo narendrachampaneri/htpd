@@ -14,6 +14,7 @@
 #include <unordered_set>
 
 #include <fpdf_doc.h>
+#include <fpdf_edit.h>
 #include <fpdf_text.h>
 #include <fpdfview.h>
 
@@ -401,6 +402,44 @@ std::vector<OutlineEntry> PdfDocument::outline() const {
     return out;
 }
 
+Result<GrayImage> PdfDocument::render(int index, const Box& region, float scale) const {
+    const PagePtr page(FPDF_LoadPage(impl_->doc, index));
+    if (!page) return fail(std::format("cannot load page {}: {}", index + 1, last_error_text()));
+    float width = FPDF_GetPageWidthF(page.get());
+    float height = FPDF_GetPageHeightF(page.get());
+    const Affine t = page_affine(page.get(), width, height);
+    if (std::fabs(t.a) < 0.5f && std::fabs(t.b) > 0.5f) std::swap(width, height);
+
+    GrayImage image;
+    image.width = std::max(1, static_cast<int>(std::lround(region.width() * scale)));
+    image.height = std::max(1, static_cast<int>(std::lround(region.height() * scale)));
+    constexpr long long kMaxPixels = 60'000'000;   // about 7700 x 7700
+    if (static_cast<long long>(image.width) * image.height > kMaxPixels) {
+        return fail(std::format("page {}: the picture to read is too large", index + 1));
+    }
+    const std::unique_ptr<std::remove_pointer_t<FPDF_BITMAP>, decltype(&FPDFBitmap_Destroy)> bitmap(
+        FPDFBitmap_Create(image.width, image.height, 0), &FPDFBitmap_Destroy);
+    if (!bitmap) return fail(std::format("page {}: cannot draw the page", index + 1));
+    FPDFBitmap_FillRect(bitmap.get(), 0, 0, image.width, image.height, 0xFFFFFFFF);
+    // The whole page at `scale`, moved so that the region lands on the bitmap.
+    FPDF_RenderPageBitmap(bitmap.get(), page.get(), static_cast<int>(std::lround(-region.x0 * scale)),
+                          static_cast<int>(std::lround(-region.y0 * scale)),
+                          static_cast<int>(std::lround(width * scale)), static_cast<int>(std::lround(height * scale)),
+                          0, FPDF_GRAYSCALE | FPDF_PRINTING);
+    const auto* buffer = static_cast<const std::uint8_t*>(FPDFBitmap_GetBuffer(bitmap.get()));
+    const int stride = FPDFBitmap_GetStride(bitmap.get());
+    image.pixels.resize(static_cast<std::size_t>(image.width) * static_cast<std::size_t>(image.height));
+    for (int y = 0; y < image.height; ++y) {
+        const std::uint8_t* row = buffer + static_cast<std::ptrdiff_t>(y) * stride;
+        std::uint8_t* to = image.pixels.data() + static_cast<std::ptrdiff_t>(y) * image.width;
+        for (int x = 0; x < image.width; ++x) {
+            const std::uint8_t* px = row + 4 * x;   // B G R x
+            to[x] = static_cast<std::uint8_t>((29 * px[0] + 150 * px[1] + 77 * px[2]) >> 8);
+        }
+    }
+    return image;
+}
+
 std::vector<FontFacts> PdfDocument::fonts() const {
     std::vector<FontFacts> facts(impl_->fonts.size());
     for (std::size_t i = 1; i < facts.size(); ++i) {
@@ -425,6 +464,26 @@ Result<PageText> PdfDocument::read_page(int index) const {
     // The size above is the size before /Rotate; a quarter turn swaps it.
     if (std::fabs(out.user_to_display.a) < 0.5f && std::fabs(out.user_to_display.b) > 0.5f) {
         std::swap(out.width, out.height);
+    }
+
+    // Picture objects, in display space as the page is drawn (before any turn
+    // of the text below): the places where OCR may find text.
+    const int objects = FPDFPage_CountObjects(page.get());
+    out.objects = static_cast<std::size_t>(std::max(objects, 0));
+    for (int i = 0; i < objects; ++i) {
+        FPDF_PAGEOBJECT object = FPDFPage_GetObject(page.get(), i);
+        if (FPDFPageObj_GetType(object) != FPDF_PAGEOBJ_IMAGE) continue;
+        float left = 0, bottom = 0, right = 0, top = 0;
+        if (!FPDFPageObj_GetBounds(object, &left, &bottom, &right, &top)) continue;
+        float xs[2], ys[2];
+        out.user_to_display.apply(left, bottom, xs[0], ys[0]);
+        out.user_to_display.apply(right, top, xs[1], ys[1]);
+        Box box{std::min(xs[0], xs[1]), std::min(ys[0], ys[1]), std::max(xs[0], xs[1]), std::max(ys[0], ys[1])};
+        box.x0 = std::max(box.x0, 0.0f);
+        box.y0 = std::max(box.y0, 0.0f);
+        box.x1 = std::min(box.x1, out.width);
+        box.y1 = std::min(box.y1, out.height);
+        if (box.width() > 1 && box.height() > 1) out.images.push_back(box);
     }
 
     const TextPagePtr text_page(FPDFText_LoadPage(page.get()));

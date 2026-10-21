@@ -26,7 +26,9 @@ question names stays first, and without word search they are not used.
 * On 133 test questions (`htpd-words` -> `htpd-rerank` in `eval/report.md`):
   R@1 0.667 -> 0.766, R@5 0.892 -> 0.946, MRR 0.763 -> 0.837, page 0.622 ->
   0.631; "not found" unchanged; the answer in the text 0.856 -> 0.847 (one
-  question).
+  question). These numbers were measured on bundles made without OCR. With
+  OCR (figure labels read from pictures) the re-ranker gives the same R@1,
+  R@5, MRR and page, and the answer is in the text for 0.856.
 * Without `rerank.json` (or with `Settings(rerank=False)`) the reader keeps
   the order of the retriever. A file with `weights` and `bias` instead of
   `nets` is read as one logistic model.

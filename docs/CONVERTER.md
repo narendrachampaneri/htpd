@@ -72,6 +72,33 @@ All fields and rules are in [`FORMAT.md`](FORMAT.md).
 
 Nothing else. No Python, no database, no other library.
 
+Optional, for OCR: the free [Tesseract](https://github.com/tesseract-ocr/tesseract)
+program (`sudo apt install tesseract-ocr`; more languages:
+`tesseract-ocr-deu`, ...). The converter runs it as a program, so the build
+does not need it.
+
+### OCR
+
+A page with (almost) no text that shows something is a scan: the converter
+draws it at 300 dpi and Tesseract reads all of it. On a page that has text,
+each picture larger than about 2 x 0.5 cm is read when no text of the PDF
+lies on it (a scan with a hidden text layer is not read twice). Several
+Tesseract processes run at the same time, one per CPU core. Rules:
+
+* A word Tesseract is not sure of (confidence below 60) is left out, not
+  guessed; the notes count them.
+* Text of the PDF always wins: an OCR line that lies on text of the PDF is
+  dropped.
+* Text read from a picture on a page with text is the content of a figure:
+  it is never taken for a heading, and never split into table columns.
+* Text read by OCR never becomes a heading by its size alone; on a scanned
+  page a numbered heading ("3.2 Clock tree") does, checked by its sequence.
+* The pages that hold OCR text are listed per section (`ocr_pages`).
+
+Speed: about 1-3 s per scanned page per core. Pictures on normal pages
+cost little; the 5600-page i.MX 93 manual, with 41 pictures read, takes
+about 12 s more on two cores.
+
 ## Build
 
 ### 1. Get PDFium
@@ -142,6 +169,8 @@ htpd info manual.pdf                     # show what would be found, write nothi
 | `--headings none` | No headings: one section per page. |
 | `--keep-headers` | Keeps the running headers and footers in the text. |
 | `--dehyphenate` | `inter-` + `rupt` becomes `interrupt` instead of `inter-rupt`. |
+| `--ocr auto\|on\|off` | Read text from pictures and scanned pages with Tesseract. `auto` (default): when it is installed. `on`: stop with an error when it is not. `off`: never. |
+| `--ocr-lang <langs>` | Tesseract languages, e.g. `eng+deu` (default `eng`). Each must be installed (`tesseract --list-langs`). |
 | `--margin-band 0.09` | How much of the page height at the top and bottom is searched for headers and footers. |
 | `--password <text>` | For an encrypted PDF. Other users of the computer can see the command line while the program runs. |
 
@@ -179,6 +208,7 @@ One PDF goes through seven steps. Each step is one small file.
 | Step | File | What happens |
 |---|---|---|
 | 1. Read | `src/pdf_reader_pdfium.cpp` | PDFium gives every character with its position, size and font, and the links of each page. Page rotation is removed here, and a page whose text mainly runs sideways or upside down is turned, so all later steps see upright pages. This is the only file that knows PDFium. |
+| 1b. OCR | `src/ocr.cpp` | Pages without a text layer and pictures without text of the PDF on them are drawn (by PDFium, in `pdf_reader_pdfium.cpp`) and read by the Tesseract program, several at a time, when it is installed. See "OCR" above. |
 | 2. Lines | `src/layout.cpp` | Characters become lines. Wide gaps are marked (table columns); raised and lowered numbers stay raised (2³¹). |
 | 3. Headers and footers | `src/furniture.cpp` | Lines that repeat at the page edge on many pages are taken out and reported. |
 | 4. Headings | `src/headings.cpp` | From the bookmarks of the PDF, and from the text: section numbers, font size, bold, another font. |
@@ -267,8 +297,12 @@ honest about the rest.
 * **Only tested with English technical documents.** Text in scripts that
   need shaping (Gujarati, Hindi, Arabic, ...) may come out in a wrong
   order. This was not tested.
-* **No OCR.** A scanned page has no text for the converter. It counts such
-  pages and tells you.
+* **OCR needs Tesseract.** Scanned pages and words inside pictures are read
+  only when the free Tesseract program is installed (see "OCR" above).
+  Without it a scanned page has no text; the converter counts such pages
+  and tells you. OCR text may hold misread words, and Tesseract reads small
+  or blurred text and handwriting badly; the bundle marks the pages
+  (`ocr_pages`).
 * **Tables are rows of text.** Cells are split by ` | `. A cell that wraps
   onto several lines is joined, and a table that the PDF stores cell by
   cell (register field tables) is put together by position, when the
@@ -279,8 +313,9 @@ honest about the rest.
   that the columns are certain. Tables whose first column wraps too (change
   histories, lists of references) can still come out as rows plus loose
   lines. Always check important numbers from a table against the PDF page.
-* **No pictures.** Figures are not converted. Words inside a drawing that
-  are real text in the PDF do come out, as loose lines.
+* **No pictures.** Figures are not stored as pictures. Words inside a
+  drawing that are real text in the PDF do come out, as loose lines; words
+  inside a picture only with OCR.
 * **Formulas** lose their form (fractions, indices, roots).
 * **Reading order** is the order in which the PDF stores the text. That is
   right for almost all PDFs, also with two columns. The converter does not

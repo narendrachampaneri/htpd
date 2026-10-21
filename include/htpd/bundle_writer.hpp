@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "htpd/furniture.hpp"
+#include "htpd/ocr.hpp"
 #include "htpd/types.hpp"
 
 namespace htpd {
@@ -45,6 +46,7 @@ struct BundleInfo {
     std::size_t unmapped = 0;
     std::size_t pages_without_text = 0;
     std::size_t links = 0;               // links from one section to another
+    OcrReport ocr;
 };
 
 struct WriteOptions {

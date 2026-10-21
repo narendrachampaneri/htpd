@@ -44,7 +44,8 @@ internet; a test that needs a model uses a small stand-in.
    header in any other file.
 5. C++ errors are returned as values (`htpd::Result<T>`, which is
    `std::expected`). No exception for a bad PDF.
-6. No new library without asking. The converter is C++ only. Part B is
+6. No new library without asking. The converter is C++ only (it may run
+   the Tesseract program for OCR when it is installed; it never needs it). Part B is
    Python; its allowed libraries are listed per phase in `docs/PART-B.md`.
 7. Never lose text and never make text up. When a case is not certain,
    keep the text as it stands.
@@ -96,6 +97,7 @@ internet; a test that needs a model uses a small stand-in.
 | Step | File |
 |---|---|
 | 1. Read the PDF | `src/pdf_reader_pdfium.cpp` |
+| 1b. OCR of scanned pages and pictures (runs the Tesseract program, when installed) | `src/ocr.cpp` |
 | 2. Characters to lines | `src/layout.cpp` |
 | 3. Headers and footers | `src/furniture.cpp` |
 | 4. Headings | `src/headings.cpp` |

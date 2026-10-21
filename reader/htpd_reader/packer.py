@@ -82,7 +82,9 @@ def render_section(ps: PackedSection, number: int) -> str:
     n = ps.node
     pages = ps.pages
     where = (f"page {pages[0]}" if len(pages) == 1 else f"pages {pages[0]}-{pages[-1]}") if pages else "no text"
-    lines = [f"[{number}] {' > '.join(ps.path)}", f"(section {n.id}, {where})", ""]
+    ocr = [p for p in pages if p in n.ocr_pages]
+    note = f"; text of page{'s' if len(ocr) > 1 else ''} {', '.join(map(str, ocr))} read by OCR" if ocr else ""
+    lines = [f"[{number}] {' > '.join(ps.path)}", f"(section {n.id}, {where}{note})", ""]
     page = None
     for b in ps.blocks:
         if b.page != page:

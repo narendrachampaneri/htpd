@@ -18,9 +18,11 @@ jobs:
         run: ./scripts/get_pdfium.sh
       - name: Build (Makefile)
         run: make
-      - name: C++ tests
+      - name: C++ tests (without OCR)
         run: make test
-      - name: Build and test (CMake)
+      - name: Install Tesseract (the OCR tests run with it)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng
+      - name: Build and test (CMake, with OCR)
         run: |
           cmake -S . -B build-cmake
           cmake --build build-cmake -j

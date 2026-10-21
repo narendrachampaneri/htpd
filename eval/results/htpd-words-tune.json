@@ -8,23 +8,23 @@
     "aaelf64",
     "riscv-priv"
   ],
-  "when": "2026-10-20",
+  "when": "2026-10-21",
   "machine": "Linux x86_64, Python 3.13.16",
   "metrics": {
     "questions": 121,
     "answerable": 97,
     "not_in_document": 24,
     "recall@1": 0.8041237113402062,
-    "recall@5": 0.9175257731958762,
+    "recall@5": 0.9278350515463918,
     "recall@10": 0.9690721649484536,
-    "mrr": 0.8623629520536737,
+    "mrr": 0.862461135657012,
     "page_accuracy": 0.7731958762886598,
     "not_found_accuracy": 0.9583333333333334,
     "false_not_found": 0.0,
     "answer_in_text": 0.9175257731958762,
-    "tokens_mean": 2323.198347107438,
-    "tokens_vs_whole": 0.0606358790042081,
-    "ms_per_question": 13.30690886776964,
+    "tokens_mean": 2323.4297520661157,
+    "tokens_vs_whole": 0.06060534254929706,
+    "ms_per_question": 20.239470578520592,
     "by_kind": {
       "1": {
         "n": 72,
@@ -32,7 +32,7 @@
       },
       "2": {
         "n": 15,
-        "recall@5": 0.7333333333333333
+        "recall@5": 0.8
       },
       "3": {
         "n": 10,
@@ -87,15 +87,6 @@
       ]
     },
     {
-      "id": "priv-021",
-      "rank": 6,
-      "top": [
-        "sections/0010-2-1-csr-address-mapping-conventions",
-        "sections/0152-chapter-18-h-extension-for-hypervisor-support-version-1-0",
-        "sections/0184-18-5-2-guest-page-faults"
-      ]
-    },
-    {
       "id": "priv-022",
       "rank": 12,
       "top": [
@@ -106,7 +97,7 @@
     },
     {
       "id": "priv-023",
-      "rank": 6,
+      "rank": 7,
       "top": [
         "sections/0120-10-1-10-supervisor-environment-configuration-register-senvcf",
         "sections/0154-18-2-hypervisor-and-virtual-supervisor-csrs",

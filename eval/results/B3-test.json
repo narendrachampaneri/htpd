@@ -8,27 +8,27 @@
     "aapcs64",
     "riscv-debug"
   ],
-  "when": "2026-10-20",
+  "when": "2026-10-21",
   "machine": "Linux x86_64, Python 3.13.16",
   "metrics": {
     "questions": 133,
     "answerable": 111,
     "not_in_document": 22,
-    "recall@1": 0.6486486486486487,
-    "recall@5": 0.8738738738738738,
+    "recall@1": 0.6396396396396397,
+    "recall@5": 0.8648648648648649,
     "recall@10": 0.9279279279279279,
-    "mrr": 0.7482731689253428,
-    "page_accuracy": 0.5585585585585585,
+    "mrr": 0.7441240604284083,
+    "page_accuracy": 0.5495495495495496,
     "not_found_accuracy": 0.0,
     "false_not_found": 0.0,
-    "answer_in_text": 0.8378378378378378,
-    "tokens_mean": 2215.315789473684,
-    "tokens_vs_whole": 0.053758355903377256,
-    "ms_per_question": 0.59162698496271,
+    "answer_in_text": 0.8288288288288288,
+    "tokens_mean": 2219.7593984962405,
+    "tokens_vs_whole": 0.053744989719832895,
+    "ms_per_question": 0.6109150451036949,
     "by_kind": {
       "1": {
         "n": 66,
-        "recall@5": 0.8787878787878788
+        "recall@5": 0.8636363636363636
       },
       "2": {
         "n": 29,
@@ -105,8 +105,17 @@
       ]
     },
     {
+      "id": "debug-021",
+      "rank": 6,
+      "top": [
+        "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0",
+        "sections/0034-3-7-1-2-quick-access",
+        "sections/0057-3-14-15-program-buffer-0-progbuf0-at-0x20"
+      ]
+    },
+    {
       "id": "debug-025",
-      "rank": 22,
+      "rank": 23,
       "top": [
         "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0",
         "sections/0086-4-9-core-debug-registers",
@@ -124,7 +133,7 @@
     },
     {
       "id": "debug-033",
-      "rank": 21,
+      "rank": 22,
       "top": [
         "sections/0163-b-3-1-single-step",
         "sections/0025-3-3-selecting-harts",
@@ -151,7 +160,7 @@
     },
     {
       "id": "debug-055",
-      "rank": 12,
+      "rank": 13,
       "top": [
         "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0",
         "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11",

@@ -647,6 +647,13 @@ std::vector<Section> build_sections(std::span<const Line> lines, std::span<const
         if (end > begin) s.page_start = std::min(s.page_start, lines[begin].page);
         s.span_page_end = s.page_end;
         s.paragraphs = build_paragraphs(lines.subspan(begin, end - begin), pitch, options);
+        for (std::size_t i = begin; i < end; ++i) {
+            if (lines[i].ocr != Line::Ocr::None && (s.ocr_pages.empty() || s.ocr_pages.back() != lines[i].page)) {
+                s.ocr_pages.push_back(lines[i].page);
+            }
+        }
+        std::ranges::sort(s.ocr_pages);
+        s.ocr_pages.erase(std::unique(s.ocr_pages.begin(), s.ocr_pages.end()), s.ocr_pages.end());
         sections.push_back(std::move(s));
     };
 

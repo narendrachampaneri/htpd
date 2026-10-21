@@ -33,6 +33,12 @@ public:
     // All characters of one page (0-based index) with geometry in display space.
     Result<PageText> read_page(int index) const;
 
+    // Draws a part of a page (display space, points) as a grey image with
+    // `scale` pixels per point: what a scanner would see, for OCR. The page
+    // is drawn as the PDF shows it (the turn of `PageText::turned` is not
+    // applied).
+    Result<GrayImage> render(int index, const Box& region, float scale) const;
+
     // Facts about the fonts seen so far, indexed by Glyph::font. Call it after
     // the pages have been read: fonts are measured while reading.
     std::vector<FontFacts> fonts() const;

@@ -17,6 +17,7 @@
 
 #include "htpd/furniture.hpp"
 #include "htpd/headings.hpp"
+#include "htpd/ocr.hpp"
 #include "htpd/types.hpp"
 
 namespace htpd {
@@ -31,6 +32,8 @@ struct ConvertOptions {
     HeadingMode headings = HeadingMode::Auto;
     bool dehyphenate = false;            // "inter-" + "rupt" -> "interrupt"
     bool single_file = false;            // write one file "<input name>.htpd" instead of a folder
+    OcrMode ocr = OcrMode::Auto;         // read text from pictures with Tesseract, when installed
+    OcrOptions ocr_options;
     std::function<void(int done, int total)> on_progress;   // called once per page
 };
 
@@ -51,6 +54,7 @@ struct ConvertReport {
     std::size_t skipped_rotated = 0;
     std::size_t unmapped = 0;
     std::size_t pages_without_text = 0;
+    OcrReport ocr;
     std::size_t files = 0;
     std::uintmax_t source_bytes = 0;
     std::uintmax_t bundle_bytes = 0;

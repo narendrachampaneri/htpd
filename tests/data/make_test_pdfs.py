@@ -358,6 +358,44 @@ def fonts(path):
     ])
 
 
+def ocr(path):
+    """Text that is only in pictures: page 1 has text of its own and a picture
+    of two lines of text; page 2 is a scanned page (one picture, no text)."""
+    from io import BytesIO
+    from PIL import Image, ImageDraw, ImageFont
+    from reportlab.lib.utils import ImageReader
+
+    def picture(lines, width, height, size):
+        img = Image.new('L', (width, height), 255)
+        draw = ImageDraw.Draw(img)
+        try:
+            face = ImageFont.truetype('DejaVuSans.ttf', size)
+        except OSError:
+            face = ImageFont.load_default(size)
+        for i, text in enumerate(lines):
+            draw.text((40, 30 + i * int(size * 1.6)), text, fill=0, font=face)
+        out = BytesIO()
+        img.save(out, format='PNG')
+        out.seek(0)
+        return ImageReader(out)
+
+    c = canvas.Canvas(path, pagesize=letter)
+    c.setTitle('OCR test')
+    c.setFont('Helvetica-Bold', 16)
+    c.drawString(72, 720, '1 Wiring')
+    c.setFont('Helvetica', 10)
+    c.drawString(72, 700, 'The picture below shows the connector.')
+    # 300 dpi: 4 x 1 inch on the page
+    c.drawImage(picture(['Connector J7 pin 3 is CAN high.', 'Pin 4 is CAN low.'], 1200, 300, 48),
+                72, 560, width=288, height=72)
+    c.drawString(72, 530, 'More text follows the picture.')
+    c.showPage()
+    c.drawImage(picture(['2 Scanned notes', 'The fuse is rated 16 A.', 'Replace it only when the power is off.'],
+                        2550, 1100, 56), 0, 528, width=612, height=264)
+    c.showPage()
+    c.save()
+
+
 if __name__ == '__main__':
     Manual(os.path.join(OUT, 'sample.pdf'), bookmarks=True).build(manual_story())
     Manual(os.path.join(OUT, 'sample_nobookmarks.pdf'), bookmarks=False).build(manual_story())
@@ -365,4 +403,5 @@ if __name__ == '__main__':
     fonts(os.path.join(OUT, 'fonts.pdf'))
     sideways(os.path.join(OUT, 'sideways.pdf'))
     links(os.path.join(OUT, 'links.pdf'))
-    print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf, sideways.pdf, links.pdf to', OUT)
+    ocr(os.path.join(OUT, 'ocr.pdf'))
+    print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf, sideways.pdf, links.pdf, ocr.pdf to', OUT)

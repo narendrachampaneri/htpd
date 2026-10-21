@@ -34,9 +34,14 @@ class Line:
     header: str | None = None  # the first row of the table, for a row
     score: float = 0.0
 
+    @property
+    def ocr(self) -> bool:
+        """The page of the line holds text read from pictures by OCR: a word there may be misread."""
+        return self.page is not None and self.page in self.section.ocr_pages
+
     def to_dict(self) -> dict[str, Any]:
         return {"text": self.text, "page": self.page, "section": self.section.id, "title": self.section.title,
-                "kind": self.kind, "header": self.header, "score": round(self.score, 3)}
+                "kind": self.kind, "header": self.header, "score": round(self.score, 3), "ocr": self.ocr}
 
 
 @dataclass
@@ -53,7 +58,7 @@ class Answer:
         out = []
         for ln in self.lines:
             where = f"page {ln.page}" if ln.page is not None else "no page"
-            out.append(f"[{where}, {ln.section.title}]")
+            out.append(f"[{where}, {ln.section.title}{', page has OCR text' if ln.ocr else ''}]")
             if ln.header:
                 out.append(f"  {ln.header}")
             out.append(f"  {ln.text}")

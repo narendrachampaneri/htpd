@@ -265,11 +265,12 @@ HTPD is version 0.1. It works today; these are the known next steps.
 - [x] **Fewer false "not found"** answers (see the report)
 - [x] Rank the first section at least as well as plain BM25 over HTPD sections (see the report)
 - [x] A small trained re-ranker (tiny neural networks, standard library, no GPU) that puts the right section first more often (77 % instead of 67 % of test questions); trained on training manuals only ([`model/README.md`](model/README.md))
-- [ ] OCR for scanned pages (Tesseract, local)
+- [x] OCR for scanned pages and text inside pictures (Tesseract, local, optional; marked in the file)
 - [ ] Windows build
 
-**Known limits:** no pictures or figures; formulas lose their layout;
-scanned pages have no text yet; tables are rows of text (a table whose
+**Known limits:** figures are not stored as pictures (words in them only
+with OCR); formulas lose their layout; scanned pages need the free
+Tesseract program; tables are rows of text (a table whose
 first column wraps can come apart); tested mainly with English technical
 documents. Details: [`docs/CONVERTER.md`](docs/CONVERTER.md#limits-please-read).
 

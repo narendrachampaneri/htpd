@@ -30,6 +30,12 @@ Options for convert:
       --force               Replace a previous bundle in the output folder
       --keep-headers        Keep running headers and footers in the text
       --dehyphenate         Join words split at a line end ("inter-" "rupt")
+      --ocr <mode>          Text in pictures and scanned pages, read with the
+                            free Tesseract program:
+                              auto  when Tesseract is installed (default)
+                              on    always; an error without Tesseract
+                              off   never
+      --ocr-lang <langs>    Tesseract language(s), e.g. eng+deu (default eng)
   -q, --quiet               Print errors only
 
 Options for convert and info:
@@ -130,6 +136,10 @@ int run_convert(Args& args) {
         print(std::format("  + page parts    {} parts of long text, cut by pages\n", r.page_parts));
     }
     print(std::format("  paragraphs      {}\n", r.paragraphs));
+    if (r.ocr.pages_read + r.ocr.pictures_read > 0) {
+        print(std::format("  OCR             {} pages and {} pictures read, {} lines ({})\n", r.ocr.pages_read,
+                          r.ocr.pictures_read, r.ocr.lines, r.ocr.engine));
+    }
     print(std::format("  files written   {} ({}; the PDF is {})\n", r.files, megabytes(r.bundle_bytes),
                       megabytes(r.source_bytes)));
     print(std::format("  time            {:.2f} s\n", r.seconds));
@@ -142,10 +152,19 @@ int run_convert(Args& args) {
         print(std::format("Warning: {} characters have no Unicode mapping; some text may be wrong.\n",
                           r.unmapped));
     }
-    if (r.pages_without_text > 0) {
-        print(std::format("Warning: {} of {} pages {} no text layer (scans or figures). Such pages "
-                          "need OCR.\n", r.pages_without_text, r.pages,
-                          r.pages_without_text == 1 ? "has" : "have"));
+    if (r.ocr.words_dropped > 0) {
+        print(std::format("  unsure OCR words        {} (left out, not guessed)\n", r.ocr.words_dropped));
+    }
+    if (r.ocr.failed > 0) {
+        print(std::format("Warning: OCR could not read {} pictures.\n", r.ocr.failed));
+    }
+    if (r.ocr.pages_unread > 0) {
+        print(std::format("Warning: {} of {} pages {} no text layer (scans). Install the free Tesseract OCR "
+                          "program to read them (Ubuntu: sudo apt install tesseract-ocr).\n",
+                          r.ocr.pages_unread, r.pages, r.ocr.pages_unread == 1 ? "has" : "have"));
+    } else if (r.pages_without_text > 0) {
+        print(std::format("Note: {} of {} pages {} no text at all (empty pages or pictures without text).\n",
+                          r.pages_without_text, r.pages, r.pages_without_text == 1 ? "has" : "have"));
     }
     if (r.heading_source == htpd::HeadingSource::None) {
         print("Warning: no headings were found; the text was split by page.\n");
@@ -228,6 +247,17 @@ int main(int argc, char** argv) {
             if (!value(v) || !parse_fraction(v, args.convert.margin_band)) {
                 return usage_error("--margin-band must be a number from 0 to 0.3");
             }
+        } else if (arg == "--ocr") {
+            if (!value(v)) return usage_error("--ocr must be auto, on or off");
+            if (v == "auto") args.convert.ocr = htpd::OcrMode::Auto;
+            else if (v == "on") args.convert.ocr = htpd::OcrMode::On;
+            else if (v == "off") args.convert.ocr = htpd::OcrMode::Off;
+            else return usage_error("--ocr must be auto, on or off");
+        } else if (arg == "--ocr-lang") {
+            if (!value(v) || v.empty() || v.find_first_not_of("abcdefghijklmnopqrstuvwxyz_+") != std::string_view::npos) {
+                return usage_error("--ocr-lang needs Tesseract language names such as eng or eng+deu");
+            }
+            args.convert.ocr_options.language = v;
         } else if (arg == "--single") {
             args.convert.single_file = true;
         } else if (arg == "--force") {

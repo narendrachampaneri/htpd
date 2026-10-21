@@ -62,6 +62,19 @@ struct PageLink {
     float target_x = 0, target_y = 0;       // the point it jumps to (PDF user space of that page)
 };
 
+// A rectangle on the page, display space (points, y down).
+struct Box {
+    float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+    float width() const { return x1 - x0; }
+    float height() const { return y1 - y0; }
+};
+
+// An image in shades of grey, one byte per pixel, rows from the top.
+struct GrayImage {
+    int width = 0, height = 0;
+    std::vector<std::uint8_t> pixels;
+};
+
 struct PageText {
     int index = 0;                       // 0-based page index
     float width = 0, height = 0;         // display size in points
@@ -71,6 +84,8 @@ struct PageText {
     int turned = 0;                      // quarter turns applied so that the main text is upright
     std::size_t unmapped = 0;            // glyphs without a Unicode mapping
     std::vector<PageLink> links;         // jumps to other places of the document
+    std::vector<Box> images;             // picture objects (photos, scans, pictures of text)
+    std::size_t objects = 0;             // everything drawn on the page: text, pictures, lines, shapes
 };
 
 // One visual line of text.
@@ -95,6 +110,10 @@ struct Line {
     // For every space in `text`, in order: the distance in points from the pen
     // position of the character before it to that of the character after it.
     std::vector<float> space_spans;
+    // Read by OCR, not from the text of the PDF: from a scanned page (Page) or
+    // from a picture on a page that has text (Picture). Picture text is the
+    // content of a figure: it is never taken for a heading.
+    enum class Ocr : std::uint8_t { None, Page, Picture } ocr = Ocr::None;
 };
 
 // A PDF bookmark (outline entry).
@@ -180,6 +199,7 @@ struct Section {
     std::string file;                    // bundle-relative path, set by the writer
     std::size_t first_line = 0;          // first line of the section (its heading), index into the lines
     std::vector<SectionLink> links;      // links in its text to other sections
+    std::vector<int> ocr_pages;          // 0-based pages of its own text that hold text read by OCR
 };
 
 }  // namespace htpd

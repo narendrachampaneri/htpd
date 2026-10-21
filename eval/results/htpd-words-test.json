@@ -8,23 +8,23 @@
     "aapcs64",
     "riscv-debug"
   ],
-  "when": "2026-10-20",
+  "when": "2026-10-21",
   "machine": "Linux x86_64, Python 3.13.16",
   "metrics": {
     "questions": 133,
     "answerable": 111,
     "not_in_document": 22,
-    "recall@1": 0.6666666666666666,
+    "recall@1": 0.6576576576576577,
     "recall@5": 0.8918918918918919,
-    "recall@10": 0.9279279279279279,
-    "mrr": 0.7634676884676884,
-    "page_accuracy": 0.6216216216216216,
+    "recall@10": 0.9369369369369369,
+    "mrr": 0.7567928317928319,
+    "page_accuracy": 0.6126126126126126,
     "not_found_accuracy": 0.9545454545454546,
     "false_not_found": 0.009009009009009009,
     "answer_in_text": 0.8558558558558559,
-    "tokens_mean": 2455.3609022556393,
-    "tokens_vs_whole": 0.06041120968301711,
-    "ms_per_question": 10.60774514285083,
+    "tokens_mean": 2456.5263157894738,
+    "tokens_vs_whole": 0.06033620628295863,
+    "ms_per_question": 13.639750999990289,
     "by_kind": {
       "1": {
         "n": 66,
@@ -133,7 +133,7 @@
     },
     {
       "id": "debug-055",
-      "rank": 11,
+      "rank": 10,
       "top": [
         "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11",
         "sections/0023-3-1-debug-module-interface-dmi",

@@ -67,13 +67,15 @@ add_library(htpd_core STATIC
   src/layout.cpp
   src/links.cpp
   src/structure.cpp
+  src/ocr.cpp
   src/pdf_reader_pdfium.cpp
   src/sections.cpp
   src/sha256.cpp
   src/text.cpp)
 target_include_directories(htpd_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 # Only src/pdf_reader_pdfium.cpp uses PDFium; the HTPD headers do not show it.
-target_link_libraries(htpd_core PRIVATE htpd_pdfium)
+find_package(Threads REQUIRED)   # OCR runs several reader processes at once
+target_link_libraries(htpd_core PRIVATE htpd_pdfium PUBLIC Threads::Threads)
 
 set(HTPD_WARNINGS "")
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")

@@ -25,6 +25,7 @@
 #include "htpd/headings.hpp"
 #include "htpd/layout.hpp"
 #include "htpd/links.hpp"
+#include "htpd/ocr.hpp"
 #include "htpd/pdf_reader.hpp"
 #include "htpd/sections.hpp"
 #include "htpd/sha256.hpp"
@@ -1472,6 +1473,91 @@ TEST(a_heading_never_takes_the_title_lines_of_the_one_before) {
     CHECK_EQ(sections[1].paragraphs[0].text, std::string("Body text."));
 }
 
+// ---- OCR ----------------------------------------------------------------------
+
+TEST(ocr_lines_come_from_the_words_tesseract_is_sure_of) {
+    const std::string tsv =
+        "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n"
+        "1\t1\t0\t0\t0\t0\t0\t0\t1200\t300\t-1\t\n"
+        "4\t1\t1\t1\t1\t0\t40\t30\t600\t50\t-1\t\n"
+        "5\t1\t1\t1\t1\t1\t40\t30\t200\t50\t96.5\tSupply\n"
+        "5\t1\t1\t1\t1\t2\t260\t30\t200\t50\t91\tvoltage\n"
+        "5\t1\t1\t1\t1\t3\t900\t30\t100\t50\t88\t3.3V\n"     // a wide gap: a table column
+        "5\t1\t1\t1\t2\t1\t40\t120\t100\t50\t12\tqx#\n"      // unsure: left out
+        "5\t1\t1\t1\t3\t1\t40\t200\t100\t50\t95\t|\n";       // no letter or digit: left out
+    // The picture was drawn at 300 dpi (scale 300/72) from a place 100 pt from the left, 200 pt from the top.
+    const float scale = 300.0f / 72.0f;
+    const TsvLines page = lines_from_tsv(tsv, 4, Box{100, 200, 388, 272}, scale, 60, true);
+    REQUIRE(page.lines.size() == 1);
+    const Line& l = page.lines[0];
+    CHECK_EQ(l.text, std::string("Supply voltage 3.3V"));
+    CHECK(l.ocr == Line::Ocr::Page);
+    CHECK_EQ(l.page, 4);
+    CHECK(std::fabs(l.x0 - (100 + 40 / scale)) < 0.01f);
+    CHECK(std::fabs(l.y0 - (200 + 30 / scale)) < 0.01f);
+    CHECK(std::fabs(l.size - 50 / scale) < 0.01f);
+    REQUIRE(l.gaps.size() == 1);
+    CHECK_EQ(l.text.substr(l.gaps[0] + 1), std::string("3.3V"));
+    CHECK_EQ(page.words_dropped, std::size_t{2});
+    // In a picture on a page with text there are no columns: a figure is no table.
+    const TsvLines figure = lines_from_tsv(tsv, 4, Box{100, 200, 388, 272}, scale, 60, false);
+    REQUIRE(figure.lines.size() == 1);
+    CHECK(figure.lines[0].gaps.empty());
+    CHECK(figure.lines[0].ocr == Line::Ocr::Picture);
+}
+
+TEST(ocr_pictures_are_written_as_pgm) {
+    GrayImage image;
+    image.width = 3;
+    image.height = 2;
+    image.pixels = {0, 128, 255, 255, 128, 0};
+    const std::string pgm = pgm_bytes(image);
+    CHECK(pgm.starts_with("P5\n3 2\n255\n"));
+    CHECK_EQ(pgm.size(), std::string("P5\n3 2\n255\n").size() + 6);
+}
+
+TEST(ocr_text_never_repeats_the_text_of_the_pdf) {
+    std::vector<Line> page;
+    page.push_back(make_line(0, "Text above the picture.", 100));
+    page.push_back(make_line(0, "Caption on the picture", 200));
+    page.push_back(make_line(0, "Text below the picture.", 300));
+    std::vector<Line> found;
+    found.push_back(make_line(0, "Caption on the picture", 200));   // the same place: already text of the PDF
+    found.push_back(make_line(0, "CAN high", 230));
+    for (Line& l : found) l.ocr = Line::Ocr::Picture;
+    insert_picture_lines(page, found, Box{72, 180, 400, 250});
+    REQUIRE(page.size() == 4);
+    CHECK_EQ(page[2].text, std::string("CAN high"));   // in its place: below the caption on the picture
+    CHECK(page[1].ocr == Line::Ocr::None);              // the exact text of the PDF stays
+    CHECK_EQ(page[3].text, std::string("Text below the picture."));
+
+    std::vector<Line> scan;
+    scan.push_back(make_line(0, "12", 750));   // a page number, the only text of the PDF
+    std::vector<Line> read;
+    read.push_back(make_line(0, "First line of the scan", 100));
+    read.push_back(make_line(0, "12", 750));
+    for (Line& l : read) l.ocr = Line::Ocr::Page;
+    merge_page_lines(scan, read);
+    REQUIRE(scan.size() == 2);
+    CHECK_EQ(scan[0].text, std::string("First line of the scan"));   // top to bottom
+    CHECK(scan[1].ocr == Line::Ocr::None);
+}
+
+TEST(text_of_a_figure_is_never_a_heading) {
+    std::vector<Line> lines;
+    lines.push_back(make_line(0, "Body text of the page that is long enough to be the body.", 100));
+    Line figure = make_line(0, "0 FFFFFFFD", 130, 20);   // numbered and large, but read from a picture
+    figure.ocr = Line::Ocr::Picture;
+    lines.push_back(figure);
+    Line scanned_large = make_line(0, "POST", 160, 20);    // large, read by OCR: size says nothing
+    scanned_large.ocr = Line::Ocr::Page;
+    lines.push_back(scanned_large);
+    lines.push_back(make_line(0, "Body text again, long enough to be the body of the page.", 190));
+    lines.push_back(make_line(0, "Body text again, long enough to be the body of the page.", 220));
+    const HeadingResult r = detect_headings(lines, {}, {});
+    CHECK(r.headings.empty());
+}
+
 // ---- structure for documents with few headings ------------------------------
 
 namespace {
@@ -2154,6 +2240,46 @@ TEST(links_lead_from_section_to_section) {
     CHECK(sections[1].links.empty());
     REQUIRE(sections[2].links.size() == 1);
     CHECK_EQ(sections[2].links[0].target, std::size_t{0});
+}
+
+TEST(end_to_end_ocr_reads_pictures_and_scanned_pages) {
+    OcrOptions probe;
+    if (!find_ocr(probe).available) {
+        std::printf("     (skipped: the tesseract program is not installed)\n");
+        return;
+    }
+    ConvertOptions options;
+    options.input = fs::path(HTPD_TEST_DATA) / "ocr.pdf";
+    options.output_dir = fresh_temp_dir("e2e_ocr");
+    const auto report = convert(options);
+    REQUIRE(report.has_value());
+    CHECK_EQ(report->ocr.pages_read, std::size_t{1});
+    CHECK_EQ(report->ocr.pictures_read, std::size_t{1});
+    const std::string text = all_section_text(options.output_dir);
+    // the picture's lines stand between the text above and below it
+    CHECK(text.contains("The picture below shows the connector.\n\nConnector J7 pin 3 is CAN high.\n\n"
+                        "Pin 4 is CAN low.\n\nMore text follows the picture."));
+    CHECK(text.contains("The fuse is rated 16 A."));
+    CHECK(text.contains("ocr_pages: [2]"));
+    CHECK(read_file(options.output_dir / "document.md").contains("Text in pictures was read by OCR"));
+
+    options.output_dir = fresh_temp_dir("e2e_ocr_single");
+    options.output_dir /= "ocr.htpd";
+    options.single_file = true;
+    REQUIRE(convert(options).has_value());
+    const std::string single = read_file(options.output_dir);
+    CHECK(single.contains(",\"ocr\":[2]} -->"));
+    CHECK(single.contains("\n11. Some text was read from pictures by OCR"));
+
+    // Without OCR the scanned page is missing, and the file says so.
+    options.single_file = false;
+    options.output_dir = fresh_temp_dir("e2e_ocr_off");
+    options.ocr = OcrMode::Off;
+    const auto off = convert(options);
+    REQUIRE(off.has_value());
+    CHECK_EQ(off->ocr.pages_unread, std::size_t{1});
+    CHECK(!all_section_text(options.output_dir).contains("fuse"));
+    CHECK(read_file(options.output_dir / "document.md").contains("could not be read: no OCR program"));
 }
 
 TEST(end_to_end_links) {

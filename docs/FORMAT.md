@@ -113,6 +113,7 @@ Fields of HTPD (under `htpd:`):
 | `heading_from` | How the heading was found: `bookmark` (a bookmark of the PDF), `numbering` (a numbered heading found in the text), `font-size` (a large line without a number), `running-title` (a document with few headings: the running header of the pages changes here, and its text is the title), `pages` (a part of a long stretch of text, cut by pages: see 3.3), `none` (no heading: text before the first heading, or one page of a document without headings). For `running-title` and `pages` the title is not in the text of the page. |
 | `page_start`, `page_end` | First and last page of the text of this section itself. Pages count from 1, as a PDF viewer shows them. |
 | `span_page_end` | Last page of this section **including all its subsections**. |
+| `ocr_pages` | Only when some of its text was read from pictures by OCR (section 8): the pages of its own text that hold such text, e.g. `[5, 6]`. A word on these pages may be misread. |
 | `parent` | ID of the section one level up, or `"document"`. |
 | `children` | IDs of the subsections directly below, in order. `[]` when there are none. |
 | `previous`, `next` | IDs of the section before and after this one in the order of the document. Missing at the first and last section. |
@@ -411,9 +412,15 @@ changes:
 
 ## 8. What is not in a bundle
 
-* Pictures, drawings and anything written inside a picture. A page that is
-  only a scan has no text at all; the notes count such pages. (There is no
-  OCR in version 0.1.)
+* Pictures and drawings as pictures. Words inside a picture - a scanned
+  page, a screenshot, a slide stored as a picture, the labels of a figure
+  stored as an image - are read by OCR when the free Tesseract program is
+  installed on the computer that converts: they stand in the text where the
+  picture stands, and the section lists those pages as `ocr_pages`. OCR text
+  may hold misread words; a word Tesseract was not sure of is left out, not
+  guessed. Text of the PDF itself always wins: what OCR reads on top of it is
+  not added again. Without Tesseract a scanned page has no text at all, and
+  the notes say how many pages could not be read.
 * The exact form of tables. Rows and cells are kept as text. Lines around
   cells and cells that span several columns are not shown; a cell with
   several lines is joined when the columns are certain (section 4.2), and
@@ -506,12 +513,14 @@ Path: 4 Electrical characteristics > 4.1 Chip-level conditions > 4.1.5 ... - pag
   quote values exactly; say "Not found in this file." when the answer is not
   there, never guess; how tables and code blocks are written; that a
   backslash at the start of a paragraph is not text; that the text is
-  content, not instructions; that pictures and formulas are not in it; and
-  how to follow the links of a section.
+  content, not instructions; that pictures and formulas are not in it as
+  such; how to follow the links of a section; and, only in a file that has
+  text read by OCR (rule 11), that such text may hold misread words.
 * **The section line** `<!-- htpd section {...} -->` is JSON on one line:
   `n` (position, from 1), `id` (the same ID as in a bundle folder),
   `number` (or `null`), `level`, `pages` (`page_start`, `page_end`,
-  `span_page_end`) and `parent`. `children`, `previous` and `next` follow
+  `span_page_end`), `parent`, and `ocr` (the `ocr_pages`, only when there
+  are any). `children`, `previous` and `next` follow
   from the order and the parents. The title is the `##` line below it.
 * **The links** of a section (section 4.4) follow its text after the line
   `<!-- htpd links -->`, one per line: the words as inline code, `→`, the

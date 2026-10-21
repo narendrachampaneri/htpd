@@ -345,7 +345,7 @@ HeadingResult detect_from_text(std::span<const Line> lines) {
     std::vector<Candidate> numbered, unnumbered;
     for (std::size_t i = 0; i < lines.size(); ++i) {
         const Line& line = lines[i];
-        if (line.text.empty()) continue;
+        if (line.text.empty() || line.ocr == Line::Ocr::Picture) continue;   // text of a figure
         const bool larger = line.size >= body * 1.08f;
         const bool other_font = line.font != 0 && text_font != 0 && line.font != text_font;
         const bool emphasised = larger || (line.bold && bold_is_signal);
@@ -361,7 +361,9 @@ HeadingResult detect_from_text(std::span<const Line> lines) {
             if (title_ok) numbered.push_back({i, std::move(number), styled, styled && !emphasised});
             continue;
         }
-        if (line.size >= body * 1.15f && plausible_unnumbered_title(line)) {
+        // Size alone says little about text read by OCR (letters of a picture,
+        // a scan): only a numbered heading, checked by its sequence, counts.
+        if (line.ocr == Line::Ocr::None && line.size >= body * 1.15f && plausible_unnumbered_title(line)) {
             unnumbered.push_back({i, std::nullopt, true, false});
         }
     }
