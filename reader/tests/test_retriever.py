@@ -1,9 +1,7 @@
-"""Tests of phase 3: retriever (words, meaning, tree, numbers, fusion, not found) and packer."""
+"""Tests of the retriever (words, tree, numbers, fusion, not found) and the packer."""
 
 from __future__ import annotations
 
-import hashlib
-import math
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,32 +9,14 @@ from pathlib import Path
 from htpd_reader import open_bundle
 from htpd_reader.ask import Asker
 from htpd_reader.packer import NOT_FOUND, pack
-from htpd_reader.retriever import Retriever, Settings, card_text
+from htpd_reader.retriever import Retriever, Settings
 from htpd_reader.tokens import count_tokens, plain_words
 
 from reader.tests.bundlegen import P, Sec, T, make_bundle
 
 ROOT = Path(__file__).resolve().parents[2]
 SAMPLE = ROOT / "examples" / "sample.htpd"
-WORDS_ONLY = Settings(meaning=False, tree=False, numbers=False)
-
-
-class FakeEmbedder:
-    name = "fake"
-
-    def __init__(self) -> None:
-        self.calls = 0
-
-    def encode(self, texts, query=False):
-        self.calls += 1
-        out = []
-        for t in texts:
-            v = [0.0] * 64
-            for w in plain_words(t):
-                v[int(hashlib.md5(w.encode()).hexdigest(), 16) % 64] += 1.0
-            n = math.sqrt(sum(x * x for x in v)) or 1.0
-            out.append([x / n for x in v])
-        return out
+WORDS_ONLY = Settings(tree=False, numbers=False)
 
 
 class Manual(unittest.TestCase):
@@ -63,7 +43,7 @@ class Manual(unittest.TestCase):
     def tearDownClass(cls) -> None:
         cls._tmp.cleanup()
 
-    def top(self, question: str, settings: Settings = Settings(meaning=False)) -> str | None:
+    def top(self, question: str, settings: Settings = Settings()) -> str | None:
         cands = Retriever(self.b, settings).retrieve(question).candidates
         return cands[0].node.title if cands else None
 
@@ -72,7 +52,7 @@ class Manual(unittest.TestCase):
         self.assertEqual(self.top("Which registers return values?", WORDS_ONLY), "2.1 Return values")
 
     def test_technical_tokens(self) -> None:
-        plain = Settings(meaning=False, tree=False, numbers=False, technical=False)
+        plain = Settings(tree=False, numbers=False, technical=False)
         self.assertEqual(self.top("sme state", WORDS_ONLY), "2 Calling convention")
         self.assertIsNone(self.top("sme state", plain))
         self.assertEqual(self.top("version 3.14.2", WORDS_ONLY), "2 Calling convention")
@@ -81,43 +61,33 @@ class Manual(unittest.TestCase):
     def test_tree_finds_the_place(self) -> None:
         # "abstract command" + "debug": the path of 1.1 holds both words, its text neither
         q = "How do I start a debug abstract command?"
-        r = Retriever(self.b, Settings(meaning=False, words=False, numbers=False)).retrieve(q)
+        r = Retriever(self.b, Settings(words=False, numbers=False)).retrieve(q)
         self.assertEqual(r.candidates[0].node.title, "1.1 Abstract commands")
         self.assertIn("tree", r.candidates[0].ranks)
 
     def test_section_number_goes_first(self) -> None:
         self.assertEqual(self.top("What does section 2.1 say?"), "2.1 Return values")
-        only_numbers = Settings(meaning=False, words=False, tree=False)
+        only_numbers = Settings(words=False, tree=False)
         self.assertEqual(self.top("Explain clause 1.2 please", only_numbers), "1.2 Registers")
-        self.assertIsNone(self.top("Explain clause 1.2 please", Settings(meaning=False, words=False, tree=False,
+        self.assertIsNone(self.top("Explain clause 1.2 please", Settings(words=False, tree=False,
                                                                        numbers=False)))
 
     def test_fusion_keeps_ranks_of_each_list(self) -> None:
-        r = Retriever(self.b, Settings(meaning=False)).retrieve("abstract command register")
+        r = Retriever(self.b, Settings()).retrieve("abstract command register")
         self.assertTrue(all(c.ranks for c in r.candidates))
         self.assertEqual(r.candidates, sorted(r.candidates, key=lambda c: -c.score))
 
-    def test_meaning(self) -> None:
-        emb = FakeEmbedder()
-        with tempfile.TemporaryDirectory() as cache:
-            r = Retriever(self.b, Settings(words=False, tree=False, numbers=False), embedder=emb, cache_dir=Path(cache))
-            self.assertEqual(r.retrieve("x0 x1 return values").candidates[0].node.title, "2.1 Return values")
-            calls = emb.calls
-            Retriever(self.b, Settings(words=False, tree=False), embedder=emb, cache_dir=Path(cache))
-            self.assertEqual(emb.calls, calls)  # cards come from the cache the second time
-        self.assertIn("1 Debug module > 1.1 Abstract commands", card_text(self.b, self.b.find("1.1")))
-
     def test_not_found(self) -> None:
-        r = Retriever(self.b, Settings(meaning=False, not_found_below=0.5))
+        r = Retriever(self.b, Settings(not_found_below=0.5))
         self.assertTrue(r.retrieve("What is the baud rate of the UART?").not_found)
         self.assertFalse(r.retrieve("reset value of dmcontrol").not_found)
         self.assertFalse(r.retrieve("What does section 3 say about baud?").not_found)
         # the coverage rule alone: switched off when its threshold is 0
-        off = Retriever(self.b, Settings(meaning=False, unknown_terms=False))
+        off = Retriever(self.b, Settings(unknown_terms=False))
         self.assertFalse(off.retrieve("What is the baud rate of the UART?").not_found)
 
     def test_terms_the_file_never_uses(self) -> None:
-        r = Retriever(self.b, Settings(meaning=False))
+        r = Retriever(self.b, Settings())
         x = r.retrieve("What is the baud rate of the UART?")
         self.assertEqual((x.not_found, x.missing), (True, ["UART"]))
         self.assertEqual(x.reason, "the file never mentions UART")
@@ -130,11 +100,11 @@ class Manual(unittest.TestCase):
         # a named section is never "not found", even with an unknown term
         self.assertFalse(r.retrieve("What does section 2.1 say about PCIe?").not_found)
         # switched off
-        self.assertFalse(Retriever(self.b, Settings(meaning=False, unknown_terms=False))
+        self.assertFalse(Retriever(self.b, Settings(unknown_terms=False))
                          .retrieve("Does the PCIe link support Gen3?").not_found)
 
     def test_plain_words_the_file_never_uses(self) -> None:
-        r = Retriever(self.b, Settings(meaning=False))
+        r = Retriever(self.b, Settings())
         x = r.retrieve("Can the hart connect over Bluetooth?")
         self.assertTrue(x.not_found)
         self.assertIn("Bluetooth", x.missing)
@@ -144,11 +114,11 @@ class Manual(unittest.TestCase):
                   "What happens to the reset value of abstractcs?", "Where is DMCONTROL described?"):
             self.assertEqual(r.retrieve(q).missing, [], q)
         # the whole "never mentions" rule is switched off with unknown_terms
-        self.assertFalse(Retriever(self.b, Settings(meaning=False, unknown_terms=False))
+        self.assertFalse(Retriever(self.b, Settings(unknown_terms=False))
                          .retrieve("Can the hart connect over Bluetooth?").not_found)
 
     def test_short_forms_and_modal_verbs_are_known(self) -> None:
-        r = Retriever(open_bundle(SAMPLE), Settings(meaning=False))
+        r = Retriever(open_bundle(SAMPLE), Settings())
         # the table of the sample says "Max", the question "maximum"
         self.assertEqual(r.retrieve("What is the maximum bus voltage?").missing, [])
         self.assertEqual(r.retrieve("At which temperature must the controller reduce the current?").missing, [])
@@ -163,7 +133,7 @@ class Manual(unittest.TestCase):
                 for text in (s.title, s.text):
                     full.update(main_tokens(text))
                     full.update(technical_tokens(text))
-            self.assertEqual(Retriever(b, Settings(meaning=False)).vocabulary, full)
+            self.assertEqual(Retriever(b, Settings()).vocabulary, full)
 
     def test_raised_numbers_match_plain_ones(self) -> None:
         """The converter writes raised numbers as they stand (I²C, 2³¹); a question
@@ -173,7 +143,7 @@ class Manual(unittest.TestCase):
                 Sec("1 Buses", number="1", blocks=[P(1, "The I²C bus runs at a rate of 400 kHz.")]),
                 Sec("2 Ranges", number="2", blocks=[P(2, "Check that -2³¹ <= X < 2³².")]),
             ], pages=2)
-            r = Retriever(open_bundle(root), Settings(meaning=False))
+            r = Retriever(open_bundle(root), Settings())
             x = r.retrieve("At what rate does the I2C bus run?")
             self.assertFalse(x.not_found, x.reason)
             self.assertEqual(x.candidates[0].node.title, "1 Buses")
@@ -181,7 +151,7 @@ class Manual(unittest.TestCase):
 
     def test_tree_counts_less_than_words(self) -> None:
         self.assertEqual(Settings().tree_weight, 0.01)
-        only_tree = Retriever(self.b, Settings(meaning=False, words=False, numbers=False))
+        only_tree = Retriever(self.b, Settings(words=False, numbers=False))
         c = only_tree.retrieve("debug abstract command").candidates[0]
         self.assertAlmostEqual(c.score, 0.01 / 61)
         # a tree vote is smaller than the gap between two neighbouring word ranks
@@ -195,12 +165,12 @@ class Manual(unittest.TestCase):
         self.assertEqual(specific_terms("What is the reset value?"), [])
 
     def test_coverage(self) -> None:
-        r = Retriever(self.b, Settings(meaning=False))
+        r = Retriever(self.b, Settings())
         self.assertGreater(r.retrieve("dmcontrol reset").coverage, 0.99)
         self.assertLess(r.retrieve("uart baud").coverage, 0.01)
 
     def test_with_settings_shares_indexes(self) -> None:
-        r = Retriever(self.b, Settings(meaning=False))
+        r = Retriever(self.b, Settings())
         r2 = r.with_settings(tree=False)
         self.assertIs(r2.word_index, r.word_index)
         self.assertFalse(r2.settings.tree)
@@ -216,8 +186,8 @@ class DefaultBudget(unittest.TestCase):
         from htpd_reader.packer import DEFAULT_BUDGET, DEFAULT_SECTIONS
 
         self.assertEqual((DEFAULT_BUDGET, DEFAULT_SECTIONS), (3000, 8))
-        self.assertEqual(Asker(open_bundle(SAMPLE), Settings(meaning=False)).max_sections, DEFAULT_SECTIONS)
-        self.assertEqual(Asker(open_bundle(SAMPLE), Settings(meaning=False)).budget, DEFAULT_BUDGET)
+        self.assertEqual(Asker(open_bundle(SAMPLE), Settings()).max_sections, DEFAULT_SECTIONS)
+        self.assertEqual(Asker(open_bundle(SAMPLE), Settings()).budget, DEFAULT_BUDGET)
         self.assertEqual(Server([]).budget, DEFAULT_BUDGET)
         self.assertEqual(build_parser().parse_args(["ask", "f", "q"]).budget, DEFAULT_BUDGET)
 
@@ -268,27 +238,10 @@ class Packer(unittest.TestCase):
 
 class AskerTest(unittest.TestCase):
     def test_ask(self) -> None:
-        a = Asker(open_bundle(SAMPLE), Settings(meaning=False), budget=400)
+        a = Asker(open_bundle(SAMPLE), Settings(), budget=400)
         r = a.ask("What is the reset value of the READY bit?")
         self.assertEqual(r.ranked[0].number, "A.1")
         self.assertEqual(r.top_page, 5)
         self.assertLess(r.pack.tokens, count_tokens(" ".join(s.text for s in a.bundle.sections)))
         d = r.to_dict()
         self.assertEqual(d["top_page"], 5)
-
-    def test_decider_is_used(self) -> None:
-        b = open_bundle(SAMPLE)
-
-        class Last:
-            def decide(self, bundle, question, retrieval):
-                return [c.node for c in reversed(retrieval.candidates)], False
-
-        q = "controller temperature current"
-        plain = Asker(b, Settings(meaning=False)).ask(q)
-        r = Asker(b, Settings(meaning=False), decider=Last()).ask(q)
-        self.assertGreater(len(r.ranked), 1)
-        self.assertEqual(r.ranked, list(reversed(plain.ranked)))
-
-
-if __name__ == "__main__":
-    unittest.main()

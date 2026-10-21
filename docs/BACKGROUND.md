@@ -1,91 +1,57 @@
-# Background: how HTPD came to be
+# Background: why HTPD is the way it is
 
-Status as of 19 October 2026. Read this to understand why the project is
-the way it is. The rules are in `AGENTS.md`; the format is in
-`docs/FORMAT.md`; the plan for part B is in `docs/PART-B.md`.
+The rules for coding agents are in `AGENTS.md`, the format in
+`docs/FORMAT.md`, the converter in `docs/CONVERTER.md`, the reader in
+`docs/READER.md`.
 
 ## The idea
 
-A normal AI ("X") reads a large document, such as a 300-page PDF, as one
-long text. It loses details, uses many tokens and cannot say on which page
-something stands. The owner of this project, Narendra, wants an AI "Y"
-with two parts:
+An AI that reads a large document - a 300-page PDF, say - as one long text
+loses details, uses many tokens and cannot say on which page something
+stands. HTPD gives the AI the document in a form made for it:
 
-* **A - the converter.** It only converts any document (PDF first) into
-  HTPD: a set of connected nodes that an AI can read piece by piece.
-* **B - the reader tool and model**, "the strength and power". It tells
-  any AI how to read HTPD and picks the right pieces for a question.
-  Anybody who already has HTPD bundles should be able to add B to their
-  own work.
+* **The converter** turns a document into an HTPD file: the document's own
+  sections, every paragraph, table and code block with its page, the
+  tree of headings, the links between sections, and the text inside
+  pictures read by OCR. It never summarises or rewrites.
+* **The reader** finds, for a question, the few sections that answer it and
+  hands exactly that text, with its pages, to any AI - or says "Not found
+  in this file." with the reason. It also comes as an MCP server for AI
+  agents and as a skill for AI apps.
 
-## Decisions taken at the start
+A single `.htpd` file also works with no tool at all: it starts with
+reading rules that tell any AI how to use it.
 
-* No new format from scratch: an HTPD bundle is a valid bundle of Google's
+## Decisions
+
+* **No new format from scratch.** An HTPD bundle is a valid bundle of the
   Open Knowledge Format (OKF 0.2), plus HTPD's own fields under `htpd:`.
-* Every node keeps the original text and its page numbers. Part A never
-  summarises or rewrites.
-* No promises that are not measured (for example "answers in
-  milliseconds").
-* Part A is the hard part and comes first, PDF first.
-* Part A is written in C++ (C++23) only, on Linux (Ubuntu). Python and a
-  UI come later.
+* **Exact text with pages.** Every piece keeps the original text and its
+  page. Nothing is summarised, rewritten or guessed - not by the converter,
+  not by OCR (unsure words are left out), not by the reader.
+* **Local, free and light.** Everything runs on a normal PC, offline,
+  without a GPU and without any model download. The converter is C++23
+  with PDFium; OCR uses the free Tesseract program when it is installed.
+  The reader is plain Python. Large language models were considered for
+  the reader and dropped: they need a GPU to train and are slow on a CPU.
+  The reader's one learned part, the re-ranker, is a few kilobytes of
+  weights.
+* **Measured, not promised.** Every claim about the reader comes from the
+  evaluation harness on public test documents (`eval/report.md`). Test
+  documents are never used for tuning or training.
+* **Private documents stay private.** They are never committed, uploaded or
+  put into a prompt for a cloud model.
 
-## Part A - done (version 0.1.0)
+## What real documents taught
 
-* `htpd convert file.pdf` writes a bundle: `index.md`, `log.md`,
-  `document.md` and one file per heading in `sections/`. Each section file
-  has its pages, its parent, children, previous and next section, and the
-  SHA-256 of the PDF.
-* PDFium (version chromium/8086) reads the PDF; `scripts/get_pdfium.sh`
-  downloads it and checks its SHA-256. Builds with make and with CMake.
-* Checked: 63 tests; 99 deliberate breaks of rules in the code, each one
-  caught by a test; no warnings with strict flags; clean under
-  AddressSanitizer and UndefinedBehaviorSanitizer.
-* Tried on three real manuals: RISC-V Debug Specification (119 pages,
-  164 sections), Arm AAPCS64 (65 pages, 125 sections), RISC-V Instruction
-  Set Manual (906 pages, 1015 sections, 2.6 s). And on 301 odd and damaged
-  PDFs from PDFium's own tests: no crash, no hang.
-* What the real manuals taught (all fixed): header/footer removal at
-  first deleted real text, so it now needs a repeated position at the page
-  edge; bookmarks are often too coarse, so numbered headings found in the
-  text are added below them; some headings use another font at text size;
-  code listings need their spacing, so monospace fonts are measured from
-  their character widths; empty table cells are only marked when the
-  columns are certain; text that looks like Markdown gets one backslash.
-* Known limits: tables only as rows of text, no OCR, no figures, formulas
-  lose their form, only English documents tested, reading order is the
-  order stored in the PDF, Linux only.
-
-## Part B - the reader
-
-Part B is written and works (`reader/`, `skills/htpd/`). The plan and
-its phases are in `docs/PART-B.md`: Python, offline first, free and open
-models only. Reader → retriever → decider → packer. It needs nothing but
-Python 3.10+; the small open models (a cross-encoder of 22M parameters
-as decider, an embedding model for meaning search) are optional and run
-on a CPU. B is offered to any AI as a single `.htpd` file with reading
-rules, as a skill (`skills/htpd/SKILL.md`) and through an MCP server.
-Still open: measuring it with the evaluation harness on public test
-documents, and better search in very large manuals.
-
-## How the work is done
-
-* One phase at a time, each on its own branch. Before a merge all tests
-  are run and must pass; a review by someone else is welcome but not
-  required.
-* Test first; a task is done only when all tests pass.
-* The rules for coding agents are in `AGENTS.md`.
-
-## History
-
-* 6-7 October 2026: the idea was discussed; part A was written, tested on
-  real manuals and delivered as `htpd-0.1.0.zip`.
-* 7 October: `AGENTS.md` (rules for coding agents) added.
-* 9 October: the plan for part B written (`docs/PART-B.md`); the
-  repository put on GitHub.
-* 19 October: the code of part B, phases 1 to 6, written and tested, one
-  branch per phase. Narendra decided that a phase needs no separate review;
-  the author runs all tests before a merge. The measurements wait for the
-  public PDFs and the models (see the table in `docs/PART-B.md` section 5).
-  Laya was dropped from the plan: HTPD must stay local, free and light,
-  and Laya needs a GPU to train and is slow on a CPU.
+* Header and footer removal at first deleted real text; it now needs a
+  repeated position at the page edge.
+* Bookmarks are often too coarse, so numbered headings found in the text
+  are added below them; documents with few headings get parts where their
+  running header changes and parts of about two pages.
+* Code listings need their spacing, so monospace fonts are measured from
+  their character widths. Empty table cells are only marked when the
+  columns are certain. Raised numbers stay raised (`2³¹`, not `231`).
+* A question in the user's words is the hard case for "not found": the
+  rule "the document never mentions this word" must allow other forms of a
+  word and short forms used in tables.

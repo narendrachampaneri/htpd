@@ -104,13 +104,7 @@ def cmd_ask(b: Bundle, args: argparse.Namespace) -> int:
     from .ask import Asker
     from .retriever import TUNED_NOT_FOUND_BELOW, Settings
 
-    embedder = None
-    if args.meaning:
-        from .embed import SentenceTransformerEmbedder
-
-        embedder = SentenceTransformerEmbedder()
-    asker = Asker(b, Settings(meaning=args.meaning, not_found_below=TUNED_NOT_FOUND_BELOW),
-                  embedder=embedder, budget=args.budget)
+    asker = Asker(b, Settings(not_found_below=TUNED_NOT_FOUND_BELOW), budget=args.budget)
     a = answer(asker, " ".join(args.question), lines=args.lines)
     if args.json:
         data = a.to_dict()
@@ -164,7 +158,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--lines", type=int, default=5, help="how many lines to give (default 5)")
     p.add_argument("--context", action="store_true", help="also print the sections the lines come from")
     p.add_argument("--budget", type=int, default=DEFAULT_BUDGET, help=f"most tokens of context (default {DEFAULT_BUDGET})")
-    p.add_argument("--meaning", action="store_true", help="also meaning search (needs sentence-transformers)")
     p.set_defaults(func=cmd_ask)
     p = add("check", "list every problem of the bundle")
     p.add_argument("--pdf", help="also check that the bundle was made from this PDF")

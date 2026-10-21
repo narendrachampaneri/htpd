@@ -1,7 +1,7 @@
 {
   "system": "B1",
   "label": "B1 chunks, BM25",
-  "phase": "Phase 2 - baselines",
+  "group": "Baselines",
   "split": "tune",
   "only_checked": false,
   "bundles": [
@@ -24,7 +24,7 @@
     "answer_in_text": 0.9175257731958762,
     "tokens_mean": 2710.785123966942,
     "tokens_vs_whole": 0.07071355742503799,
-    "ms_per_question": 0.6205869338839326,
+    "ms_per_question": 0.5738945702387731,
     "by_kind": {
       "1": {
         "n": 72,

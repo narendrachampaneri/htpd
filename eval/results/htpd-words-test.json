@@ -1,7 +1,7 @@
 {
   "system": "htpd-words",
-  "label": "HTPD: words + tree (no model)",
-  "phase": "Phase 3 - retriever and packer",
+  "label": "HTPD reader without the re-ranker",
+  "group": "HTPD",
   "split": "test",
   "only_checked": false,
   "bundles": [
@@ -22,9 +22,9 @@
     "not_found_accuracy": 0.9545454545454546,
     "false_not_found": 0.009009009009009009,
     "answer_in_text": 0.8558558558558559,
-    "tokens_mean": 2456.5263157894738,
-    "tokens_vs_whole": 0.06033620628295863,
-    "ms_per_question": 13.639750999990289,
+    "tokens_mean": 2456.6616541353383,
+    "tokens_vs_whole": 0.06033849832736164,
+    "ms_per_question": 12.348115518775591,
     "by_kind": {
       "1": {
         "n": 66,

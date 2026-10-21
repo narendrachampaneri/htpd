@@ -21,7 +21,7 @@ SAMPLE = ROOT / "examples" / "sample.htpd"
 class AnswerTest(unittest.TestCase):
     def setUp(self) -> None:
         self.b = open_bundle(SAMPLE)
-        self.asker = Asker(self.b, Settings(meaning=False))
+        self.asker = Asker(self.b, Settings())
 
     def test_table_row_with_its_header(self) -> None:
         a = answer(self.asker, "What is the reset value of the READY bit?")

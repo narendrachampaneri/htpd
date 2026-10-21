@@ -1,17 +1,15 @@
 """The HTPD retriever: find the sections of a bundle that answer a question.
 
-Three ranked lists, merged by reciprocal rank fusion (RRF):
+Two ranked lists, merged by reciprocal rank fusion (RRF):
 
 * words   - BM25 over each section's title and text, with the technical
             tokenizer (register names, hex numbers and section numbers stay
             whole). The title counts twice.
-* meaning - cosine similarity of an open embedding model (optional; needs
-            sentence-transformers, see embed.py).
 * tree    - BM25 over the *path* of titles of each section (chapter > section
             > subsection). This is what the structure of a bundle adds: a
             question about "the abstract command in the debug module" matches
             the place in the tree, even when the section text says neither.
-            It counts only a hundredth of the other lists (`tree_weight`), so
+            It counts only a hundredth of the words (`tree_weight`), so
             it can only decide between candidates the words rank alike: on
             the tuning questions every weight from 0.02 up pushed the right
             section down (Recall@1 0.804 at 0.01, 0.691 at 0.1, Arm ELF
@@ -71,7 +69,6 @@ _SECTION_REF = re.compile(r"(?:section|chapter|clause|appendix|table|§)\s*([A-Z
 @dataclass(frozen=True)
 class Settings:
     words: bool = True
-    meaning: bool = True
     tree: bool = True
     numbers: bool = True  # a section number in the question goes first
     technical: bool = True  # technical tokenizer; False: plain words
@@ -79,7 +76,7 @@ class Settings:
     not_found_below: float = 0.0  # 0 disables "not found"
     coverage_of: int = 3  # how many top candidates count for the coverage
     unknown_terms: bool = True  # "not found" when the question names a term or word the document never uses
-    tree_weight: float = 0.01  # weight of the tree list in the fusion (words and meaning count 1)
+    tree_weight: float = 0.01  # weight of the tree list in the fusion (the words count 1)
     rerank: bool = True  # re-order the candidates with the trained re-ranker (rerank.py, rerank.json)
 
 
@@ -128,14 +125,6 @@ def specific_terms(question: str) -> list[str]:
     return out
 
 
-def card_text(bundle: Bundle, node: Node, max_words: int = 120) -> str:
-    """A short card of a section: its path of titles and its first words."""
-    path = " > ".join(bundle.path_titles(node)[1:])
-    words = node.text.split()
-    first = " ".join(words[:max_words])
-    return f"{path}\n{first}" if first else path
-
-
 def stem(word: str) -> str:
     """A light stem, so that "started", "starts" and "start" are one word."""
     w = word.lower()
@@ -149,8 +138,7 @@ def stem(word: str) -> str:
 
 
 class Retriever:
-    def __init__(self, bundle: Bundle, settings: Settings | None = None, embedder: Any = None,
-                 cache_dir: Any = None):
+    def __init__(self, bundle: Bundle, settings: Settings | None = None):
         self.bundle = bundle
         self.settings = settings or Settings()
         self.sections = [s for s in bundle.sections]
@@ -160,13 +148,6 @@ class Retriever:
         self.by_number = {s.number.lower(): i for i, s in enumerate(self.sections) if s.number}
         self._vocabulary: set[str] | None = None
         self._stems: set[str] | None = None
-        self.embedder = embedder if self.settings.meaning else None
-        self.vectors: list[list[float]] | None = None
-        if self.embedder is not None:
-            from .embed import cached_encode
-
-            cards = [card_text(bundle, s) for s in self.sections]
-            self.vectors = cached_encode(self.embedder, cards, cache_dir, f"{bundle.name}-cards")
 
     def tokens(self, text: str) -> list[str]:
         return technical_tokens(text) if self.settings.technical else plain_words(text)
@@ -189,11 +170,6 @@ class Retriever:
             out["words"] = [i for i, _ in self.word_index.top(q, st.candidates)]
         if st.tree:
             out["tree"] = [i for i, _ in self.tree_index.top(q, st.candidates)]
-        if st.meaning and self.embedder is not None and self.vectors is not None:
-            from .embed import cosine_top
-
-            qv = self.embedder.encode([question], query=True)[0]
-            out["meaning"] = [i for i, _ in cosine_top(qv, self.vectors, st.candidates)]
         return out
 
     def retrieve(self, question: str, k: int = 20) -> Retrieval:

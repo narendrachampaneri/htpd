@@ -1,4 +1,4 @@
-"""Tests of phase 1: reading a bundle exactly, and checking it.
+"""Tests of reading a bundle exactly, and checking it.
 
 Plain unittest, so both `python -m pytest` and
 `python -m unittest discover -s reader/tests -t .` run them. No internet.

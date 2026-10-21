@@ -1,4 +1,4 @@
-"""htpd_reader - part B of HTPD: read bundles and find the text that answers a question.
+"""htpd_reader - the HTPD reader: read bundles and find the text that answers a question.
 
     from htpd_reader import open_bundle
     b = open_bundle("manual.htpd")

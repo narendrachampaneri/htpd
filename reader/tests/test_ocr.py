@@ -29,7 +29,7 @@ class Ocr(unittest.TestCase):
 
     def test_the_answer_says_its_page_has_ocr_text(self) -> None:
         for path in (FOLDER, SINGLE):
-            a = answer(Asker(open_bundle(path), Settings(meaning=False)), "What is the fuse rated?")
+            a = answer(Asker(open_bundle(path), Settings()), "What is the fuse rated?")
             self.assertTrue(a.found)
             self.assertEqual(a.lines[0].text, "The fuse is rated 16 A.")
             self.assertTrue(a.lines[0].ocr)
@@ -37,7 +37,7 @@ class Ocr(unittest.TestCase):
             self.assertIn("[page 2, Page 2, page has OCR text]", a.text())
 
     def test_the_packed_text_says_which_pages_were_read_by_ocr(self) -> None:
-        r = Asker(open_bundle(SINGLE), Settings(meaning=False)).ask("Which pin is CAN low?")
+        r = Asker(open_bundle(SINGLE), Settings()).ask("Which pin is CAN low?")
         self.assertIn("text of page 1 read by OCR", r.pack.text)
         self.assertIn("Pin 4 is CAN low.", r.pack.text)
 

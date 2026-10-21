@@ -1,4 +1,4 @@
-"""Tests of phase 6: the MCP server over stdio."""
+"""Tests of the MCP server over stdio."""
 
 from __future__ import annotations
 

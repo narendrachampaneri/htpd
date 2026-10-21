@@ -1,9 +1,9 @@
 """A simple word search over the sections of a bundle.
 
-This is phase 1's plain search: every word of the query must stand in the
-section (title or text). Ranking counts the words, titles count three times.
-The stronger search (BM25 with a technical tokenizer, meaning search, the
-tree) is `retriever.py`.
+Every word of the query must stand in the section (title or text). Ranking
+counts the words, titles count three times. The search that answers
+questions (BM25 with a technical tokenizer, the tree, the re-ranker) is
+`retriever.py`.
 """
 
 from __future__ import annotations

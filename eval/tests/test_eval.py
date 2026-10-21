@@ -1,10 +1,9 @@
-"""Tests of phase 2: tokenizers, BM25, question checks, baselines, harness, report."""
+"""Tests of the evaluation: tokenizers, BM25, question checks, baselines, harness, report."""
 
 from __future__ import annotations
 
 import hashlib
 import json
-import math
 import tempfile
 import unittest
 from pathlib import Path
@@ -39,22 +38,6 @@ QUESTIONS = [
       ["The logic supply is 3.3 V.", "Logic supply voltage | 3.0 | 3.3 | 3.6 | V"], [SUPPLY, LIMITS], [2]),
     q("s5", 4, "What is the baud rate of the RS-485 port?", "", [], []),
 ]
-
-
-class FakeEmbedder:
-    """Bag of hashed words: enough to test the plumbing of meaning search."""
-
-    name = "fake"
-
-    def encode(self, texts, query=False):
-        out = []
-        for t in texts:
-            v = [0.0] * 64
-            for w in plain_words(t):
-                v[int(hashlib.md5(w.encode()).hexdigest(), 16) % 64] += 1.0
-            n = math.sqrt(sum(x * x for x in v)) or 1.0
-            out.append([x / n for x in v])
-        return out
 
 
 class Tokens(unittest.TestCase):
@@ -169,7 +152,7 @@ class Harness(unittest.TestCase):
         self.docs = t / "docs.list"
         self.docs.write_text("# test\nsample test - -\n")
         self.results = t / "results"
-        self.ctx = Context(embedder_factory=FakeEmbedder)
+        self.ctx = Context()
 
     def tearDown(self) -> None:
         self._tmp.cleanup()
@@ -197,11 +180,10 @@ class Harness(unittest.TestCase):
         self.assertIsNotNone(m["answer_in_text"])
         self.assertLessEqual(m["answer_in_text"], 1.0)
 
-    def test_b1_and_b2_run(self) -> None:
-        for name in ("B1", "B2"):
-            m = self.ev(name)["metrics"]
-            self.assertIsNotNone(m["recall@10"], name)
-            self.assertIsNotNone(m["page_accuracy"], name)
+    def test_b1_runs(self) -> None:
+        m = self.ev("B1")["metrics"]
+        self.assertIsNotNone(m["recall@10"])
+        self.assertIsNotNone(m["page_accuracy"])
 
     def test_report_is_written_from_results(self) -> None:
         for name in ("B0", "B3"):
@@ -229,7 +211,7 @@ class Harness(unittest.TestCase):
         self.assertEqual(splits, {"tune"})
 
     def test_all_baselines_registered(self) -> None:
-        self.assertLessEqual({"B0", "B1", "B2", "B3"}, set(REGISTRY))
+        self.assertLessEqual({"B0", "B1", "B3"}, set(REGISTRY))
 
     def test_results_file(self) -> None:
         self.ev("B3")
@@ -255,14 +237,14 @@ if __name__ == "__main__":
     unittest.main()
 
 
-class Phase3Systems(unittest.TestCase):
+class HtpdSystems(unittest.TestCase):
     def setUp(self) -> None:
         import eval.systems_htpd  # noqa: F401  (registers the htpd systems)
 
         self._tmp = tempfile.TemporaryDirectory()
         t = Path(self._tmp.name)
         self.t = t
-        self.ctx = Context(embedder_factory=FakeEmbedder, cache_dir=t / "cache")
+        self.ctx = Context()
 
     def tearDown(self) -> None:
         self._tmp.cleanup()
@@ -272,7 +254,7 @@ class Phase3Systems(unittest.TestCase):
         save(qfile, QUESTIONS)
         docs = self.t / "docs.list"
         docs.write_text("sample test - -\n")
-        for name in ("htpd", "htpd-words", "htpd-no-tree", "htpd-plain", "htpd-no-words"):
+        for name in ("htpd-rerank", "htpd-words", "htpd-no-tree", "htpd-plain", "htpd-no-words"):
             m = harness.evaluate(name, "test", [qfile], EXAMPLES, self.ctx, docs_list=docs,
                                  results_dir=self.t / "results")["metrics"]
             self.assertIsNotNone(m["recall@5"], name)
@@ -329,7 +311,7 @@ class AgentCheck(unittest.TestCase):
             m = r["metrics"]
             self.assertEqual((m["questions"], m["page_accuracy"], m["not_found_accuracy"]), (3, 0.5, 1.0))
             text = harness.write_report(t / "results", t / "report.md")
-            self.assertIn("Phase 6 - end to end", text)
+            self.assertIn("### AI agents", text)
 
 
 class ShippedThreshold(unittest.TestCase):

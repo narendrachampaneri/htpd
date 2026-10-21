@@ -1,6 +1,6 @@
 """python -m eval COMMAND
 
-  run SYSTEM [--split test]   measure one system (B0 B1 B2 B3, htpd, ...); saves eval/results/
+  run SYSTEM [--split test]   measure one system (B0, B1, B3, htpd-rerank, ...); saves eval/results/
   report                      write eval/report.md from eval/results/
   tune SYSTEM                 set the "not found" threshold on the tuning split (eval/tuned.json)
   validate                    check every question against its bundle; exit 1 on a bad one
@@ -34,7 +34,7 @@ def _question_files(arg: list[str] | None) -> list[Path]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    _load_phase_systems()
+    import eval.systems_htpd  # noqa: F401  (registers the HTPD systems)
     ap = argparse.ArgumentParser(prog="python -m eval")
     ap.add_argument("--bundles", default=str(EVAL / "bundles"), help="folder with the <name>.htpd bundles")
     ap.add_argument("--questions", nargs="*", help="question files (default eval/questions/*.jsonl)")
@@ -43,11 +43,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("system", choices=sorted(REGISTRY))
     p.add_argument("--split", default="test", choices=harness.SPLITS)
     p.add_argument("--checked", action="store_true", help="only questions checked by a person")
-    p.add_argument("--cache", default=str(EVAL / "cache"), help="cache for embeddings")
     sub.add_parser("report")
     p = sub.add_parser("tune")
     p.add_argument("system", choices=sorted(REGISTRY))
-    p.add_argument("--cache", default=str(EVAL / "cache"), help="cache for embeddings")
     sub.add_parser("validate")
     p = sub.add_parser("review")
     p.add_argument("--bundle")
@@ -63,19 +61,19 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "systems":
         for s in REGISTRY.values():
-            print(f"{s.name:16} {s.label}  ({s.phase})")
+            print(f"{s.name:16} {s.label}  ({s.group})")
         return 0
     if args.cmd == "report":
         print(harness.write_report(), end="")
         return 0
     if args.cmd == "tune":
-        t = harness.tune_not_found(args.system, _question_files(args.questions), bundles, Context(cache_dir=Path(args.cache)))
+        t = harness.tune_not_found(args.system, _question_files(args.questions), bundles, Context())
         print(f"{t['system']}: not found below coverage {t['not_found_below']:.2f} "
               f"(balanced accuracy {t['balanced_accuracy']:.3f} on {t['questions']} tuning questions); "
               "saved in eval/tuned.json")
         return 0
     if args.cmd == "run":
-        ctx = Context(cache_dir=Path(args.cache))
+        ctx = Context()
         r = harness.evaluate(args.system, args.split, _question_files(args.questions), bundles, ctx, args.checked)
         m = r["metrics"]
         print(f"{r['label']} on {args.split}: {m['questions']} questions, R@5 {harness._f(m['recall@5'])}, "
@@ -153,15 +151,6 @@ def _review(files: list[Path], bundle, only: str | None) -> int:
         if changed:
             save(f, [q for q in qs if not q.extra.get("dropped")])
     return 0
-
-
-def _load_phase_systems() -> None:
-    """Later phases add systems; they register when their module is imported."""
-    import importlib.util
-
-    for name in ("eval.systems_htpd", "eval.systems_decider"):
-        if importlib.util.find_spec(name) is not None:
-            importlib.import_module(name)
 
 
 if __name__ == "__main__":

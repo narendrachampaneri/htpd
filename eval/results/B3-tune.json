@@ -1,7 +1,7 @@
 {
   "system": "B3",
   "label": "B3 HTPD sections, BM25",
-  "phase": "Phase 2 - baselines",
+  "group": "Baselines",
   "split": "tune",
   "only_checked": false,
   "bundles": [
@@ -24,7 +24,7 @@
     "answer_in_text": 0.9072164948453608,
     "tokens_mean": 2805.4876033057853,
     "tokens_vs_whole": 0.05808569468092357,
-    "ms_per_question": 0.5732464545391007,
+    "ms_per_question": 0.7113880330454911,
     "by_kind": {
       "1": {
         "n": 72,

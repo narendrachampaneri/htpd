@@ -1,1 +1,1 @@
-"""Part B, model side: training data (phase 4), deciders and their training (phase 5)."""
+"""The re-ranker's training: questions made by rules from training documents, and the trainer."""

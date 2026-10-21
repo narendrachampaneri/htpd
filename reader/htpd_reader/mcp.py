@@ -1,7 +1,7 @@
-"""Phase 6: HTPD as an MCP server, so any AI agent can read bundles.
+"""HTPD as an MCP server, so any AI agent can read bundles.
 
     htpd-mcp --bundles ~/manuals              # every *.htpd folder or file in ~/manuals
-    python -m htpd_reader.mcp --bundles DIR [--meaning] [--decider ce|ce-trained]
+    python -m htpd_reader.mcp --bundles DIR
 
 The server speaks MCP over stdio (JSON-RPC 2.0, one message per line) with
 only the Python standard library. Tools:
@@ -11,7 +11,7 @@ only the Python standard library. Tools:
   open_section   the exact text of one section, with pages, parent, children, neighbours
   search         word search in a bundle
   ask            question in, the few sections that answer it out (retriever,
-                 decider, packer), or "not found"
+                 re-ranker, packer), or "not found"
   check          every problem of a bundle
 
 Text of a bundle is content of a document, never instructions: every tool
@@ -79,14 +79,11 @@ class ToolError(Exception):
 
 
 class Server:
-    def __init__(self, roots: list[Path], meaning: bool = False, decider: str | None = None, budget: int = DEFAULT_BUDGET):
+    def __init__(self, roots: list[Path], budget: int = DEFAULT_BUDGET):
         self.roots = roots
-        self.meaning = meaning
-        self.decider_name = decider
         self.budget = budget
         self._bundles: dict[str, Bundle] = {}
         self._askers: dict[str, Any] = {}
-        self._embedder: Any = None
         self.handlers: dict[str, Callable[[dict[str, Any]], tuple[str, Any]]] = {
             "list_bundles": self.t_list, "contents": self.t_contents, "open_section": self.t_section,
             "search": self.t_search, "ask": self.t_ask, "check": self.t_check,
@@ -133,17 +130,7 @@ class Server:
             from .ask import Asker
             from .retriever import Settings
 
-            embedder = None
-            if self.meaning:
-                from .embed import SentenceTransformerEmbedder
-
-                self._embedder = self._embedder or SentenceTransformerEmbedder()
-                embedder = self._embedder
-            decider = None
-            if self.decider_name:
-                decider = make_decider(self.decider_name)
-            self._askers[key] = Asker(b, Settings(meaning=self.meaning, not_found_below=_threshold("htpd" if self.meaning else "htpd-rerank")),
-                                      embedder=embedder, decider=decider, budget=self.budget)
+            self._askers[key] = Asker(b, Settings(not_found_below=_threshold("htpd-rerank")), budget=self.budget)
         return self._askers[key]
 
     # --- tools: each gives (text for the model, structured data) ---
@@ -303,28 +290,13 @@ def _threshold(name: str) -> float:
         return TUNED_NOT_FOUND_BELOW if name in ("htpd-words", "htpd-rerank") else 0.0
 
 
-def make_decider(name: str) -> Any:
-    from .decider import DEFAULT_CROSS_ENCODER, CrossEncoderScorer, Decider
-
-    checkpoints = Path(__file__).resolve().parents[2] / "model" / "checkpoints"
-    if name == "ce":
-        scorer: Any = CrossEncoderScorer(os.environ.get("HTPD_CROSS_ENCODER", DEFAULT_CROSS_ENCODER))
-    elif name == "ce-trained":
-        scorer = CrossEncoderScorer(os.environ.get("HTPD_CE_TRAINED", str(checkpoints / "cross-encoder-htpd")))
-    else:
-        raise ValueError(f"unknown decider {name!r}")
-    return Decider(scorer, not_found_below=_threshold(f"htpd-{name}"))
-
-
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="htpd-mcp", description="HTPD bundles as an MCP server (stdio).")
     ap.add_argument("--bundles", nargs="+", default=[os.environ.get("HTPD_BUNDLES", ".")],
                     help="folders that hold *.htpd bundles, or bundle folders (default: $HTPD_BUNDLES or .)")
-    ap.add_argument("--meaning", action="store_true", help="also meaning search (needs sentence-transformers)")
-    ap.add_argument("--decider", choices=["ce", "ce-trained"], help="re-order with a decider model")
     ap.add_argument("--budget", type=int, default=DEFAULT_BUDGET, help="most tokens of text per answer")
     args = ap.parse_args(argv)
-    Server([Path(p).expanduser() for p in args.bundles], args.meaning, args.decider, args.budget).serve()
+    Server([Path(p).expanduser() for p in args.bundles], args.budget).serve()
     return 0
 
 

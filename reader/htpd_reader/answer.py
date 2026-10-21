@@ -1,7 +1,7 @@
 """The answer from the file: the exact lines that answer a question, with pages.
 
 No model writes anything here. The best lines are picked from the sections the
-retriever (and decider) ranked first: a table row with its header row, or a
+retriever ranked first: a table row with its header row, or a
 sentence of a paragraph, or a line of code - each word for word as it stands
 in the file, with its page and section. When the retriever says "not found",
 the answer is "Not found in this file" and why.

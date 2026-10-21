@@ -3,12 +3,13 @@
 Read these before you change anything:
 
 * `README.md` - what HTPD is, quick start, how to use it with an AI.
-* `docs/CONVERTER.md` - the converter (part A): build, use, limits.
-* `docs/FORMAT.md` - the bundle format. It is the contract between part A
-  and part B.
-* `docs/PART-B.md` - the plan for part B, the reader model, phase by phase.
-* `docs/BACKGROUND.md` - why the project is the way it is: the idea, the
-  decisions, the state and the history.
+* `docs/CONVERTER.md` - the converter: build, use, limits.
+* `docs/FORMAT.md` - the file format. It is the contract between the
+  converter and the reader.
+* `docs/READER.md` - the reader: how it finds the answer, its rules, how it
+  is measured.
+* `docs/BACKGROUND.md` - why the project is the way it is: the idea and the
+  decisions.
 
 What is true: these five files and this one. If anything else (notes kept
 by a tool, a generated summary, your own notes) says something different,
@@ -16,7 +17,7 @@ these files win - fix the other thing, or ask.
 
 ## Build and test
 
-Part A, the converter (C++):
+The converter (C++):
 
 ```sh
 ./scripts/get_pdfium.sh     # first time only
@@ -28,11 +29,10 @@ make test                   # all tests must pass
 * There are two builds. The Makefile finds `src/*.cpp` by itself. A new
   source file must also be added to `CMakeLists.txt`.
 
-Part B, the reader model (Python 3.10+, folders `reader/`, `model/`,
-`eval/`): run its tests with `python -m pytest` from the repository root
-(without pytest: `PYTHONPATH=reader:. python -m unittest discover -s reader/tests -t .`,
-the same for `eval/tests` and `model/tests`). Tests must not need the
-internet; a test that needs a model uses a small stand-in.
+The reader (Python 3.10+, folders `reader/`, `eval/`, `model/`): run its
+tests with `python -m pytest` from the repository root (without pytest:
+`PYTHONPATH=reader:. python -m unittest discover -s reader/tests -t .`, the
+same for `eval/tests` and `model/tests`). Tests must not need the internet.
 
 ## Rules
 
@@ -44,18 +44,18 @@ internet; a test that needs a model uses a small stand-in.
    header in any other file.
 5. C++ errors are returned as values (`htpd::Result<T>`, which is
    `std::expected`). No exception for a bad PDF.
-6. No new library without asking. The converter is C++ only (it may run
-   the Tesseract program for OCR when it is installed; it never needs it). Part B is
-   Python; its allowed libraries are listed per phase in `docs/PART-B.md`.
+6. No new library without asking. The converter is C++ with PDFium only (it
+   may run the Tesseract program for OCR when it is installed; it never
+   needs it). The reader uses the Python standard library only (PyYAML when
+   it is installed); training the re-ranker uses numpy.
 7. Never lose text and never make text up. When a case is not certain,
    keep the text as it stands.
 8. The output format is a contract. When a change alters what is written
    into a bundle, update `docs/FORMAT.md` in the same change, make the
    example again, and say so:
    `cd examples && ../build/htpd convert ../tests/data/sample.pdf --force`
-   During a phase of part B, do not change the converter at all.
 9. Small commits, one topic each.
-10. Numbers about part B come only from the evaluation harness
+10. Numbers about the reader come only from the evaluation harness
     (`eval/report.md`), on the test split. Never type a result by hand,
     never tune on the test split, never train on a test document.
 11. Documents in `private/` are never committed, never uploaded and never
@@ -66,11 +66,9 @@ internet; a test that needs a model uses a small stand-in.
 
 ## How we work
 
-* One phase of `docs/PART-B.md` at a time, on its own branch
-  (`phase-N-short-name`). Do not add, drop or merge phases without asking.
-* Before a phase is merged, all tests run and pass (C++ and Python). A
-  review by someone else is welcome but not required (decided by the owner
-  on 19 October 2026).
+* Small, tested steps. Before anything is pushed, all tests pass (C++ and
+  Python) and the owner has agreed. A review by someone else is welcome but
+  not required.
 
 ## Facts that are easy to get wrong
 
@@ -92,7 +90,7 @@ internet; a test that needs a model uses a small stand-in.
 * Whether a font is monospace is measured from the widths of its
   characters. It is not taken from the font name.
 
-## The converter in seven steps
+## The converter, step by step
 
 | Step | File |
 |---|---|

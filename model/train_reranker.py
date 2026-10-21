@@ -3,7 +3,7 @@
     python -m model.train_reranker eval/bundles/riscv-isa.htpd private/bundles/more.htpd ...
                                    [--out reader/htpd_reader/rerank.json]
 
-For each question made by rules from a training bundle (model/make_data.py:
+For each question made by rules from a training bundle (model/questions.py:
 section titles, table cells, rare terms), the retriever finds its 20
 candidates, and each candidate gets the features of rerank.py. A few small
 neural networks (numpy only; one hidden layer of 16 units each, started from
@@ -33,7 +33,7 @@ from htpd_reader import open_bundle
 from htpd_reader.rerank import FEATURES, WEIGHTS, Features
 from htpd_reader.retriever import Retriever, Settings
 
-from .make_data import refuse_test_documents, table_questions, term_questions, title_questions
+from .questions import refuse_test_documents, rule_questions
 
 SOURCE_WEIGHT = {"title": 0.3, "table": 1.0, "term": 1.0}
 KEEP = 20
@@ -54,9 +54,9 @@ def examples(paths: list[Path]) -> Data:
     refuse_test_documents(bundles)
     d = Data()
     for name, b in bundles.items():
-        r = Retriever(b, Settings(meaning=False, rerank=False))
+        r = Retriever(b, Settings(rerank=False))
         feats = Features(r)
-        qs = list(title_questions(b)) + list(table_questions(b)) + list(term_questions(b))
+        qs = rule_questions(b)
         used = 0
         for q in qs:
             cands = r.retrieve(q.question, k=KEEP).candidates

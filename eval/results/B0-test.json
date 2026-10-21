@@ -1,7 +1,7 @@
 {
   "system": "B0",
   "label": "B0 whole document",
-  "phase": "Phase 2 - baselines",
+  "group": "Baselines",
   "split": "test",
   "only_checked": false,
   "bundles": [
@@ -24,7 +24,7 @@
     "answer_in_text": 1.0,
     "tokens_mean": 45988.924812030076,
     "tokens_vs_whole": 1.0,
-    "ms_per_question": 0.012881022551762973,
+    "ms_per_question": 0.01555366917868137,
     "by_kind": {}
   },
   "misses": [

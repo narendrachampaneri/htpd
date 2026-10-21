@@ -1,4 +1,4 @@
-"""Question in, exact text with pages out: retriever -> (decider) -> packer.
+"""Question in, exact text with pages out: retriever (with its re-ranker) -> packer.
 
     from htpd_reader import open_bundle
     from htpd_reader.ask import Asker
@@ -6,25 +6,16 @@
     result = asker.ask("What is the reset value of ndmreset?")
     print(result.pack.text)      # hand this to any AI model
     print(result.top_page)
-
-The decider (phase 5) is optional. Without it, the retriever's order and its
-"not found" rule are used as they are.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any
 
 from .bundle import Bundle, Node
 from .packer import DEFAULT_BUDGET, DEFAULT_SECTIONS, Pack, best_block, pack
 from .retriever import Retrieval, Retriever, Settings
-
-
-class Decider(Protocol):
-    """Re-orders candidates and decides "not found" (phase 5)."""
-
-    def decide(self, bundle: Bundle, question: str, retrieval: Retrieval) -> tuple[list[Node], bool]: ...
 
 
 @dataclass
@@ -49,24 +40,17 @@ class Result:
 
 
 class Asker:
-    def __init__(self, bundle: Bundle, settings: Settings | None = None, embedder: Any = None,
-                 decider: Decider | None = None, budget: int = DEFAULT_BUDGET, max_sections: int = DEFAULT_SECTIONS,
-                 cache_dir: Any = None):
+    def __init__(self, bundle: Bundle, settings: Settings | None = None, budget: int = DEFAULT_BUDGET,
+                 max_sections: int = DEFAULT_SECTIONS):
         self.bundle = bundle
-        self.retriever = Retriever(bundle, settings, embedder=embedder, cache_dir=cache_dir)
-        self.decider = decider
+        self.retriever = Retriever(bundle, settings)
         self.budget = budget
         self.max_sections = max_sections
 
     def ask(self, question: str) -> Result:
         r = self.retriever.retrieve(question)
-        if self.decider is not None:
-            ranked, not_found = self.decider.decide(self.bundle, question, r)
-            not_found = not_found or bool(r.missing)  # a term the file never uses stays "not found"
-        else:
-            ranked, not_found = [c.node for c in r.candidates], r.not_found
-        reason = r.reason if not_found and r.not_found else ("" if not not_found else
-                                                              "no section passes the decider")
+        ranked, not_found = [c.node for c in r.candidates], r.not_found
+        reason = r.reason if not_found else ""
         p = pack(self.bundle, question, ranked, budget=self.budget, max_sections=self.max_sections,
                  not_found=not_found, reason=reason)
         top = None

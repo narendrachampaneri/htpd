@@ -1,6 +1,6 @@
 """Run a system on the questions and measure it; write eval/report.md.
 
-Numbers about part B come only from here (AGENTS.md rule 10). The report is
+Numbers about the reader come only from here (AGENTS.md rule 10). The report is
 made from the result files in eval/results/, never typed by hand.
 """
 
@@ -136,7 +136,7 @@ def evaluate(name: str, split: str, questions_paths: list[Path], bundles_dir: Pa
     rows = run(system, qs, bundles_dir, ctx)
     whole = {b: count_tokens(whole_text(open_bundle(bundles_dir / f"{b}.htpd"))) for b in {q.bundle for q in qs}}
     result = {
-        "system": name, "label": system.label, "phase": system.phase, "split": split,
+        "system": name, "label": system.label, "group": system.group, "split": split,
         "only_checked": only_checked, "bundles": sorted(whole), "when": _dt.date.today().isoformat(),
         "machine": f"{platform.system()} {platform.machine()}, Python {platform.python_version()}",
         "metrics": measure(system, rows, whole),
@@ -188,7 +188,7 @@ def tune_not_found(name: str, questions_paths: list[Path], bundles_dir: Path, ct
     if not any(q.kind == 4 for q in qs) or not any(q.kind != 4 for q in qs):
         raise SystemExit("the tuning split needs answerable and not-found questions")
     rows = run(REGISTRY[name], qs, bundles_dir, ctx)
-    # nf_score: the number a system says "not found" below (coverage, or a decider's best probability);
+    # nf_score: the number a system says "not found" below (the coverage of the question);
     # nf_fixed: "not found" by a rule that has no threshold (a word the file never uses)
     best = best_threshold([((r.extra or {}).get("nf_score", 0.0), bool((r.extra or {}).get("nf_fixed", False)),
                             r.q.kind == 4) for r in rows])
@@ -241,7 +241,7 @@ def agent_score(name: str, qs: list[Question], answers: Path, results_dir: Path 
         "tokens_mean": 0.0, "tokens_vs_whole": None, "ms_per_question": 0.0, "by_kind": {},
     }
     result = {"system": f"agent-{name}", "label": f"Agent {name} through the MCP server",
-              "phase": "Phase 6 - end to end", "split": "test", "only_checked": False,
+              "group": "AI agents", "split": "test", "only_checked": False,
               "bundles": sorted({q.bundle for q, _, _ in rows}), "when": _dt.date.today().isoformat(),
               "machine": "answers scored by hand", "metrics": metrics, "misses": []}
     results_dir.mkdir(parents=True, exist_ok=True)
@@ -261,7 +261,7 @@ def _f(x: Any, pct: bool = False) -> str:
 
 def write_report(results_dir: Path = RESULTS, out: Path = REPORT) -> str:
     results = [json.loads(p.read_text(encoding="utf-8")) for p in sorted(results_dir.glob("*.json"))]
-    lines = ["# HTPD part B - evaluation report", "",
+    lines = ["# HTPD evaluation report", "",
              "Written by `python -m eval report` from `eval/results/`. Never edit by hand.", "",
              "Recall@k: a gold section is among the first k. MRR: mean of 1/rank of the first gold section.",
              "Page: the first page the system points to is a gold page. Not found: share of questions",
@@ -275,9 +275,9 @@ def write_report(results_dir: Path = RESULTS, out: Path = REPORT) -> str:
         if not rs:
             continue
         lines += [f"## Split: {split}", ""]
-        for phase in sorted({r["phase"] for r in rs}):
-            group = [r for r in rs if r["phase"] == phase]
-            lines += [f"### {phase}", "",
+        for name in sorted({r.get("group", r.get("phase", "")) for r in rs}):
+            group = [r for r in rs if r.get("group", r.get("phase", "")) == name]
+            lines += [f"### {name}", "",
                       "| System | Questions | R@1 | R@5 | R@10 | MRR | Page | Not found | False not found | Answer in text | Tokens | Of whole | ms/question |",
                       "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
             for r in sorted(group, key=lambda r: r["system"]):

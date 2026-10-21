@@ -4,21 +4,18 @@ Every system gets one bundle and one question and gives an `Answer`:
 the sections in the order it ranks them, the page it points to first, the
 text it would hand to an AI model, and whether it says "not found".
 
-Baselines (docs/PART-B.md section 4) - B must beat them:
+Baselines - HTPD must beat them:
   B0  the whole document text
   B1  fixed chunks of about 500 tokens, BM25
-  B2  the same chunks, embeddings (needs sentence-transformers)
   B3  HTPD sections, BM25 only
 
-Phase 3 adds the HTPD retriever (`htpd`) and its ablations in
-eval/systems_htpd.py.
+The HTPD reader and its ablations are in eval/systems_htpd.py.
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Callable
 
 from htpd_reader import Block, Bundle
@@ -50,29 +47,15 @@ class Unit:
 
 @dataclass
 class Context:
-    """What a system may need besides the bundle."""
-
-    cache_dir: Path | None = None
-    embedder_factory: Callable[[], Any] | None = None
-    scorer_factory: Callable[[str], Any] | None = None  # system name -> scorer (phase 5; tests)
-    _embedder: Any = None
-
-    def embedder(self) -> Any:
-        if self._embedder is None:
-            if self.embedder_factory is None:
-                from htpd_reader.embed import SentenceTransformerEmbedder
-
-                self._embedder = SentenceTransformerEmbedder()
-            else:
-                self._embedder = self.embedder_factory()
-        return self._embedder
+    """What a system may need besides the bundle (nothing yet: every system
+    runs from the bundle alone)."""
 
 
 @dataclass
 class System:
     name: str
     label: str
-    phase: str
+    group: str  # the heading the system stands under in the report
     prepare: Callable[[Bundle, Context], Any]
     answer: Callable[[Any, str], Answer]
     ranks: bool = True  # False: recall and pages do not apply (B0)
@@ -180,7 +163,7 @@ def _b0_prepare(bundle: Bundle, ctx: Context) -> str:
     return whole_text(bundle)
 
 
-register(System("B0", "B0 whole document", "Phase 2 - baselines", _b0_prepare,
+register(System("B0", "B0 whole document", "Baselines", _b0_prepare,
                 lambda text, q: Answer([], None, text), ranks=False))
 
 
@@ -194,28 +177,8 @@ def _bm25_answer(state: tuple[list[Unit], BM25], question: str) -> Answer:
     return answer_from_units(units, order, question)
 
 
-register(System("B1", "B1 chunks, BM25", "Phase 2 - baselines",
+register(System("B1", "B1 chunks, BM25", "Baselines",
                 lambda b, ctx: _bm25_prepare(chunk_units(b)), _bm25_answer))
-register(System("B3", "B3 HTPD sections, BM25", "Phase 2 - baselines",
+register(System("B3", "B3 HTPD sections, BM25", "Baselines",
                 lambda b, ctx: _bm25_prepare(section_units(b)), _bm25_answer))
 
-
-def _b2_prepare(bundle: Bundle, ctx: Context) -> tuple[list[Unit], list[list[float]], Any]:
-    from htpd_reader.embed import cached_encode
-
-    units = chunk_units(bundle)
-    emb = ctx.embedder()
-    vecs = cached_encode(emb, [u.text for u in units], ctx.cache_dir, f"{bundle.name}-chunks")
-    return units, vecs, emb
-
-
-def _b2_answer(state: tuple[list[Unit], list[list[float]], Any], question: str) -> Answer:
-    from htpd_reader.embed import cosine_top
-
-    units, vecs, emb = state
-    q = emb.encode([question], query=True)[0]
-    order = [i for i, _ in cosine_top(q, vecs, 50)]
-    return answer_from_units(units, order, question)
-
-
-register(System("B2", "B2 chunks, embeddings", "Phase 2 - baselines", _b2_prepare, _b2_answer))

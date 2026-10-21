@@ -1,10 +1,8 @@
-"""Phase 3 systems: the HTPD retriever and packer, and one row per part switched off.
+"""The HTPD reader as the harness measures it, and one row per part switched off.
 
-  htpd             words + meaning + tree + section numbers, packed
-  htpd-words       without meaning search and without the re-ranker
-  htpd-rerank      words + tree + the trained re-ranker: what the reader and skill use by default
+  htpd-rerank      words + tree + section numbers + the trained re-ranker: the reader's default
+  htpd-words       the same without the re-ranker
   htpd-no-words    without word search
-  htpd-no-meaning  same as htpd-words, named for the ablation table
   htpd-no-tree     without the path-of-titles list
   htpd-no-numbers  without "section 3.1 in the question goes first"
   htpd-plain       plain words instead of the technical tokenizer
@@ -26,14 +24,12 @@ from htpd_reader.retriever import Settings
 from .systems import Answer, Context, System, register
 
 TUNED = Path(__file__).resolve().parent / "tuned.json"
-PHASE = "Phase 3 - retriever and packer"
+GROUP = "HTPD"
 
 VARIANTS: dict[str, tuple[str, dict[str, Any]]] = {
-    "htpd": ("HTPD: words + meaning + tree", {}),
-    "htpd-words": ("HTPD: words + tree (no model)", {"meaning": False, "rerank": False}),
-    "htpd-rerank": ("HTPD: words + tree + re-ranker (no model)", {"meaning": False, "rerank": True}),
+    "htpd-rerank": ("HTPD reader (words, tree, re-ranker)", {}),
+    "htpd-words": ("HTPD reader without the re-ranker", {"rerank": False}),
     "htpd-no-words": ("HTPD without word search", {"words": False}),
-    "htpd-no-meaning": ("HTPD without meaning search", {"meaning": False}),
     "htpd-no-tree": ("HTPD without the tree", {"tree": False}),
     "htpd-no-numbers": ("HTPD without section numbers", {"numbers": False}),
     "htpd-plain": ("HTPD with plain words", {"technical": False}),
@@ -50,9 +46,7 @@ def tuned(name: str, path: Path = TUNED) -> dict[str, Any]:
 
 def make(name: str, label: str, changes: dict[str, Any]) -> System:
     def prepare(bundle: Bundle, ctx: Context) -> Asker:
-        settings = Settings(**{**changes, **tuned(name)})
-        embedder = ctx.embedder() if settings.meaning else None
-        return Asker(bundle, settings, embedder=embedder, cache_dir=ctx.cache_dir)
+        return Asker(bundle, Settings(**{**changes, **tuned(name)}))
 
     def answer(asker: Asker, question: str) -> Answer:
         r = asker.ask(question)
@@ -60,7 +54,7 @@ def make(name: str, label: str, changes: dict[str, Any]) -> System:
                       {"coverage": r.retrieval.coverage, "nf_score": r.retrieval.coverage,
                        "nf_fixed": bool(r.retrieval.missing)})
 
-    return System(name, label, PHASE, prepare, answer)
+    return System(name, label, GROUP, prepare, answer)
 
 
 for _name, (_label, _changes) in VARIANTS.items():

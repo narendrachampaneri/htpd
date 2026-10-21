@@ -1,6 +1,6 @@
 """Question files: eval/questions/*.jsonl, one question per line.
 
-Fields (docs/PART-B.md section 4):
+Fields (docs/READER.md, "Evaluation"):
 
   id            unique, e.g. "debug-0042"
   bundle        name of the bundle in eval/bundles/, e.g. "riscv-debug"

@@ -1,6 +1,6 @@
-# htpd_reader - part B of HTPD
+# htpd_reader - the HTPD reader
 
-Python 3.10+. Reads HTPD bundles exactly as `docs/FORMAT.md` describes them.
+Python 3.10+, standard library only. Reads HTPD files exactly as `docs/FORMAT.md` describes them.
 
 ## Install
 
@@ -32,9 +32,8 @@ exit code 1 when there is an error.
 its header row, a sentence, a code line) with their page and section, and
 `--context` adds the sections they come from. When the file cannot answer it
 prints `Not found in this file.` and why - for example when the question
-names a term the file never uses ("the file never mentions PCIe"). No model
-is needed; `--meaning` adds meaning search when sentence-transformers is
-installed.
+names a term the file never uses ("the file never mentions PCIe"). Nothing
+is downloaded and no GPU is used. How it works: `docs/READER.md`.
 
 ## Library
 

@@ -5,16 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "htpd-reader"
 version = "0.1.1"
-description = "Part B of HTPD: read HTPD bundles and find the exact text, with pages, that answers a question."
+description = "The HTPD reader: read HTPD files and find the exact text, with pages, that answers a question."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Narendra Champaneri" }]
 dependencies = ["PyYAML>=5.4"]
-
-[project.optional-dependencies]
-# meaning search, the cross-encoder decider and its training (downloads models once)
-models = ["sentence-transformers>=2.2"]
 
 [project.scripts]
 htpd-read = "htpd_reader.cli:main"
@@ -28,7 +24,7 @@ include = ["htpd_reader*"]
 htpd_reader = ["rerank.json"]  # the weights of the re-ranker
 
 [tool.pytest.ini_options]
-# The Python tests of part B. They are plain unittest tests, so
+# The Python tests (reader, evaluation, re-ranker training). They are plain unittest tests, so
 # `python -m unittest discover -s reader/tests -t .` runs them as well.
 testpaths = ["reader/tests", "eval/tests", "model/tests"]
 pythonpath = ["reader", "."]

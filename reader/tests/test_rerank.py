@@ -19,7 +19,7 @@ SAMPLE = ROOT / "examples" / "sample.htpd"
 class RerankTest(unittest.TestCase):
     def setUp(self) -> None:
         self.b = open_bundle(SAMPLE)
-        self.on = Retriever(self.b, Settings(meaning=False))
+        self.on = Retriever(self.b, Settings())
         self.off = self.on.with_settings(rerank=False)
 
     def test_weights_ship_with_the_reader(self) -> None:
