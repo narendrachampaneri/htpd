@@ -148,6 +148,11 @@ The body of `document.md` has two parts:
   for example `(+8 sections below)`, and a line under the list says how
   many sections are shown. Nothing is lost: every section file lists its
   own subsections, and `sections/index.md` lists all sections.
+  Where the title was not written by the author (`heading_from: none` or
+  `pages`: "Front matter", "Page 5", "Report - pages 12-13"), the entry
+  ends with the first words of its text, so the list shows what the part
+  is about: `- starts: `Byte ordering of the core.``. The same holds for
+  the contents of the single file.
 * **`# Conversion notes`** - what the converter did and what it left out:
   where the headings come from, which header and footer lines were
   removed, how many rotated characters were skipped, how many pages have

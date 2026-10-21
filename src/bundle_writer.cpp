@@ -50,6 +50,29 @@ std::string snippet(const Section& s) {
     return flat + " ...";
 }
 
+std::string code_span(std::string_view text);
+
+// For the contents list: the first words of a section whose title was not
+// written by the author ("Page 5", "Front matter", "Report - pages 12-13"),
+// so the reader of the list sees what the part is about. Empty otherwise.
+std::string contents_hint(const Section& s) {
+    constexpr std::size_t kHintBytes = 90;
+    if (s.paragraphs.empty() || (s.source != HeadingSource::None && s.source != HeadingSource::Pages)) return {};
+    std::string flat = text::collapse_spaces(s.paragraphs.front().text);
+    for (char& c : flat) {
+        if (c == '\n') c = ' ';
+    }
+    if (flat.size() > kHintBytes) {
+        std::size_t cut = kHintBytes;
+        while (cut > 0 && (static_cast<unsigned char>(flat[cut]) & 0xC0) == 0x80) --cut;   // UTF-8 boundary
+        const std::size_t space = flat.rfind(' ', cut);
+        if (space != std::string::npos && space > kHintBytes / 2) cut = space;
+        flat.resize(cut);
+        flat += " ...";
+    }
+    return std::format(" - starts: {}", code_span(flat));
+}
+
 constexpr bool is_ascii_letter(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
@@ -466,7 +489,8 @@ std::string document_markdown(const std::vector<Section>& sections, const Bundle
         if (depth[s.order] > shown) continue;
         ++listed;
         md += std::string(std::min<std::size_t>(depth[s.order], 8) * 2, ' ');
-        md += std::format("* {} - {}", link(s.title, s.file), page_range(s.page_start, s.span_page_end));
+        md += std::format("* {} - {}{}", link(s.title, s.file), page_range(s.page_start, s.span_page_end),
+                          contents_hint(s));
         if (depth[s.order] == shown && below[s.order] > 0) {
             md += std::format(" (+{} section{} below)", below[s.order], below[s.order] == 1 ? "" : "s");
         }
@@ -560,8 +584,8 @@ std::string single_file_markdown(const std::vector<Section>& sections, const Bun
     }
     for (const Section& s : sections) {
         md += std::string(std::min<std::size_t>(depth[s.order], 8) * 2, ' ');
-        md += std::format("* [S{}] {} - {}\n", s.order + 1, s.title,
-                          page_range(s.page_start, s.span_page_end));
+        md += std::format("* [S{}] {} - {}{}\n", s.order + 1, s.title,
+                          page_range(s.page_start, s.span_page_end), contents_hint(s));
     }
     md += '\n';
     md += conversion_notes(info);

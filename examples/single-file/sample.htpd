@@ -10,7 +10,7 @@ pages: 5
 sections: 14
 headings_from: bookmark
 body_font_size: 10.0
-generated: { by: htpd/0.1.1, at: 2026-10-20T11:36:50Z }
+generated: { by: htpd/0.1.1, at: 2026-10-21T07:19:21Z }
 ---
 
 # How to read this file
@@ -30,7 +30,7 @@ This is an HTPD file: the document "ACME DC Charger Controller Reference Manual"
 
 # Contents
 
-* [S1] Front matter - page 1
+* [S1] Front matter - page 1 - starts: `ACME DC Charger Controller`
 * [S2] Revision history - page 2
 * [S3] 1 Introduction - page 2
   * [S4] 1.1 Scope - page 2

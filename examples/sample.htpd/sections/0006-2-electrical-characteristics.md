@@ -4,7 +4,7 @@ title: "2 Electrical characteristics"
 description: "The controller supervises the power stage and the vehicle interface. It samples the bus voltage, the output current and three temperature ..."
 resource: "sample.pdf#page=2"
 tags: [htpd, section]
-generated: { by: htpd/0.1.1, at: 2026-10-20T11:36:50Z }
+generated: { by: htpd/0.1.1, at: 2026-10-21T07:19:21Z }
 sources:
   - id: source-pdf
     resource: "sample.pdf#page=2"

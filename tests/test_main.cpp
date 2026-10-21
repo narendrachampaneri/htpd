@@ -1623,6 +1623,30 @@ BundleInfo example_info() {
     return info;
 }
 
+TEST(contents_show_the_first_words_where_the_title_says_little) {
+    std::vector<Line> lines;
+    lines.push_back(make_line(0, "Cover text of the `report`", 100));
+    lines.push_back(make_line(1, "1 Intro", 100, 16, true));
+    lines.push_back(make_line(1, "Intro body.", 130));
+    lines.push_back(make_line(2, "Byte ordering of the core.", 100));
+    std::vector<Heading> headings;
+    headings.push_back({"1 Intro", "1", 1, 1, 1, 1, HeadingSource::Numbering});
+    headings.push_back({"1 Intro - page 3", "", 2, 2, 3, 0, HeadingSource::Pages});
+    std::vector<Section> sections = build_sections(lines, headings);
+    REQUIRE(sections.size() == 3);
+
+    const fs::path dir = fresh_temp_dir("hints");
+    REQUIRE(write_bundle(dir, sections, example_info()).has_value());
+    const std::string document = read_file(dir / "document.md");
+    CHECK(document.contains("- page 1 - starts: `` Cover text of the `report` ``\n"));   // a backtick stays text
+    CHECK(document.contains("- page 3 - starts: `Byte ordering of the core.`\n"));
+    CHECK(document.contains("[1 Intro](sections/0002-1-intro.md) - pages 2-3\n"));       // the author's title: no hint
+
+    const fs::path file = fresh_temp_dir("hints_single") / "x.htpd";
+    REQUIRE(write_single_file(file, sections, example_info()).has_value());
+    CHECK(read_file(file).contains("* [S3] 1 Intro - page 3 - page 3 - starts: `Byte ordering of the core.`\n"));
+}
+
 TEST(bundle_is_written_and_links_resolve) {
     const fs::path dir = fresh_temp_dir("bundle");
     std::vector<Section> sections = example_sections();
