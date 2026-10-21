@@ -217,7 +217,8 @@ class Retriever:
         order = sorted(fused, key=lambda i: (-fused[i], i))[:k]
         cands = [Candidate(self.sections[i], fused[i], ranks.get(i, {})) for i in order]
         coverage = self.coverage(question, [c.node for c in cands[: st.coverage_of]])
-        reranker = self.reranker_for() if st.rerank and not named and len(cands) > 1 else None
+        # the re-ranker learned from the ranks of word search: without it, the fused order stays
+        reranker = self.reranker_for() if st.rerank and st.words and not named and len(cands) > 1 else None
         if reranker is not None:
             # after the coverage: "not found" keeps the rule it was tuned with
             cands = reranker.rerank(self.rerank_features(), question, cands)

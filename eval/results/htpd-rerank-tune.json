@@ -8,23 +8,23 @@
     "aaelf64",
     "riscv-priv"
   ],
-  "when": "2026-10-20",
+  "when": "2026-10-21",
   "machine": "Linux x86_64, Python 3.13.16",
   "metrics": {
     "questions": 121,
     "answerable": 97,
     "not_in_document": 24,
-    "recall@1": 0.8247422680412371,
+    "recall@1": 0.8969072164948454,
     "recall@5": 0.979381443298969,
     "recall@10": 0.979381443298969,
-    "mrr": 0.8870898187453675,
-    "page_accuracy": 0.7938144329896907,
+    "mrr": 0.9319050354813657,
+    "page_accuracy": 0.8247422680412371,
     "not_found_accuracy": 0.9583333333333334,
     "false_not_found": 0.0,
-    "answer_in_text": 0.9278350515463918,
-    "tokens_mean": 2407.6694214876034,
-    "tokens_vs_whole": 0.0648266656033199,
-    "ms_per_question": 25.46841960330652,
+    "answer_in_text": 0.9587628865979382,
+    "tokens_mean": 2341.793388429752,
+    "tokens_vs_whole": 0.061532112346697594,
+    "ms_per_question": 29.148598876032743,
     "by_kind": {
       "1": {
         "n": 72,
@@ -45,18 +45,18 @@
       "id": "elf-001",
       "rank": 17,
       "top": [
+        "sections/0016-2-2-references",
         "sections/0003-1-1-ilp32-beta",
-        "sections/0017-2-3-terms-and-abbreviations",
-        "sections/0016-2-2-references"
+        "sections/0017-2-3-terms-and-abbreviations"
       ]
     },
     {
       "id": "priv-015",
-      "rank": 18,
+      "rank": 19,
       "top": [
         "sections/0128-10-4-1-addressing-and-memory-protection",
-        "sections/0004-preface",
-        "sections/0031-3-1-6-4-endianness-control-in-mstatus-and-mstatush-registers"
+        "sections/0183-18-5-1-guest-physical-address-translation",
+        "sections/0004-preface"
       ]
     }
   ]

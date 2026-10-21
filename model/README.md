@@ -2,26 +2,34 @@
 
 ## The re-ranker (used by default)
 
-A small logistic model (`reader/htpd_reader/rerank.py`, weights in
-`reader/htpd_reader/rerank.json`, 14 numbers plus a bias) that re-orders the
-20 sections the retriever finds. It looks at what a person would look at:
-the ranks of word search and the tree, how much of the question the section
-and its best single line or table row hold, the specific terms and word
-pairs of the question, the title, length and depth. It needs only the
-Python standard library and adds a few milliseconds per question, so the
-skill and the MCP server use it too. It never changes the "not found" rule,
-and a section the question names stays first.
+Five small neural networks (`reader/htpd_reader/rerank.py`, weights in
+`reader/htpd_reader/rerank.json`; one hidden layer of 16 units each, their
+scores averaged) re-order the 20 sections the retriever finds. They look at
+14 numbers a person would also look at: the ranks of word search and the
+tree, how much of the question the section and its best single line or
+table row hold, the specific terms and word pairs of the question, the
+title, length and depth. Running them needs only the Python standard
+library and adds a few milliseconds per question, so the skill and the MCP
+server use them too. They never change the "not found" rule, a section the
+question names stays first, and without word search they are not used.
 
-* Trained with `python -m model.train_reranker eval/bundles/riscv-isa.htpd`
-  (numpy only, about 15 s on a CPU) on about 1 500 questions made by rules
-  from the **training document only**; test and tuning documents are refused.
-* Its one setting (the L2 penalty, 0.1) and the weight of title questions
-  (0.3) were chosen on the tuning split, then the test split was measured
-  once: on 133 test questions R@1 0.667 -> 0.685, R@5 0.892 -> 0.919, MRR
-  0.763 -> 0.793, page 0.622 -> 0.631, the answer in the text and "not found"
-  unchanged (`htpd-words` -> `htpd-rerank` in `eval/report.md`).
+* Trained with `python -m model.train_reranker BUNDLE ...` (numpy only, about
+  2 minutes on a CPU, no GPU) on about 2 700 questions made by rules from
+  three training manuals: the RISC-V unprivileged ISA (`riscv-isa` in
+  eval/docs.list), an Arm architecture reference manual and an NXP KM34
+  data sheet (both supplied by the owner, converted with HTPD, kept in
+  `private/`, never committed). Test and tuning documents are refused, and
+  a manual whose text overlaps a tuning manual was left out.
+* Chosen on the tuning split: the network size, the training manuals (the C
+  and Python books made it worse on hardware manuals and were left out), the
+  weight of title questions (0.3). Then the test split was measured once.
+* On 133 test questions (`htpd-words` -> `htpd-rerank` in `eval/report.md`):
+  R@1 0.667 -> 0.766, R@5 0.892 -> 0.946, MRR 0.763 -> 0.837, page 0.622 ->
+  0.631; "not found" unchanged; the answer in the text 0.856 -> 0.847 (one
+  question).
 * Without `rerank.json` (or with `Settings(rerank=False)`) the reader keeps
-  the order of the retriever.
+  the order of the retriever. A file with `weights` and `bias` instead of
+  `nets` is read as one logistic model.
 
 ## The decider (optional)
 

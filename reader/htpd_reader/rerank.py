@@ -12,9 +12,10 @@ looks at each candidate more closely than word search can, with a few numbers
 * how much of the question its title holds, whether the question names its
   number, how long and how deep it is, whether it is a list of contents.
 
-A logistic model turns these into one score. Its weights are trained by
-`model/train_reranker.py` on questions made from the TRAINING manual only,
-and stored in `rerank.json` next to this file. Running it needs only the
+A few small neural networks (one hidden layer each, their scores averaged)
+turn these into one score. Their weights are trained by
+`model/train_reranker.py` on questions made from training manuals only, and
+stored in `rerank.json` next to this file. Running it needs only the
 Python standard library (the skill has no packages), and a few milliseconds.
 """
 
@@ -113,29 +114,52 @@ class Features:
 
 
 class Reranker:
-    """Scores candidates with the trained logistic model."""
+    """Scores candidates with the trained networks (or one logistic model)."""
 
     def __init__(self, weights: dict[str, Any]):
         self.names = list(weights["features"])
-        self.w = [float(x) for x in weights["weights"]]
-        self.b = float(weights["bias"])
-        self.mean = [float(x) for x in weights["mean"]]
-        self.scale = [float(x) or 1.0 for x in weights["scale"]]
         if self.names != list(FEATURES):
             raise ValueError("the weights belong to other features than this reader computes")
+        self.mean = [float(x) for x in weights["mean"]]
+        self.scale = [float(x) or 1.0 for x in weights["scale"]]
+        n = len(FEATURES)
+        if "nets" in weights:
+            self.nets = []
+            for net in weights["nets"]:
+                w1 = [[float(v) for v in row] for row in net["w1"]]  # features x hidden
+                b1 = [float(v) for v in net["b1"]]
+                w2 = [float(v) for v in net["w2"]]
+                if len(w1) != n or any(len(row) != len(b1) for row in w1) or len(w2) != len(b1):
+                    raise ValueError("the weights of a network do not fit together")
+                # hidden x features: one row per hidden unit, faster in plain Python
+                self.nets.append(([list(col) for col in zip(*w1)], b1, w2))
+            if not self.nets:
+                raise ValueError("no network in the weights")
+        else:  # one logistic model
+            w = [float(x) for x in weights["weights"]]
+            if len(w) != n:
+                raise ValueError("the weights do not fit the features")
+            self.nets = [([w], [float(weights["bias"])], [1.0])]
+            self.linear = True
 
     @classmethod
     def load(cls, path: Path = WEIGHTS) -> "Reranker | None":
         try:
             return cls(json.loads(path.read_text(encoding="utf-8")))
-        except (OSError, ValueError, KeyError):
+        except (OSError, ValueError, KeyError, TypeError):
             return None
 
     def score(self, rows: list[list[float]]) -> list[float]:
+        linear = getattr(self, "linear", False)
         out = []
         for row in rows:
-            z = self.b + sum(w * (x - m) / s for w, x, m, s in zip(self.w, row, self.mean, self.scale))
-            out.append(z)
+            z = [(x - m) / s for x, m, s in zip(row, self.mean, self.scale)]
+            total = 0.0
+            for units, b1, w2 in self.nets:
+                for wu, bu, ou in zip(units, b1, w2):
+                    a = bu + sum(w * x for w, x in zip(wu, z))
+                    total += ou * (a if linear or a > 0 else 0.0)
+            out.append(total / len(self.nets))
         return out
 
     def rerank(self, features: Features, question: str, candidates: list[Any], keep: int = 20) -> list[Any]:
