@@ -92,6 +92,8 @@ def render_section(ps: PackedSection, number: int) -> str:
             lines += [f"<!-- page {page} -->", ""]
         if b.kind == "paragraph":
             lines.append(b.text)
+        elif b.kind == "figure":
+            lines.append(f"[Figure {b.figure}: {b.caption}] (a picture in the file; a tool can show it)")
         else:
             fence = "`" * max(3, _longest_run(b.text) + 1)
             lines += [fence + ("text" if b.kind == "table" else ""), b.text, fence]

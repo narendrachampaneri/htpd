@@ -57,6 +57,10 @@ PARTS = ("# Location", "# Text", "# Links", "# Subsections", "# Neighbours")
 NO_TEXT_LINE = "_No text directly under this heading._"
 
 _PAGE_MARK = re.compile(r"^<!-- page ([0-9]+) -->$")
+_FIGURE_MARK = re.compile(r"^<!-- figure (F[0-9]+) -->$")
+_FIGURE_IMAGE = re.compile(r"^!\[(F[0-9]+): ((?:[^\]\\]|\\.)*)\]\(([^)\s]+)\)$")
+FIGURES_PART = "# Figures"  # the pictures at the end of a single file
+_FIGURE_DATA = re.compile(r"^<!-- htpd figure (\{.*\}) -->$")
 _FENCE_OPEN = re.compile(r"^(`{3,})(.*)$")
 # A Markdown link outside of the text of the PDF: [label](target)
 _LINK = re.compile(r"\[(?:[^\]\\]|\\.)*\]\(([^)\s]+)\)")
@@ -94,9 +98,10 @@ class Problem:
 class Block:
     """One piece of the text of a section.
 
-    kind:  "paragraph", "table" (rows with " | " between cells) or "code"
-           (monospace text, line by line).
-    text:  the exact text. For a paragraph, after the backslash rule.
+    kind:  "paragraph", "table" (rows with " | " between cells), "code"
+           (monospace text, line by line) or "figure" (FORMAT.md 4.5).
+    text:  the exact text. For a paragraph, after the backslash rule. For a
+           figure, the words of its image line (its caption) as written.
     page:  page number (from 1) of the nearest page mark above, or None when
            the block stands before the first page mark (a format error).
     line:  line of the file where the block starts (from 1).
@@ -106,6 +111,8 @@ class Block:
     text: str
     page: int | None
     line: int
+    figure: str | None = None  # "F12" for a figure block
+    target: str | None = None  # where its picture is: "../figures/F0012.png" or "#F12"
 
     def rows(self) -> list[list[str]]:
         """The cells of a table block. Empty cells are kept as ""."""
@@ -113,8 +120,16 @@ class Block:
             raise ValueError("only a table block has rows")
         return [row.split(" | ") for row in self.text.split("\n")]
 
+    @property
+    def caption(self) -> str:
+        """The caption of a figure, without the escapes of a Markdown link."""
+        return re.sub(r"\\(.)", r"\1", self.text)
+
     def to_dict(self) -> dict[str, Any]:
-        return {"kind": self.kind, "page": self.page, "line": self.line, "text": self.text}
+        d = {"kind": self.kind, "page": self.page, "line": self.line, "text": self.text}
+        if self.figure:
+            d["figure"] = self.figure
+        return d
 
 
 @dataclass
@@ -228,8 +243,13 @@ class Node:
 
     @property
     def text(self) -> str:
-        """All blocks, one empty line between them. Exact text, no page marks."""
-        return "\n\n".join(b.text for b in self.blocks)
+        """All blocks of text, one empty line between them. Exact text, no page
+        marks. A figure is no text (its caption stands in the text as well)."""
+        return "\n\n".join(b.text for b in self.blocks if b.kind != "figure")
+
+    @property
+    def figures(self) -> list[Block]:
+        return [b for b in self.blocks if b.kind == "figure"]
 
     def summary(self) -> dict[str, Any]:
         return {
@@ -343,9 +363,20 @@ def parse_body(body: str, first_line: int, file: str) -> tuple[str, list[Block],
             continue
         if part == "# Text":
             mark = _PAGE_MARK.match(line)
+            fig = _FIGURE_MARK.match(line)
             if mark:
                 flush_paragraph()
                 page = int(mark.group(1))
+            elif fig:
+                flush_paragraph()
+                image = _FIGURE_IMAGE.match(lines[i + 1]) if i + 1 < len(lines) else None
+                if image is None or image.group(1) != fig.group(1):
+                    problems.append(Problem("error", "bad-figure", file,
+                                            f"the figure mark of {fig.group(1)} is not followed by its image line",
+                                            lineno))
+                else:
+                    blocks.append(Block("figure", image.group(2), page, lineno, image.group(1), image.group(3)))
+                    i += 1
             elif line == "":
                 flush_paragraph()
             else:
@@ -453,6 +484,41 @@ class Bundle:
     # --- opening ---
 
     single: bool = False  # True when read from one .htpd file (FORMAT.md section 11)
+    figure_data: dict[str, tuple[dict[str, Any], str]] = {}  # single file: id -> (fields, base64)
+
+    def figure(self, figure_id: str) -> tuple[Block, Node] | None:
+        """The figure block with this ID ("F12" or "12") and its section."""
+        fid = figure_id.upper() if figure_id.upper().startswith("F") else f"F{figure_id}"
+        for s in self.sections:
+            for b in s.blocks:
+                if b.figure == fid:
+                    return b, s
+        return None
+
+    def figure_png(self, figure_id: str) -> bytes | None:
+        """The picture of a figure as PNG bytes, or None when the file does not hold it."""
+        import base64
+
+        found = self.figure(figure_id)
+        if found is None:
+            return None
+        block, node = found
+        if self.single:
+            # "#F3": the picture is stored once, under the first figure that shows it
+            key = block.target[1:] if block.target and block.target.startswith("#") else block.figure or ""
+            data = self.figure_data.get(key)
+            try:
+                return base64.b64decode(data[1], validate=True) if data else None
+            except ValueError:
+                return None
+        if not block.target or block.target.startswith("#"):
+            return None
+        path = (self.root / node.path).parent / block.target
+        try:
+            path.resolve().relative_to(self.root.resolve())   # never outside the bundle
+            return path.read_bytes()
+        except (OSError, ValueError):
+            return None
 
     @classmethod
     def open(cls, path: str | Path) -> "Bundle":
@@ -621,6 +687,42 @@ def read_single_file(path: Path) -> Bundle:
     problems: list[Problem] = []
     lines = body.split("\n")
 
+    # The pictures at the end (FORMAT.md 4.5): cut them off before the sections.
+    figure_data: dict[str, tuple[dict[str, Any], str]] = {}
+    fence_at: str | None = None
+    for i, line in enumerate(lines):
+        if fence_at is not None:
+            if line == fence_at:
+                fence_at = None
+            continue
+        m = _FENCE_OPEN.match(line)
+        if m:
+            fence_at = m.group(1)
+        elif line == FIGURES_PART:
+            tail, lines = lines[i + 1:], lines[:i]
+            while lines and lines[-1] == "":
+                lines.pop()
+            k = 0
+            while k < len(tail):
+                fm = _FIGURE_DATA.match(tail[k])
+                if fm and k + 1 < len(tail) and tail[k + 1] == "```base64":
+                    end = k + 2
+                    while end < len(tail) and tail[end] != "```":
+                        end += 1
+                    try:
+                        fields = json.loads(fm.group(1))
+                    except ValueError:
+                        fields = {}
+                    if isinstance(fields, dict) and isinstance(fields.get("id"), str):
+                        figure_data[fields["id"]] = (fields, "".join(tail[k + 2:end]))
+                    else:
+                        problems.append(Problem("error", "bad-figure", fname, "a picture under # Figures has "
+                                                "fields that are not valid JSON", first_line + i + 1 + k))
+                    k = end + 1
+                else:
+                    k += 1
+            break
+
     # Cut the body at the section marks; inside a code block nothing is a mark.
     marks: list[tuple[int, dict[str, Any]]] = []
     fence: str | None = None
@@ -728,6 +830,13 @@ def read_single_file(path: Path) -> Bundle:
     document = Node(id=DOCUMENT_ID, path=fname, fields=doc_fields)
     b = Bundle(path, document, sections, problems)
     b.single = True
+    b.figure_data = figure_data
+    for s in sections:
+        for fb in s.figures:
+            key = fb.target[1:] if fb.target and fb.target.startswith("#") else fb.figure
+            if key not in figure_data:
+                problems.append(Problem("error", "missing-figure", fname,
+                                        f"the picture of {fb.figure} is not under # Figures", fb.line))
     return b
 
 

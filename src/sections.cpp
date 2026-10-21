@@ -561,6 +561,12 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
 
     for (std::size_t index = 0; index < lines.size(); ++index) {
         const Line& line = lines[index];
+        if (line.figure > 0) {   // a figure: a block of its own between the paragraphs
+            flush();
+            paragraphs.push_back(Paragraph{line.page, ParagraphKind::Figure, std::to_string(line.figure)});
+            previous = nullptr;
+            continue;
+        }
         if (line.text.empty()) continue;
         const ParagraphKind kind = kinds[index];
         const bool table_starts = current.kind != ParagraphKind::Rows || rows.empty() ||
@@ -670,7 +676,11 @@ std::vector<Section> build_sections(std::span<const Line> lines, std::span<const
     }
 
     const std::size_t first = std::min(headings.front().line_index, lines.size());
-    if (first > 0) add("Front matter", {}, 1, HeadingSource::None, lines.front().page, 0, first, 0);
+    // Only figures before the first heading (a logo on the cover): they join
+    // the first section rather than make a front matter of their own.
+    const bool only_figures = std::all_of(lines.begin(), lines.begin() + static_cast<std::ptrdiff_t>(first),
+                                          [](const Line& l) { return l.figure > 0; });
+    if (first > 0 && !only_figures) add("Front matter", {}, 1, HeadingSource::None, lines.front().page, 0, first, 0);
 
     std::size_t title_end = 0;   // end of the previous heading's own title lines
     for (std::size_t i = 0; i < headings.size(); ++i) {
@@ -680,6 +690,14 @@ std::vector<Section> build_sections(std::span<const Line> lines, std::span<const
         const std::size_t end = i + 1 < headings.size() ? headings[i + 1].line_index : lines.size();
         add(h.title, h.number, h.level, h.source, h.page, begin, end, std::min(h.line_index, begin));
         title_end = begin;
+    }
+
+    if (first > 0 && only_figures && !sections.empty()) {
+        Section& s0 = sections.front();
+        std::vector<Paragraph> lead = build_paragraphs(lines.subspan(0, first), pitch, options);
+        s0.page_start = std::min(s0.page_start, lines.front().page);
+        s0.paragraphs.insert(s0.paragraphs.begin(), std::make_move_iterator(lead.begin()),
+                             std::make_move_iterator(lead.end()));
     }
 
     // Parent/child links from the heading levels.

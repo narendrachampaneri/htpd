@@ -24,9 +24,11 @@
 #include "htpd/furniture.hpp"
 #include "htpd/headings.hpp"
 #include "htpd/layout.hpp"
+#include "htpd/figures.hpp"
 #include "htpd/links.hpp"
 #include "htpd/ocr.hpp"
 #include "htpd/pdf_reader.hpp"
+#include "htpd/png.hpp"
 #include "htpd/sections.hpp"
 #include "htpd/sha256.hpp"
 #include "htpd/structure.hpp"
@@ -1473,6 +1475,135 @@ TEST(a_heading_never_takes_the_title_lines_of_the_one_before) {
     CHECK_EQ(sections[1].paragraphs[0].text, std::string("Body text."));
 }
 
+// ---- figures ------------------------------------------------------------------
+
+TEST(figure_and_table_captions_are_told_apart) {
+    CHECK(is_figure_caption("Figure 1. RISC-V Debug System Overview"));
+    CHECK(is_figure_caption("Figure 3-2 Clock tree"));
+    CHECK(is_figure_caption("Fig. 4: Timing"));
+    CHECK(is_figure_caption("FIGURE A.1 Pin map"));
+    CHECK(is_figure_caption("Figure 12"));
+    CHECK(!is_figure_caption("Figure 3 shows the main parts."));
+    CHECK(!is_figure_caption("Figures 3 and 4"));
+    CHECK(!is_figure_caption("See Figure 3."));
+    CHECK(!is_figure_caption("Figureheads"));
+    CHECK(is_table_caption("Table 1. Register Access Abbreviations"));
+    CHECK(!is_table_caption("Table 1 is above."));
+    CHECK(!is_figure_caption("Table 1. Limits"));
+}
+
+namespace {
+
+std::vector<Box> grid_box(float x, float y) {   // a box drawn as four lines
+    return {{x, y, x + 100, y}, {x, y + 50, x + 100, y + 50}, {x, y, x, y + 50}, {x + 100, y, x + 100, y + 50}};
+}
+
+}  // namespace
+
+TEST(figures_are_drawings_with_a_caption_or_many_shapes_and_little_text) {
+    // A block diagram: three boxes with lines between them, a caption below.
+    std::vector<Box> paths;
+    for (float x : {80.0f, 230.0f, 380.0f}) {
+        for (const Box& b : grid_box(x, 200)) paths.push_back(b);
+    }
+    paths.push_back({180, 225, 230, 225});
+    paths.push_back({330, 225, 380, 225});
+    std::vector<Line> lines;
+    lines.push_back(make_line(0, "Grid", 230, 10, false, 110));
+    lines.push_back(make_line(0, "Figure 1. Power path", 270, 9, false, 80));
+    auto found = find_figures(0, 612, 792, {}, paths, {}, lines, false);
+    REQUIRE(found.size() == 1);
+    CHECK(found[0].kind == Figure::Kind::Drawing);
+    CHECK_EQ(found[0].caption, std::string("Figure 1. Power path"));
+    CHECK(std::fabs(found[0].box.x0 - 80) < 0.5f && std::fabs(found[0].box.x1 - 480) < 0.5f);
+
+    // The same drawing without a caption: 14 shapes, little text - still a figure.
+    lines.pop_back();
+    CHECK_EQ(find_figures(0, 612, 792, {}, paths, {}, lines, false).size(), std::size_t{1});
+    // Too few shapes and no caption: a frame around a note, no figure.
+    CHECK(find_figures(0, 612, 792, {}, grid_box(80, 200), {}, lines, false).empty());
+    // A caption "Table 1" next to it makes it a table.
+    lines.push_back(make_line(0, "Table 1. Limits", 270, 9, false, 80));
+    CHECK(find_figures(0, 612, 792, {}, paths, {}, lines, false).empty());
+}
+
+TEST(a_ruled_table_a_listing_a_frame_and_a_logo_are_no_figures) {
+    // Rules across the whole width at five heights: a table, even without a caption.
+    std::vector<Box> rules;
+    for (int i = 0; i < 5; ++i) {
+        // each rule drawn as three cell borders
+        for (int j = 0; j < 3; ++j) rules.push_back({72.0f + j * 120, 300.0f + i * 18, 192.0f + j * 120, 300.0f + i * 18});
+    }
+    for (float x : {72.0f, 192.0f, 312.0f, 432.0f}) rules.push_back({x, 300, x, 372});
+    CHECK(find_figures(0, 612, 792, {}, rules, {}, {}, false).empty());
+
+    // A frame around lines of code, with many little shapes: a listing.
+    std::vector<Box> frame = {{76, 336, 376, 336}, {76, 386, 376, 386}, {76, 336, 76, 386}, {376, 336, 376, 386}};
+    for (int k = 0; k < 10; ++k) frame.push_back({76.0f + k * 30, 386, 76.0f + k * 30, 388});
+    std::vector<Line> code_lines;
+    std::vector<char> code;
+    for (int i = 0; i < 4; ++i) {
+        code_lines.push_back(make_line(0, "int main(void) {", 350.0f + i * 10, 9, false, 84));
+        code.push_back(1);
+    }
+    CHECK(find_figures(0, 612, 792, {}, frame, {}, code_lines, false, {}, code).empty());
+    std::vector<char> prose(code.size(), 0);   // the same frame around ordinary text with no caption: a figure
+    CHECK_EQ(find_figures(0, 612, 792, {}, frame, {}, code_lines, false, {}, prose).size(), std::size_t{1});
+
+    const std::vector<Box> frame_of_page = {{20, 20, 592, 772}};   // a frame around the whole page
+    CHECK(find_figures(0, 612, 792, frame_of_page, {}, {}, {}, false).empty());
+    const std::vector<Box> logo = {{470, 10, 542, 40}};           // a picture in the top margin
+    CHECK(find_figures(0, 612, 792, logo, {}, {}, {}, false).empty());
+    const std::vector<Box> photo = {{72, 400, 312, 520}};
+    CHECK_EQ(find_figures(0, 612, 792, photo, {}, {}, {}, false).size(), std::size_t{1});
+    // On a turned page the drawn shapes are in another space: only pictures count.
+    std::vector<Box> paths;
+    for (float x : {80.0f, 230.0f, 380.0f}) {
+        for (const Box& b : grid_box(x, 200)) paths.push_back(b);
+    }
+    CHECK(find_figures(0, 612, 792, {}, paths, {}, {}, true).empty());
+}
+
+TEST(a_title_below_without_a_number_is_the_caption_but_bit_widths_are_not) {
+    const std::vector<Box> photo = {{200, 400, 400, 500}};
+    std::vector<Line> lines;
+    lines.push_back(make_line(0, "Memory layout of a data object", 512, 9, false, 230));
+    auto found = find_figures(0, 612, 792, photo, {}, {}, lines, false);
+    REQUIRE(found.size() == 1);
+    CHECK_EQ(found[0].caption, std::string("Memory layout of a data object"));
+    lines[0] = make_line(0, "8 24", 512, 9, false, 290);   // numbers under a register drawing
+    found = find_figures(0, 612, 792, photo, {}, {}, lines, false);
+    REQUIRE(found.size() == 1);
+    CHECK(found[0].caption.empty());
+}
+
+TEST(png_files_are_valid) {
+    CHECK_EQ(crc32("123456789"), 0xCBF43926u);   // the check value of CRC-32
+    CHECK_EQ(base64("Man"), std::string("TWFu"));
+    CHECK_EQ(base64("Ma"), std::string("TWE="));
+    CHECK_EQ(base64("M"), std::string("TQ=="));
+    // "a" stored with fixed codes: zlib header, the block, the Adler-32 of "a" (0x00620062)
+    const std::string z = zlib_deflate("a");
+    REQUIRE(z.size() == 9);
+    CHECK(z.starts_with("\x78\x01"));
+    CHECK(z.ends_with(std::string("\x00\x62\x00\x62", 4)));
+
+    Image image;
+    image.width = 4;
+    image.height = 2;
+    image.channels = 3;
+    image.pixels.assign(24, 200);   // grey in all three channels
+    const Image grey = grey_if_possible(image);
+    CHECK_EQ(grey.channels, 1);
+    CHECK_EQ(grey.pixels.size(), std::size_t{8});
+    image.pixels[0] = 10;            // one red-ish pixel: the colour stays
+    CHECK_EQ(grey_if_possible(image).channels, 3);
+    const std::string png = png_bytes(grey);
+    CHECK(png.starts_with("\x89PNG\r\n\x1a\n"));
+    CHECK(png.substr(12, 4) == "IHDR");
+    CHECK(png.ends_with(std::string("IEND\xAE\x42\x60\x82", 8)));   // IEND and its fixed CRC
+}
+
 // ---- OCR ----------------------------------------------------------------------
 
 TEST(ocr_lines_come_from_the_words_tesseract_is_sure_of) {
@@ -1507,7 +1638,7 @@ TEST(ocr_lines_come_from_the_words_tesseract_is_sure_of) {
 }
 
 TEST(ocr_pictures_are_written_as_pgm) {
-    GrayImage image;
+    Image image;
     image.width = 3;
     image.height = 2;
     image.pixels = {0, 128, 255, 255, 128, 0};
@@ -2242,6 +2373,51 @@ TEST(links_lead_from_section_to_section) {
     CHECK_EQ(sections[2].links[0].target, std::size_t{0});
 }
 
+TEST(end_to_end_figures_are_stored_with_their_caption) {
+    ConvertOptions options;
+    options.input = fs::path(HTPD_TEST_DATA) / "figures.pdf";
+    options.output_dir = fresh_temp_dir("e2e_figures");
+    options.ocr = OcrMode::Off;
+    const auto report = convert(options);
+    REQUIRE(report.has_value());
+    CHECK_EQ(report->figures, std::size_t{3});   // the diagram and the photo twice; not the table, listing or logo
+    const std::string text = all_section_text(options.output_dir);
+    CHECK(text.contains("shows how power flows from the grid to the battery.\n\n<!-- figure F1 -->\n"
+                        "![F1: Figure 1. Power path of the charger](../figures/F0001.png)\n"));
+    CHECK(text.contains("A photo of the charger follows.\n\n<!-- figure F2 -->\n![F2: picture on page 1]"));
+    CHECK(text.contains("Voltage | 200 | 480"));   // the table stays text
+    const std::string png = read_file(options.output_dir / "figures" / "F0001.png");
+    CHECK(png.starts_with("\x89PNG"));
+    CHECK(fs::exists(options.output_dir / "figures" / "F0002.png"));
+    // The same photo on page 2 is stored once: its image line points at the picture of F2.
+    CHECK(text.contains("<!-- figure F3 -->\n![F3: picture on page 2](../figures/F0002.png)\n"));
+    CHECK(!fs::exists(options.output_dir / "figures" / "F0003.png"));
+
+    // The single file: the image line points at the picture at its end.
+    options.output_dir = fresh_temp_dir("e2e_figures_single") / "f.htpd";
+    options.single_file = true;
+    REQUIRE(convert(options).has_value());
+    const std::string single = read_file(options.output_dir);
+    CHECK(single.contains("![F1: Figure 1. Power path of the charger](#F1)\n"));
+    CHECK(single.contains("\n12. A line `![F<n>: caption](#F<n>)` stands where a figure"));
+    const std::size_t at = single.find("\n# Figures\n");
+    REQUIRE(at != std::string::npos);
+    CHECK(at > single.find("[^source-pdf]: figures.pdf"));   // after all the text
+    CHECK(single.find("<!-- htpd figure {\"id\":\"F1\",\"page\":1,\"kind\":\"drawing\","
+                      "\"caption\":\"Figure 1. Power path of the charger\"", at) != std::string::npos);
+    CHECK(single.find("```base64\niVBORw0KGgo", at) != std::string::npos);   // base64 of a PNG
+    CHECK(single.contains("![F3: picture on page 2](#F2)\n"));
+    CHECK(single.find("\"id\":\"F3\"", at) == std::string::npos);   // no second copy of the picture
+
+    // Switched off: no figures, and the text is the same as before figures existed.
+    options.single_file = false;
+    options.figures = false;
+    options.output_dir = fresh_temp_dir("e2e_figures_off");
+    REQUIRE(convert(options).has_value());
+    CHECK(!all_section_text(options.output_dir).contains("<!-- figure"));
+    CHECK(!fs::exists(options.output_dir / "figures"));
+}
+
 TEST(end_to_end_ocr_reads_pictures_and_scanned_pages) {
     OcrOptions probe;
     if (!find_ocr(probe).available) {
@@ -2254,13 +2430,18 @@ TEST(end_to_end_ocr_reads_pictures_and_scanned_pages) {
     const auto report = convert(options);
     REQUIRE(report.has_value());
     CHECK_EQ(report->ocr.pages_read, std::size_t{1});
-    CHECK_EQ(report->ocr.pictures_read, std::size_t{1});
+    CHECK_EQ(report->ocr.pictures_read, std::size_t{2});
+    CHECK_EQ(report->ocr.reused, std::size_t{1});   // page 3 shows the picture of page 1: read once, used twice
     const std::string text = all_section_text(options.output_dir);
     // the picture's lines stand between the text above and below it
-    CHECK(text.contains("The picture below shows the connector.\n\nConnector J7 pin 3 is CAN high.\n\n"
+    // the picture is stored as a figure, and its words follow it, before the text below it
+    CHECK(text.contains("The picture below shows the connector.\n\n<!-- figure F1 -->\n"
+                        "![F1: picture on page 1](../figures/F0001.png)\n\nConnector J7 pin 3 is CAN high.\n\n"
                         "Pin 4 is CAN low.\n\nMore text follows the picture."));
     CHECK(text.contains("The fuse is rated 16 A."));
     CHECK(text.contains("ocr_pages: [2]"));
+    CHECK(text.contains("The connector picture again.\n\n<!-- figure F3 -->\n![F3: picture on page 3](../figures/F0001.png)"
+                        "\n\nConnector J7 pin 3 is CAN high.\n\nPin 4 is CAN low."));
     CHECK(read_file(options.output_dir / "document.md").contains("Text in pictures was read by OCR"));
 
     options.output_dir = fresh_temp_dir("e2e_ocr_single");

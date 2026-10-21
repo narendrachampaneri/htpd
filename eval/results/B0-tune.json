@@ -22,9 +22,9 @@
     "not_found_accuracy": 0.0,
     "false_not_found": 0.0,
     "answer_in_text": 1.0,
-    "tokens_mean": 64787.198347107435,
+    "tokens_mean": 64789.61157024794,
     "tokens_vs_whole": 1.0,
-    "ms_per_question": 0.014970074362807747,
+    "ms_per_question": 0.0155011322690859,
     "by_kind": {}
   },
   "misses": [

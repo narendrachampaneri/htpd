@@ -1,12 +1,14 @@
 #include "htpd/bundle_writer.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <chrono>
 #include <format>
 #include <fstream>
 #include <system_error>
 #include <utility>
 
+#include "htpd/png.hpp"
 #include "htpd/text.hpp"
 
 namespace htpd {
@@ -213,6 +215,7 @@ Result<void> prepare_folder(const fs::path& out_dir, bool force) {
             }
             // Remove only what a previous conversion created.
             fs::remove_all(out_dir / "sections", ec);
+            fs::remove_all(out_dir / "figures", ec);
             for (const char* name : {"document.md", "index.md", "log.md"}) fs::remove(out_dir / name, ec);
         }
     }
@@ -232,7 +235,30 @@ std::string htpd_source_fields(const BundleInfo& info) {
 
 // The text of a section: page marks, paragraphs, tables and code blocks
 // (FORMAT.md section 4). The same in a section file and in a single file.
-std::string text_markdown(const Section& s) {
+// "F12", and the file of its picture in a bundle folder.
+std::string figure_id(int id) { return std::format("F{}", id); }
+std::string figure_file(int id) { return std::format("figures/F{:04}.png", id); }
+
+// The words that stand for a figure: its caption, or what it is and its page.
+std::string figure_alt(const FigureFile& f) {
+    if (!f.caption.empty()) return f.caption;
+    return std::format("{} on page {}", f.kind == Figure::Kind::Picture ? "picture" : "drawing", f.page + 1);
+}
+
+// Where a figure stands in the text: in a folder the image links to its
+// file; in the single file to its picture at the end (`#F12`).
+std::string figure_markdown(const BundleInfo& info, std::string_view number, bool single) {
+    int id = 0;
+    std::from_chars(number.data(), number.data() + number.size(), id);
+    if (id < 1 || static_cast<std::size_t>(id) > info.figures.size()) return {};
+    const FigureFile& f = info.figures[static_cast<std::size_t>(id) - 1];
+    const int picture = f.same_as != 0 ? f.same_as : id;   // a picture seen before is stored once
+    return std::format("<!-- figure {} -->\n![{}: {}]({})\n\n", figure_id(id), figure_id(id),
+                       text::md_link_text(figure_alt(f)),
+                       single ? "#" + figure_id(picture) : "../" + figure_file(picture));
+}
+
+std::string text_markdown(const Section& s, const BundleInfo& info, bool single) {
     std::string md;
     if (s.paragraphs.empty()) {
         md += "_No text directly under this heading._\n\n";
@@ -243,7 +269,9 @@ std::string text_markdown(const Section& s) {
             current_page = p.page;
             md += std::format("<!-- page {} -->\n\n", p.page + 1);
         }
-        if (p.kind == ParagraphKind::Rows || p.kind == ParagraphKind::Code) {
+        if (p.kind == ParagraphKind::Figure) {
+            md += figure_markdown(info, p.text, single);
+        } else if (p.kind == ParagraphKind::Rows || p.kind == ParagraphKind::Code) {
             // Table rows are marked "text"; a code listing has no mark.
             const std::string fence = fence_for(p.text);
             const std::string_view mark = p.kind == ParagraphKind::Rows ? "text" : "";
@@ -323,7 +351,7 @@ std::string section_markdown(const std::vector<Section>& sections, const Section
     md += std::format("Source: {}, {}.[^{}]\n\n", code_span(info.source_file), pages, kSourceId);
 
     md += "# Text\n\n";
-    md += text_markdown(s);
+    md += text_markdown(s, info, false);
 
     if (!s.links.empty()) {
         md += "# Links\n\n";
@@ -448,8 +476,15 @@ std::string conversion_notes(const BundleInfo& info) {
                           "available. Their content is missing from this file.\n",
                           info.ocr.pages_unread, info.ocr.pages_unread == 1 ? "" : "s");
     }
-    md += "* Figures are not converted as pictures; words inside drawings are only there when the PDF has "
-          "them as text or OCR read them.\n";
+    if (!info.figures.empty()) {
+        md += std::format("* {} figure{} (pictures and drawings) {} stored as PNG pictures: in a bundle folder in "
+                          "`figures/`, in the single file under `# Figures` at its end. In the text, an image line "
+                          "`![F<n>: caption]` with the place of its picture stands where a figure is.\n",
+                          info.figures.size(), info.figures.size() == 1 ? "" : "s",
+                          info.figures.size() == 1 ? "is" : "are");
+    } else {
+        md += "* No figures were found, or they were not stored (`--figures off`).\n";
+    }
     return md;
 }
 
@@ -581,11 +616,17 @@ std::string reading_rules(const BundleInfo& info, std::string_view doc_title) {
         "the words of the link and the section `[S<n>]` it leads to. Follow a link when the answer needs "
         "that place too.\n{}\n",
         doc_title, info.meta.page_count, info.meta.page_count == 1 ? "" : "s", code_span(info.source_file),
-        info.ocr.pages.empty()
-            ? std::string()
-            : std::string("11. Some text was read from pictures by OCR: the line `<!-- htpd section ... -->` of "
+        std::string(info.ocr.pages.empty()
+                        ? ""
+                        : "11. Some text was read from pictures by OCR: the line `<!-- htpd section ... -->` of "
                           "such a section lists those pages as \"ocr\". A word there may be misread; when an "
-                          "answer rests on it, say that it was read by OCR.\n"));
+                          "answer rests on it, say that it was read by OCR.\n") +
+            std::string(info.figures.empty()
+                            ? ""
+                            : "12. A line `![F<n>: caption](#F<n>)` stands where a figure (a picture or a drawing) "
+                              "is. Its picture is at the very end of this file under `# Figures`, as PNG in "
+                              "base64, for tools that can show pictures: never read that data as text. When an "
+                              "answer may be in a figure, name it (F<n>, its caption and page).\n"));
 }
 
 std::string single_file_markdown(const std::vector<Section>& sections, const BundleInfo& info,
@@ -635,7 +676,7 @@ std::string single_file_markdown(const std::vector<Section>& sections, const Bun
         for (auto p = s.parent; p; p = sections[*p].parent) path = sections[*p].title + " > " + path;
         md += std::format("Path: {}{} - {}\n\n", path, s.title,
                           page_range(s.page_start, s.page_end));
-        md += text_markdown(s);
+        md += text_markdown(s, info, true);
         if (!s.links.empty()) {
             md += "<!-- htpd links -->\n";
             for (const SectionLink& l : s.links) {
@@ -648,6 +689,21 @@ std::string single_file_markdown(const std::vector<Section>& sections, const Bun
         }
     }
     md += std::format("[^{}]: {}\n", kSourceId, info.source_file);
+    if (!info.figures.empty()) {
+        md += "\n# Figures\n\nThe pictures of the figures, for tools that can show them: PNG images in "
+              "base64, one block per figure. This is not text of the document.\n\n";
+        for (const FigureFile& f : info.figures) {
+            if (f.same_as != 0) continue;   // its image line points at the figure that holds the picture
+            md += std::format(
+                "<!-- htpd figure {{\"id\":{},\"page\":{},\"kind\":{},\"caption\":{},\"width\":{},"
+                "\"height\":{},\"type\":\"image/png\"}} -->\n```base64\n",
+                json_quote(figure_id(f.id)), f.page + 1, json_quote(f.kind == Figure::Kind::Picture ? "picture" : "drawing"),
+                json_quote(f.caption), f.width, f.height);
+            const std::string data = base64(f.png);
+            for (std::size_t i = 0; i < data.size(); i += 76) md += data.substr(i, 76) + "\n";
+            md += "```\n\n";
+        }
+    }
     return md;
 }
 
@@ -703,6 +759,15 @@ Result<WriteReport> write_bundle(const fs::path& out_dir, std::vector<Section>& 
                     sections.size() == 1 ? "" : "s", info.source_file);
 
     Writer writer(out_dir);
+    if (!info.figures.empty()) {
+        std::error_code ec;
+        fs::create_directories(out_dir / "figures", ec);
+        if (ec) return fail(std::format("cannot create '{}': {}", (out_dir / "figures").string(), ec.message()));
+        for (const FigureFile& f : info.figures) {
+            if (f.same_as != 0) continue;   // stored once, under the first figure with this picture
+            if (auto ok = writer.write(figure_file(f.id), f.png); !ok) return std::unexpected(ok.error());
+        }
+    }
     for (const Section& s : sections) {
         if (auto ok = writer.write(s.file, section_markdown(sections, s, info, doc_title)); !ok) {
             return std::unexpected(ok.error());

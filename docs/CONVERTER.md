@@ -99,6 +99,24 @@ Speed: about 1-3 s per scanned page per core. Pictures on normal pages
 cost little; the 5600-page i.MX 93 manual, with 41 pictures read, takes
 about 12 s more on two cores.
 
+### Figures
+
+Pictures (photos, screenshots, scanned diagrams) and drawings made of lines
+and shapes (block diagrams, timing diagrams, charts, register layouts) are
+stored as PNG pictures at their place in the text, with their caption and
+page (FORMAT.md 4.5). The converter draws the region of the figure with
+PDFium at 120 dpi (`--figure-dpi`) and packs it as PNG itself, on all cores;
+no library is added. A drawing counts as a figure when a caption "Figure N"
+stands next to it, or when it has many shapes and little text; a caption
+"Table N", table rows, rules across its whole width, or a frame around code
+make it a table or a listing instead. Icons, logos in the page margin and
+frames around the whole page are left out. `--figures off` stores none.
+
+A picture the PDF shows on many pages (a logo, a repeated photo) is drawn,
+stored and read by OCR once: the later figures point at the first one. A
+1000-page sample with one picture per page, seven different ones, converts
+in 12 s into a file of 1.5 MB.
+
 ## Build
 
 ### 1. Get PDFium
@@ -171,6 +189,8 @@ htpd info manual.pdf                     # show what would be found, write nothi
 | `--dehyphenate` | `inter-` + `rupt` becomes `interrupt` instead of `inter-rupt`. |
 | `--ocr auto\|on\|off` | Read text from pictures and scanned pages with Tesseract. `auto` (default): when it is installed. `on`: stop with an error when it is not. `off`: never. |
 | `--ocr-lang <langs>` | Tesseract languages, e.g. `eng+deu` (default `eng`). Each must be installed (`tesseract --list-langs`). |
+| `--figures on\|off` | Store figures (pictures and drawings) as PNG pictures in the bundle (default `on`). |
+| `--figure-dpi <n>` | Resolution of the stored figures, 50 to 300 (default 120). |
 | `--margin-band 0.09` | How much of the page height at the top and bottom is searched for headers and footers. |
 | `--password <text>` | For an encrypted PDF. Other users of the computer can see the command line while the program runs. |
 
@@ -209,6 +229,7 @@ One PDF goes through seven steps. Each step is one small file.
 |---|---|---|
 | 1. Read | `src/pdf_reader_pdfium.cpp` | PDFium gives every character with its position, size and font, and the links of each page. Page rotation is removed here, and a page whose text mainly runs sideways or upside down is turned, so all later steps see upright pages. This is the only file that knows PDFium. |
 | 1b. OCR | `src/ocr.cpp` | Pages without a text layer and pictures without text of the PDF on them are drawn (by PDFium, in `pdf_reader_pdfium.cpp`) and read by the Tesseract program, several at a time, when it is installed. See "OCR" above. |
+| 1c. Figures | `src/figures.cpp`, `src/png.cpp` | The pictures and drawings of each page that are figures, with their caption; drawn by PDFium and packed as PNG (several at a time). See "Figures" above. |
 | 2. Lines | `src/layout.cpp` | Characters become lines. Wide gaps are marked (table columns); raised and lowered numbers stay raised (2³¹). |
 | 3. Headers and footers | `src/furniture.cpp` | Lines that repeat at the page edge on many pages are taken out and reported. |
 | 4. Headings | `src/headings.cpp` | From the bookmarks of the PDF, and from the text: section numbers, font size, bold, another font. |
@@ -313,9 +334,10 @@ honest about the rest.
   that the columns are certain. Tables whose first column wraps too (change
   histories, lists of references) can still come out as rows plus loose
   lines. Always check important numbers from a table against the PDF page.
-* **No pictures.** Figures are not stored as pictures. Words inside a
-  drawing that are real text in the PDF do come out, as loose lines; words
-  inside a picture only with OCR.
+* **Figures are found by rules.** A drawing without a caption "Figure N"
+  must have many shapes and little text; a small drawing without a caption
+  is not stored. Charts and diagrams that are one picture are stored, but
+  what they mean is only in the picture: an AI must look at it.
 * **Formulas** lose their form (fractions, indices, roots).
 * **Reading order** is the order in which the PDF stores the text. That is
   right for almost all PDFs, also with two columns. The converter does not

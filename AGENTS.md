@@ -96,6 +96,7 @@ same for `eval/tests` and `model/tests`). Tests must not need the internet.
 |---|---|
 | 1. Read the PDF | `src/pdf_reader_pdfium.cpp` |
 | 1b. OCR of scanned pages and pictures (runs the Tesseract program, when installed) | `src/ocr.cpp` |
+| 1c. Figures: find them, draw them, pack them as PNG | `src/figures.cpp`, `src/png.cpp` |
 | 2. Characters to lines | `src/layout.cpp` |
 | 3. Headers and footers | `src/furniture.cpp` |
 | 4. Headings | `src/headings.cpp` |

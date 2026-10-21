@@ -30,7 +30,7 @@ class Line:
     text: str  # exact text from the file
     page: int | None
     section: Node
-    kind: str  # "row", "sentence" or "code"
+    kind: str  # "row", "sentence", "code" or "figure"
     header: str | None = None  # the first row of the table, for a row
     score: float = 0.0
 
@@ -78,6 +78,8 @@ def pieces(node: Node) -> list[Line]:
 
 
 def _pieces_of_block(node: Node, b: Block) -> list[Line]:
+    if b.kind == "figure":
+        return [Line(f"[Figure {b.figure}: {b.caption}]", b.page, node, "figure")]
     if b.kind == "table":
         rows = b.text.split("\n")
         header = rows[0] if len(rows) > 1 else None

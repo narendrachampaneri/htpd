@@ -103,6 +103,8 @@ def chunk_units(bundle: Bundle, size: int = CHUNK_TOKENS) -> list[Unit]:
     for s in bundle.sections:
         pieces.append((s.id, s.title, None))
         for b in s.blocks:
+            if b.kind == "figure":   # a picture, not text
+                continue
             if count_tokens(b.text) <= size:
                 pieces.append((s.id, b.text, b))
                 continue

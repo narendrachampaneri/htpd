@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 from typing import Any, Sequence
 
 from . import __version__
@@ -69,7 +70,10 @@ def cmd_section(b: Bundle, args: argparse.Namespace) -> int:
             page = blk.page
             print(f"\n--- page {page} ---")
         print()
-        print(blk.text)
+        if blk.kind == "figure":
+            print(f"[figure {blk.figure}: {blk.caption}]  (picture: htpd-read figure ... {blk.figure})")
+        else:
+            print(blk.text)
     if not n.blocks:
         print("\n(no text directly under this heading)")
     if n.refs:
@@ -83,6 +87,27 @@ def cmd_section(b: Bundle, args: argparse.Namespace) -> int:
         for k in kids:
             print(f"  {k.title} ({_pages(k)})  [{k.id}]")
     return 0
+
+
+def cmd_figure(b: Bundle, args: argparse.Namespace) -> int:
+    found = b.figure(args.figure)
+    if found is None:
+        print(f"htpd-read: no figure {args.figure!r} in {b.name}", file=sys.stderr)
+        return 1
+    block, node = found
+    png = b.figure_png(args.figure)
+    out = Path(args.out or f"{block.figure}.png")
+    if png is not None:
+        out.write_bytes(png)
+    data = {"figure": block.figure, "caption": block.caption, "page": block.page, "section": node.id,
+            "title": node.title, "file": str(out) if png is not None else None}
+    if args.json:
+        _print_json(data)
+    else:
+        print(f"{block.figure}: {block.caption}")
+        print(f"page {block.page}, {' > '.join(b.path_titles(node))}  [{node.id}]")
+        print(f"picture written to {out}" if png is not None else "the file holds no picture of this figure")
+    return 0 if png is not None else 1
 
 
 def cmd_search(b: Bundle, args: argparse.Namespace) -> int:
@@ -159,6 +184,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--context", action="store_true", help="also print the sections the lines come from")
     p.add_argument("--budget", type=int, default=DEFAULT_BUDGET, help=f"most tokens of context (default {DEFAULT_BUDGET})")
     p.set_defaults(func=cmd_ask)
+    p = add("figure", "write the picture of a figure (F12) to a PNG file")
+    p.add_argument("figure", help="the figure, e.g. F12")
+    p.add_argument("-o", "--out", help="the PNG file to write (default F12.png)")
+    p.set_defaults(func=cmd_figure)
     p = add("check", "list every problem of the bundle")
     p.add_argument("--pdf", help="also check that the bundle was made from this PDF")
     p.set_defaults(func=cmd_check)

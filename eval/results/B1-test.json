@@ -22,9 +22,9 @@
     "not_found_accuracy": 0.0,
     "false_not_found": 0.0,
     "answer_in_text": 0.8288288288288288,
-    "tokens_mean": 2708.278195488722,
-    "tokens_vs_whole": 0.06487865377956124,
-    "ms_per_question": 0.8634304962456519,
+    "tokens_mean": 2708.03007518797,
+    "tokens_vs_whole": 0.06487626306139734,
+    "ms_per_question": 0.6645682330934889,
     "by_kind": {
       "1": {
         "n": 66,
@@ -189,9 +189,9 @@
       "id": "debug-025",
       "rank": 14,
       "top": [
-        "sections/0159-b-2-9-triggers",
-        "sections/0160-b-2-10-handling-exceptions",
-        "sections/0161-b-2-11-quick-access"
+        "sections/0088-4-9-2-debug-pc-dpc-at-0x7b1",
+        "sections/0089-4-9-3-debug-scratch-register-0-dscratch0-at-0x7b2",
+        "sections/0090-4-9-4-debug-scratch-register-1-dscratch1-at-0x7b3"
       ]
     },
     {

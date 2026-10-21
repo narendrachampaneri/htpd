@@ -32,6 +32,8 @@ struct ConvertOptions {
     HeadingMode headings = HeadingMode::Auto;
     bool dehyphenate = false;            // "inter-" + "rupt" -> "interrupt"
     bool single_file = false;            // write one file "<input name>.htpd" instead of a folder
+    bool figures = true;                 // store figures (pictures and drawings) as PNG pictures
+    float figure_dpi = 120;              // resolution of the stored figures
     OcrMode ocr = OcrMode::Auto;         // read text from pictures with Tesseract, when installed
     OcrOptions ocr_options;
     std::function<void(int done, int total)> on_progress;   // called once per page
@@ -55,6 +57,8 @@ struct ConvertReport {
     std::size_t unmapped = 0;
     std::size_t pages_without_text = 0;
     OcrReport ocr;
+    std::size_t figures = 0;             // figures stored as pictures
+    std::uintmax_t figure_bytes = 0;     // their PNG bytes
     std::size_t files = 0;
     std::uintmax_t source_bytes = 0;
     std::uintmax_t bundle_bytes = 0;

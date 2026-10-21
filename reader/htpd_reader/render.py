@@ -60,6 +60,8 @@ def render_text_part(blocks: list[Block]) -> str:
             out.append(f"<!-- page {page} -->\n\n")
         if b.kind == "paragraph":
             out.append(("\\" if starts_markdown_block(b.text) else "") + b.text + "\n\n")
+        elif b.kind == "figure":
+            out.append(f"<!-- figure {b.figure} -->\n![{b.figure}: {b.text}]({b.target})\n\n")
         else:
             fence = fence_for(b.text)
             mark = "text" if b.kind == "table" else ""

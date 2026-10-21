@@ -17,14 +17,14 @@
     "recall@1": 0.6396396396396397,
     "recall@5": 0.8648648648648649,
     "recall@10": 0.9279279279279279,
-    "mrr": 0.7441240604284083,
+    "mrr": 0.7441613648135387,
     "page_accuracy": 0.5495495495495496,
     "not_found_accuracy": 0.0,
     "false_not_found": 0.0,
     "answer_in_text": 0.8288288288288288,
-    "tokens_mean": 2219.7593984962405,
-    "tokens_vs_whole": 0.053744989719832895,
-    "ms_per_question": 0.6492392556305604,
+    "tokens_mean": 2218.4887218045114,
+    "tokens_vs_whole": 0.05372491458814337,
+    "ms_per_question": 0.632351030049849,
     "by_kind": {
       "1": {
         "n": 66,
@@ -115,7 +115,7 @@
     },
     {
       "id": "debug-025",
-      "rank": 23,
+      "rank": 21,
       "top": [
         "sections/0106-5-7-1-trigger-select-tselect-at-0x7a0",
         "sections/0086-4-9-core-debug-registers",

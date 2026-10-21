@@ -72,8 +72,12 @@ question
    most 8 sections. A long section gives its best blocks. Text read by OCR
    is marked.
 6. **Answer** (`answer.py`): the few exact lines that answer the question
-   - a table row with its header row, a sentence, a code line - each with
-   its page and section.
+   - a table row with its header row, a sentence, a code line, a figure -
+   each with its page and section.
+
+Figures stand in the text as `![F12: caption]` lines; `htpd-read figure`
+writes the picture of one to a PNG file, and the MCP tool `figure` returns
+it as an image, so an AI that can see pictures can look at a diagram.
 
 The reader is used in four ways: as a Python library, as the command
 `htpd-read`, as the MCP server `htpd-mcp` for AI agents, and as the skill

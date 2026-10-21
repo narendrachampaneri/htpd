@@ -30,6 +30,11 @@ Options for convert:
       --force               Replace a previous bundle in the output folder
       --keep-headers        Keep running headers and footers in the text
       --dehyphenate         Join words split at a line end ("inter-" "rupt")
+      --figures <on|off>    Store figures (pictures and drawings) as PNG
+                            pictures in the file, with their caption
+                            and page (default on)
+      --figure-dpi <n>      Resolution of the stored figures, 50 to 300
+                            (default 120)
       --ocr <mode>          Text in pictures and scanned pages, read with the
                             free Tesseract program:
                               auto  when Tesseract is installed (default)
@@ -136,6 +141,9 @@ int run_convert(Args& args) {
         print(std::format("  + page parts    {} parts of long text, cut by pages\n", r.page_parts));
     }
     print(std::format("  paragraphs      {}\n", r.paragraphs));
+    if (r.figures > 0) {
+        print(std::format("  figures         {} stored as pictures ({})\n", r.figures, megabytes(r.figure_bytes)));
+    }
     if (r.ocr.pages_read + r.ocr.pictures_read > 0) {
         print(std::format("  OCR             {} pages and {} pictures read, {} lines ({})\n", r.ocr.pages_read,
                           r.ocr.pictures_read, r.ocr.lines, r.ocr.engine));
@@ -247,6 +255,16 @@ int main(int argc, char** argv) {
             if (!value(v) || !parse_fraction(v, args.convert.margin_band)) {
                 return usage_error("--margin-band must be a number from 0 to 0.3");
             }
+        } else if (arg == "--figures") {
+            if (!value(v) || (v != "on" && v != "off")) return usage_error("--figures must be on or off");
+            args.convert.figures = v == "on";
+        } else if (arg == "--figure-dpi") {
+            int dpi = 0;
+            if (!value(v) || std::from_chars(v.data(), v.data() + v.size(), dpi).ec != std::errc{} || dpi < 50 ||
+                dpi > 300) {
+                return usage_error("--figure-dpi must be a number from 50 to 300");
+            }
+            args.convert.figure_dpi = static_cast<float>(dpi);
         } else if (arg == "--ocr") {
             if (!value(v)) return usage_error("--ocr must be auto, on or off");
             if (v == "auto") args.convert.ocr = htpd::OcrMode::Auto;

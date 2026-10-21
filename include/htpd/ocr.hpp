@@ -41,6 +41,7 @@ struct OcrReport {
     std::string engine;                 // "tesseract 5.3.4", empty when not found or off
     std::size_t pages_read = 0;         // whole pages read (pages without a text layer)
     std::size_t pictures_read = 0;      // pictures read on pages that have text
+    std::size_t reused = 0;             // pictures seen before (the same picture on another page): read once
     std::size_t lines = 0;              // lines of text found
     std::size_t words_dropped = 0;      // words left out: OCR was not sure of them
     std::size_t failed = 0;             // pictures the program could not read
@@ -60,7 +61,7 @@ struct OcrJob {
     int page = 0;           // 0-based page
     Box region;             // display space of the page, points
     float scale = 1;        // pixels per point of `image`
-    GrayImage image;
+    Image image;
     bool whole_page = false;   // a scanned page; otherwise a picture on a page with text
 };
 
@@ -110,6 +111,6 @@ TsvLines lines_from_tsv(std::string_view tsv, int page, const Box& region, float
                         bool whole_page = true);
 
 // The grey image as a binary PGM file (P5), which Tesseract reads.
-std::string pgm_bytes(const GrayImage& image);
+std::string pgm_bytes(const Image& image);
 
 }  // namespace htpd

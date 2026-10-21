@@ -180,6 +180,8 @@ def _check_links(b: Bundle) -> list[Problem]:
     if b.single:  # one file: there are no links between files
         return out
     files: list[tuple[str, list[tuple[int, str]]]] = [(n.path, n.links) for n in [b.document, *b.sections]]
+    # the picture of every figure (FORMAT.md 4.5)
+    files += [(s.path, [(f.line, f.target) for f in s.figures if f.target]) for s in b.sections if s.figures]
     for extra in ("index.md", "sections/index.md"):
         p = b.root / extra
         if p.is_file():

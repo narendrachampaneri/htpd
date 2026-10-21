@@ -69,9 +69,11 @@ struct Box {
     float height() const { return y1 - y0; }
 };
 
-// An image in shades of grey, one byte per pixel, rows from the top.
-struct GrayImage {
+// A drawn image, rows from the top: one byte per pixel (grey, channels 1)
+// or three (red, green, blue, channels 3).
+struct Image {
     int width = 0, height = 0;
+    int channels = 1;
     std::vector<std::uint8_t> pixels;
 };
 
@@ -85,6 +87,9 @@ struct PageText {
     std::size_t unmapped = 0;            // glyphs without a Unicode mapping
     std::vector<PageLink> links;         // jumps to other places of the document
     std::vector<Box> images;             // picture objects (photos, scans, pictures of text)
+    std::vector<std::uint64_t> image_keys;   // for each picture: a hash of its data (the same picture, the same key)
+    std::vector<Box> paths;              // line and shape objects (drawings, table rules, frames)
+    std::vector<Box> forms;              // form objects (groups drawn as one, often a whole drawing)
     std::size_t objects = 0;             // everything drawn on the page: text, pictures, lines, shapes
 };
 
@@ -114,6 +119,9 @@ struct Line {
     // from a picture on a page that has text (Picture). Picture text is the
     // content of a figure: it is never taken for a heading.
     enum class Ocr : std::uint8_t { None, Page, Picture } ocr = Ocr::None;
+    // Not text: the place of figure number `figure` (from 1) in the text. Its
+    // box is the figure's box; its text is empty.
+    int figure = 0;
 };
 
 // A PDF bookmark (outline entry).
@@ -169,6 +177,7 @@ enum class ParagraphKind {
     Text,   // ordinary paragraph: its lines are joined
     Rows,   // table rows: one row per '\n', cells split by " | " (an empty cell: nothing between two bars)
     Code,   // monospace block: one line per '\n', spacing kept
+    Figure, // a figure stands here: `text` is its number ("12")
 };
 
 struct Paragraph {

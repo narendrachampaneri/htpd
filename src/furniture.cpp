@@ -123,6 +123,7 @@ FurnitureReport remove_furniture(std::vector<std::vector<Line>>& pages,
         if (height <= 0) continue;
         for (std::size_t i = 0; i < pages[p].size(); ++i) {
             const Line& line = pages[p][i];
+            if (line.figure > 0) continue;   // the place of a figure, not text
             const double centre = (line.y0 + line.y1) / 2.0;
             const bool top = centre < options.band * height;
             const bool bottom = centre > (1.0 - options.band) * height;

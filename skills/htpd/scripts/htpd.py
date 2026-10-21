@@ -5,6 +5,7 @@
     python3 htpd.py contents FILE [--depth N]
     python3 htpd.py section  FILE S14
     python3 htpd.py search   FILE words...
+    python3 htpd.py figure   FILE F12 [-o F12.png]
     python3 htpd.py check    FILE
 
 Needs only Python 3.10 or newer. The package `htpd_reader` lies next to this

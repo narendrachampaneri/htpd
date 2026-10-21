@@ -69,6 +69,12 @@ TOOLS: list[dict[str, Any]] = [
                              "budget": {"type": "integer", "minimum": 200, "maximum": 20000,
                                         "description": f"Most tokens of text to return (default {DEFAULT_BUDGET})."}},
                             ["bundle", "question"])},
+    {"name": "figure",
+     "description": "The picture of one figure (a diagram, chart or photo of the document) as an image, with "
+                    "its caption, page and section. Figures stand in the text as a line '![F12: caption]'; "
+                    "ask for 'F12' to see it.",
+     "inputSchema": _schema({"bundle": BUNDLE, "figure": {"type": "string", "description": "e.g. 'F12'"}},
+                            ["bundle", "figure"])},
     {"name": "check", "description": "List every problem of a bundle (broken links, a tree that disagrees, ...).",
      "inputSchema": _schema({"bundle": BUNDLE}, ["bundle"])},
 ]
@@ -86,7 +92,7 @@ class Server:
         self._askers: dict[str, Any] = {}
         self.handlers: dict[str, Callable[[dict[str, Any]], tuple[str, Any]]] = {
             "list_bundles": self.t_list, "contents": self.t_contents, "open_section": self.t_section,
-            "search": self.t_search, "ask": self.t_ask, "check": self.t_check,
+            "search": self.t_search, "ask": self.t_ask, "check": self.t_check, "figure": self.t_figure,
         }
 
     # --- bundles ---
@@ -172,6 +178,9 @@ class Server:
             if blk.page != page:
                 page = blk.page
                 lines += [f"<!-- page {page} -->", ""]
+            if blk.kind == "figure":
+                lines += [f"![{blk.figure}: {blk.caption}] (figure: ask the figure tool for {blk.figure} to see it)", ""]
+                continue
             lines += [blk.text if blk.kind == "paragraph" else f"```{'text' if blk.kind == 'table' else ''}\n{blk.text}\n```", ""]
         if not n.blocks:
             lines.append("(no text directly under this heading)")
@@ -188,6 +197,22 @@ class Server:
         data = dict(n.summary(), path=path, blocks=[x.to_dict() for x in n.blocks],
                     links=[r.to_dict() for r in n.refs])
         return "\n".join(lines).rstrip(), data
+
+    def t_figure(self, a: dict[str, Any]) -> tuple[str, Any]:
+        import base64
+
+        b = self.bundle(a["bundle"])
+        found = b.figure(str(a["figure"]))
+        if found is None:
+            raise ToolError(f"no figure {a['figure']!r} in {b.name}")
+        block, node = found
+        png = b.figure_png(str(a["figure"]))
+        if png is None:
+            raise ToolError(f"the file holds no picture of {block.figure}")
+        text = (f"{block.figure}: {block.caption} - page {block.page}, section {' > '.join(b.path_titles(node))} "
+                f"[{node.id}]")
+        return text, {"figure": block.figure, "caption": block.caption, "page": block.page, "section": node.id,
+                      "_image": base64.b64encode(png).decode("ascii")}
 
     def t_search(self, a: dict[str, Any]) -> tuple[str, Any]:
         b = self.bundle(a["bundle"])
@@ -256,7 +281,10 @@ class Server:
             text, data = handler(args)
         except ToolError as e:
             return {"content": [{"type": "text", "text": str(e)}], "isError": True}
-        return {"content": [{"type": "text", "text": text}], "structuredContent": data, "isError": False}
+        content: list[dict[str, Any]] = [{"type": "text", "text": text}]
+        if isinstance(data, dict) and "_image" in data:   # a picture: MCP image content
+            content.append({"type": "image", "data": data.pop("_image"), "mimeType": "image/png"})
+        return {"content": content, "structuredContent": data, "isError": False}
 
     def serve(self, stdin: Any = None, stdout: Any = None) -> None:
         stdin = stdin or sys.stdin

@@ -360,7 +360,8 @@ def fonts(path):
 
 def ocr(path):
     """Text that is only in pictures: page 1 has text of its own and a picture
-    of two lines of text; page 2 is a scanned page (one picture, no text)."""
+    of two lines of text; page 2 is a scanned page (one picture, no text);
+    page 3 shows the picture of page 1 again."""
     from io import BytesIO
     from PIL import Image, ImageDraw, ImageFont
     from reportlab.lib.utils import ImageReader
@@ -386,12 +387,84 @@ def ocr(path):
     c.setFont('Helvetica', 10)
     c.drawString(72, 700, 'The picture below shows the connector.')
     # 300 dpi: 4 x 1 inch on the page
-    c.drawImage(picture(['Connector J7 pin 3 is CAN high.', 'Pin 4 is CAN low.'], 1200, 300, 48),
-                72, 560, width=288, height=72)
+    connector = picture(['Connector J7 pin 3 is CAN high.', 'Pin 4 is CAN low.'], 1200, 300, 48)
+    c.drawImage(connector, 72, 560, width=288, height=72)
     c.drawString(72, 530, 'More text follows the picture.')
     c.showPage()
     c.drawImage(picture(['2 Scanned notes', 'The fuse is rated 16 A.', 'Replace it only when the power is off.'],
                         2550, 1100, 56), 0, 528, width=612, height=264)
+    c.showPage()
+    c.setFont('Helvetica', 10)
+    c.drawString(72, 720, 'The connector picture again.')
+    c.drawImage(connector, 72, 300, width=288, height=72)             # the same picture: read once
+    c.showPage()
+    c.save()
+
+
+def figures(path):
+    """Figures and things that are not figures: a block diagram drawn with
+    lines and its caption, a ruled table, a framed listing, a photo without a
+    caption and a logo in the page margin."""
+    from io import BytesIO
+    from PIL import Image, ImageDraw
+    from reportlab.lib.utils import ImageReader
+
+    def photo(width, height):
+        img = Image.new('RGB', (width, height), (230, 240, 250))
+        draw = ImageDraw.Draw(img)
+        for i in range(0, width, 20):
+            draw.line([(i, 0), (width - i, height)], fill=(40 + i % 200, 90, 160), width=3)
+        out = BytesIO()
+        img.save(out, format='PNG')
+        out.seek(0)
+        return ImageReader(out)
+
+    c = canvas.Canvas(path, pagesize=letter)
+    c.setTitle('Figure test')
+    c.drawImage(photo(120, 40), 470, 750, width=72, height=24)          # a logo in the margin
+    c.setFont('Helvetica-Bold', 16)
+    c.drawString(72, 720, '1 Power path')
+    c.setFont('Helvetica', 10)
+    c.drawString(72, 700, 'The figure below shows how power flows from the grid to the battery.')
+    # a block diagram: boxes, lines and arrow heads, with labels
+    boxes = [(80, 560, 'Grid'), (230, 560, 'Rectifier'), (380, 560, 'Battery')]
+    for x, y, label in boxes:
+        c.rect(x, y, 100, 50)
+        c.rect(x + 4, y + 4, 92, 42)
+        c.drawCentredString(x + 50, y + 22, label)
+    for x in (180, 330):
+        c.line(x, 585, x + 50, 585)
+        c.line(x + 50, 585, x + 42, 590)
+        c.line(x + 50, 585, x + 42, 580)
+        c.line(x + 20, 575, x + 30, 595)
+    c.setFont('Helvetica-Oblique', 9)
+    c.drawString(72, 540, 'Figure 1. Power path of the charger')
+    c.setFont('Helvetica', 10)
+    c.drawString(72, 515, 'Table 1. Limits')
+    rows = [('Parameter', 'Min', 'Max'), ('Voltage', '200', '480'), ('Current', '0', '32'), ('Power', '0', '22')]
+    for i, row in enumerate(rows):
+        y = 495 - i * 18
+        for j, cell in enumerate(row):
+            c.drawString(80 + j * 120, y, cell)
+    for i in range(len(rows) + 1):
+        c.line(72, 508 - i * 18, 432, 508 - i * 18)
+    for x in (72, 192, 312, 432):
+        c.line(x, 508, x, 508 - len(rows) * 18)
+    c.setFont('Courier', 9)
+    for i, line in enumerate(['int main(void) {', '    start();', '    return 0;', '}']):
+        c.drawString(84, 380 - i * 12, line)
+    c.rect(76, 336, 300, 56)
+    for k in range(10):
+        c.line(76 + k * 30, 336, 76 + k * 30, 334)                       # ticks under the frame: more shapes
+    c.setFont('Helvetica', 10)
+    c.drawString(72, 300, 'A photo of the charger follows.')
+    picture = photo(400, 200)
+    c.drawImage(picture, 72, 120, width=240, height=120)
+    c.drawString(72, 100, 'The text ends here.')
+    c.showPage()
+    c.setFont('Helvetica', 10)
+    c.drawString(72, 720, 'The same photo again, on the second page.')
+    c.drawImage(picture, 72, 560, width=240, height=120)                # stored once in the PDF
     c.showPage()
     c.save()
 
@@ -404,4 +477,5 @@ if __name__ == '__main__':
     sideways(os.path.join(OUT, 'sideways.pdf'))
     links(os.path.join(OUT, 'links.pdf'))
     ocr(os.path.join(OUT, 'ocr.pdf'))
-    print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf, sideways.pdf, links.pdf, ocr.pdf to', OUT)
+    figures(os.path.join(OUT, 'figures.pdf'))
+    print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf, sideways.pdf, links.pdf, ocr.pdf, figures.pdf to', OUT)

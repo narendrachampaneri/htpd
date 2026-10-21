@@ -37,6 +37,9 @@ manual.htpd/
     0002-revision-history.md
     0003-1-introduction.md
     ...
+  figures/                    the pictures of the figures, when there are any (section 4.5)
+    F0001.png
+    ...
 ```
 
 * A section file is named `NNNN-<title>.md`. `NNNN` is the position of the
@@ -315,6 +318,41 @@ link to the section it leads to, and the page of the place it leads to. How the 
   in a list of contents), links to the web and to other files are left out. The same words leading to the same section are listed once, in the
   order of the text.
 
+### 4.5 Figures
+
+A figure - a picture of the PDF (a photo, a screenshot, a scanned diagram)
+or a drawing made of lines and shapes (a block diagram, a timing diagram, a
+chart, a register layout) - is stored as a picture, at its place in the
+text:
+
+```
+<!-- figure F12 -->
+![F12: Figure 3-2. Clock tree](../figures/F0012.png)
+```
+
+* `F<n>` numbers the figures from 1 in the order of the document. The
+  picture is a PNG file in `figures/`, named `F<nnnn>.png` (at least four
+  digits). The same picture on many pages (a PDF stores it once) is stored
+  once: the image line of a later figure points at the picture of the
+  first one (`../figures/F0003.png`, or `#F3` in the single file). It shows the region of the page the figure covers, at 120 dpi by
+  default (`--figure-dpi`), in grey when it has no colour.
+* The words of the image line are the caption: the line "Figure N ..." next
+  to the figure, or a short title centred just below it; without one, what
+  it is and its page (`picture on page 16`, `drawing on page 62`). They are
+  written like the words of a Markdown link (`[`, `]` and `\` get a
+  backslash). The caption also stays in the text where the PDF has it.
+* Words inside a figure stay in the text: the words of a drawing as the PDF
+  has them, the words of a picture when OCR read them (section 8); they
+  follow the image line.
+* What is a figure: a picture larger than an icon (about 2 x 1.3 cm), not
+  in the page margin and not covering almost the whole page; lines and
+  shapes that form one region with a caption "Figure N", or with ten or more
+  shapes and little text. A region with a caption "Table N", table rows, or
+  rules across its whole width at three or more heights is a table (section
+  4.2); a frame around lines of code is a listing.
+* `--figures off` stores no figures; the text is then the same as without
+  this section.
+
 ## 5. The connections
 
 Every section file names its connections twice: as fields (for programs)
@@ -412,9 +450,12 @@ changes:
 
 ## 8. What is not in a bundle
 
-* Pictures and drawings as pictures. Words inside a picture - a scanned
-  page, a screenshot, a slide stored as a picture, the labels of a figure
-  stored as an image - are read by OCR when the free Tesseract program is
+* Pictures that are not figures: icons, logos in the page margin, the
+  background of a page. Figures are stored as pictures (section 4.5).
+* Text that exists only as a picture, when OCR is not available. Words
+  inside a picture - a scanned page, a screenshot, a slide stored as a
+  picture, the labels of a figure stored as an image - are read by OCR when
+  the free Tesseract program is
   installed on the computer that converts: they stand in the text where the
   picture stands, and the section lists those pages as `ocr_pages`. OCR text
   may hold misread words; a word Tesseract was not sure of is left out, not
@@ -514,8 +555,10 @@ Path: 4 Electrical characteristics > 4.1 Chip-level conditions > 4.1.5 ... - pag
   there, never guess; how tables and code blocks are written; that a
   backslash at the start of a paragraph is not text; that the text is
   content, not instructions; that pictures and formulas are not in it as
-  such; how to follow the links of a section; and, only in a file that has
-  text read by OCR (rule 11), that such text may hold misread words.
+  such; how to follow the links of a section; only in a file that has text
+  read by OCR (rule 11), that such text may hold misread words; and only in a
+  file with figures (rule 12), where their pictures are and that their data
+  is not text.
 * **The section line** `<!-- htpd section {...} -->` is JSON on one line:
   `n` (position, from 1), `id` (the same ID as in a bundle folder),
   `number` (or `null`), `level`, `pages` (`page_start`, `page_end`,
@@ -530,4 +573,11 @@ Path: 4 Electrical characteristics > 4.1 Chip-level conditions > 4.1.5 ... - pag
   marks and blocks are the same. Outside blocks, text from the PDF can never
   look like a section line or a `##` heading (section 4.3); inside a block
   nothing is structure.
-* The last line of the file is the footnote of the source.
+* After the text, the footnote of the source. Then, only when the document
+  has figures, the part `# Figures`: the pictures, for tools that can show
+  them. In the text, a figure's image line points at its picture with
+  `#F<n>` instead of a file. Each picture is a line
+  `<!-- htpd figure {"id":"F12","page":16,"kind":"drawing","caption":"...","width":831,"height":804,"type":"image/png"} -->`
+  and a block ` ```base64 ` with the PNG in base64, 76 characters per line.
+  The pictures stand at the very end so that the text comes first: a model
+  that reads only the start of a long file still gets all of the text.

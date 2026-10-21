@@ -2,13 +2,21 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
+#include <deque>
+#include <future>
+#include <thread>
+#include <unordered_map>
 #include <format>
 #include <memory>
+#include <optional>
 
 #include "htpd/bundle_writer.hpp"
+#include "htpd/figures.hpp"
 #include "htpd/layout.hpp"
 #include "htpd/links.hpp"
 #include "htpd/pdf_reader.hpp"
+#include "htpd/png.hpp"
 #include "htpd/sections.hpp"
 #include "htpd/sha256.hpp"
 #include "htpd/structure.hpp"
@@ -33,7 +41,28 @@ struct Analysis {
     std::size_t unmapped = 0;
     std::size_t pages_without_text = 0;
     OcrReport ocr;
+    std::vector<FigureFile> figures;
 };
+
+// A figure is drawn at most this large (pixels): enough to read its labels.
+constexpr long long kMaxFigurePixels = 2'500'000;
+
+// Puts the place of a figure after the last line of the page above it.
+void insert_figure_mark(std::vector<Line>& page, const Figure& f, int id) {
+    Line mark;
+    mark.page = f.page;
+    mark.x0 = f.box.x0;
+    mark.y0 = f.box.y0;
+    mark.x1 = f.box.x1;
+    mark.y1 = f.box.y1;
+    mark.baseline = f.box.y1;
+    mark.figure = id;
+    std::size_t at = 0;
+    for (std::size_t i = 0; i < page.size(); ++i) {
+        if (page[i].figure == 0 && (page[i].y0 + page[i].y1) / 2 < f.box.y0) at = i + 1;
+    }
+    page.insert(page.begin() + static_cast<std::ptrdiff_t>(at), std::move(mark));
+}
 
 // Pictures smaller than this (points) hold no text worth reading: icons, logos, rules.
 constexpr float kMinPictureWidth = 60, kMinPictureHeight = 14, kMinPictureArea = 3000;
@@ -59,6 +88,8 @@ bool has_text_inside(const std::vector<Line>& lines, const Box& box) {
 
 struct AnalysisOptions {
     std::string password;
+    bool figures = false;
+    float figure_dpi = 120;
     OcrMode ocr = OcrMode::Off;
     OcrOptions ocr_options;
     bool keep_furniture = false;
@@ -101,9 +132,56 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
         int page;
         Box box;
         bool whole_page;
+        long same_as = -1;   // the same picture was read before: its words are used again
     };
-    std::vector<Picture> pictures;   // in the order they were handed to the pool
+    std::vector<Picture> pictures;   // every picture to read, in page order
     const float scale = options.ocr_options.dpi / 72.0f;
+    std::unordered_map<std::size_t, std::size_t> read_before;   // hash of the drawn picture -> picture
+    std::size_t jobs = 0;                                         // pictures handed to the pool
+    std::vector<std::size_t> job_of;                              // picture -> its job in the pool
+    // Hands a drawn picture to OCR, unless the very same picture was read before.
+    // The key of a picture of the PDF (its stored data and the size it is
+    // shown at), or 0: then the drawn pixels are the key.
+    const auto box_key = [](std::uint64_t picture, const Box& box) {
+        return picture == 0 ? std::size_t{0}
+                            : static_cast<std::size_t>(picture ^ (static_cast<std::uint64_t>(std::lround(box.width())) << 40) ^
+                                                       (static_cast<std::uint64_t>(std::lround(box.height())) << 20));
+    };
+    // Hands a picture to OCR, unless the very same picture was read before;
+    // `draw` makes the picture only when it must be read.
+    const auto read_picture = [&](int p, const Box& box, bool whole, std::size_t key, auto draw) {
+        std::optional<Image> drawn;
+        if (key == 0) {
+            drawn = draw();
+            if (!drawn) return;
+            key = std::hash<std::string_view>{}(std::string_view(
+                      reinterpret_cast<const char*>(drawn->pixels.data()), drawn->pixels.size())) ^
+                  (static_cast<std::size_t>(drawn->width) << 20) ^ static_cast<std::size_t>(drawn->height);
+        }
+        const auto found = read_before.find(key);
+        if (found == read_before.end() && !drawn) {
+            drawn = draw();
+            if (!drawn) return;
+        }
+        const auto [it, fresh] = read_before.try_emplace(key, pictures.size());
+        if (!fresh) ++a.ocr.reused;
+        pictures.push_back({p, box, whole, fresh ? -1L : static_cast<long>(it->second)});
+        job_of.push_back(fresh ? jobs : job_of[it->second]);
+        if (fresh) {
+            pool->add(OcrJob{p, box, scale, std::move(*drawn), whole});
+            ++jobs;
+        }
+    };
+
+    // Figures: drawn here (the PDF library works on this thread), packed as
+    // PNG on the other cores, a few at a time so that memory stays small.
+    std::deque<std::pair<std::size_t, std::future<std::string>>> packing;   // figure index, PNG
+    std::unordered_map<std::size_t, int> figure_seen;                       // picture key -> figure id
+    const std::size_t max_packing = std::max(2u, std::thread::hardware_concurrency());
+    const auto collect_one = [&] {
+        a.figures[packing.front().first].png = packing.front().second.get();
+        packing.pop_front();
+    };
 
     // 1. Pages -> lines.
     std::vector<std::vector<Line>> pages(static_cast<std::size_t>(page_count));
@@ -120,6 +198,62 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
             pages[index] = build_lines(*page);
             a.page_links[index] = std::move(page->links);
 
+            if (options.figures && (!page->images.empty() || !page->paths.empty() || !page->forms.empty())) {
+                const std::vector<FontFacts> fonts = doc.fonts();
+                std::vector<char> code;
+                code.reserve(pages[index].size());
+                for (const Line& l : pages[index]) code.push_back(l.font < fonts.size() && fonts[l.font].monospace);
+                const bool scan = letters_on(pages[index]) < 20;
+                for (const Figure& f : find_figures(p, page->width, page->height, page->images, page->paths,
+                                                    page->forms, pages[index], page->turned != 0, {}, code,
+                                                    page->image_keys)) {
+                    // A scanned page is one big picture: OCR reads it, it is no figure.
+                    if (scan && f.box.width() * f.box.height() > 0.6f * page->width * page->height) continue;
+                    // The same picture shown before (a logo, a repeated photo): stored once, not drawn again.
+                    const std::size_t key = box_key(f.picture, f.box);
+                    if (key != 0) {
+                        const auto seen = figure_seen.find(key);
+                        if (seen != figure_seen.end()) {
+                            FigureFile file;
+                            file.id = static_cast<int>(a.figures.size()) + 1;
+                            file.page = p;
+                            file.kind = f.kind;
+                            file.caption = f.caption;
+                            file.same_as = seen->second;
+                            const FigureFile& first = a.figures[static_cast<std::size_t>(seen->second) - 1];
+                            file.width = first.width;
+                            file.height = first.height;
+                            a.figures.push_back(std::move(file));
+                            insert_figure_mark(pages[index], f, a.figures.back().id);
+                            continue;
+                        }
+                    }
+                    float fig_scale = options.figure_dpi / 72.0f;
+                    const double pixels =
+                        static_cast<double>(f.box.width()) * f.box.height() * fig_scale * fig_scale;
+                    if (pixels > kMaxFigurePixels) {
+                        fig_scale *= static_cast<float>(std::sqrt(kMaxFigurePixels / pixels));
+                    }
+                    auto image = doc.render(p, f.box, fig_scale, true);
+                    if (!image) continue;
+                    FigureFile file;
+                    file.id = static_cast<int>(a.figures.size()) + 1;
+                    file.page = p;
+                    file.kind = f.kind;
+                    file.caption = f.caption;
+                    Image picture = grey_if_possible(std::move(*image));
+                    file.width = picture.width;
+                    file.height = picture.height;
+                    a.figures.push_back(std::move(file));
+                    if (key != 0) figure_seen.emplace(key, a.figures.back().id);
+                    insert_figure_mark(pages[index], f, a.figures.back().id);
+                    if (packing.size() >= max_packing) collect_one();
+                    packing.emplace_back(a.figures.size() - 1,
+                                         std::async(std::launch::async,
+                                                    [img = std::move(picture)] { return png_bytes(img); }));
+                }
+            }
+
             // A page with (almost) no text that shows something is a scan:
             // read all of it. On other pages, read the pictures that are
             // large enough and have no text of the PDF on them.
@@ -127,33 +261,64 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
             if (scanned && !ocr_ready()) ++a.ocr.pages_unread;
             if (scanned && pool) {
                 const Box whole{0, 0, page->width, page->height};
-                if (auto image = doc.render(p, whole, scale)) {
-                    pictures.push_back({p, whole, true});
-                    pool->add({p, whole, scale, std::move(*image), true});
-                }
+                read_picture(p, whole, true, 0, [&]() -> std::optional<Image> {
+                    auto image = doc.render(p, whole, scale);
+                    return image ? std::optional<Image>(std::move(*image)) : std::nullopt;
+                });
             } else if (!scanned && page->turned == 0) {
-                for (const Box& box : page->images) {
+                for (std::size_t k = 0; k < page->images.size(); ++k) {
+                    const Box& box = page->images[k];
                     if (box.width() < kMinPictureWidth || box.height() < kMinPictureHeight ||
                         box.width() * box.height() < kMinPictureArea || has_text_inside(pages[index], box)) {
                         continue;
                     }
                     if (!ocr_ready()) break;
-                    if (auto image = doc.render(p, box, scale)) {
-                        pictures.push_back({p, box, false});
-                        pool->add({p, box, scale, std::move(*image), false});
-                    }
+                    const std::uint64_t picture = k < page->image_keys.size() ? page->image_keys[k] : 0;
+                    read_picture(p, box, false, box_key(picture, box), [&]() -> std::optional<Image> {
+                        auto image = doc.render(p, box, scale);
+                        return image ? std::optional<Image>(std::move(*image)) : std::nullopt;
+                    });
                 }
             }
         }
         if (options.on_progress) options.on_progress(p + 1, page_count);
+    }
+    while (!packing.empty()) collect_one();
+    // The same picture on many pages (a PDF stores it once): stored once.
+    {
+        std::unordered_map<std::string_view, int> first;
+        for (FigureFile& f : a.figures) {
+            if (f.same_as != 0) continue;   // already known as a repeat
+            const auto [it, inserted] = first.try_emplace(f.png, f.id);
+            if (!inserted) f.same_as = it->second;
+        }
+        for (FigureFile& f : a.figures) {
+            if (f.same_as != 0) f.png.clear();
+        }
     }
     if (pool) {
         OcrPool::Done done = pool->finish();
         a.ocr.failed = done.failed;
         a.ocr.words_dropped = done.words_dropped;
         for (std::size_t i = 0; i < pictures.size(); ++i) {
-            std::vector<Line>& found = done.lines[i];
             const Picture& pic = pictures[i];
+            // The words of this picture: read for it, or read for the same picture elsewhere.
+            std::vector<Line> found = done.lines[job_of[i]];
+            if (pic.same_as >= 0) {
+                const Picture& src = pictures[static_cast<std::size_t>(pic.same_as)];
+                for (Line& l : found) {
+                    const float dx = pic.box.x0 - src.box.x0, dy = pic.box.y0 - src.box.y0;
+                    l.page = pic.page;
+                    l.x0 += dx;
+                    l.x1 += dx;
+                    l.y0 += dy;
+                    l.y1 += dy;
+                    l.baseline += dy;
+                    l.origin_x += dx;
+                    for (float& g : l.gap_begin) g += dx;
+                    for (float& g : l.gap_end) g += dx;
+                }
+            }
             auto& page = pages[static_cast<std::size_t>(pic.page)];
             const std::size_t before = page.size();
             if (pic.whole_page) {
@@ -216,7 +381,8 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     auto digest = sha256_file(options.input);
     if (!digest) return std::unexpected(digest.error());
 
-    auto analysed = analyse(options.input, {options.password, options.ocr, options.ocr_options,
+    auto analysed = analyse(options.input, {options.password, options.figures, options.figure_dpi, options.ocr,
+                                            options.ocr_options,
                                             options.keep_furniture, options.margin_band, options.headings,
                                             options.on_progress});
     if (!analysed) return std::unexpected(analysed.error());
@@ -247,6 +413,10 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     info.unmapped = a.unmapped;
     info.pages_without_text = a.pages_without_text;
     info.ocr = a.ocr;
+    std::uintmax_t figure_bytes = 0;
+    for (const FigureFile& f : a.figures) figure_bytes += f.png.size();
+    const std::size_t figure_count = a.figures.size();
+    info.figures = std::move(a.figures);
     for (const Section& s : sections) info.links += s.links.size();
 
     std::filesystem::path out_dir = options.output_dir;
@@ -276,6 +446,8 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     report.unmapped = a.unmapped;
     report.pages_without_text = a.pages_without_text;
     report.ocr = std::move(a.ocr);
+    report.figures = figure_count;
+    report.figure_bytes = figure_bytes;
     report.files = written->files;
     report.source_bytes = digest->bytes;
     report.bundle_bytes = written->bytes;
@@ -285,7 +457,7 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
 
 Result<InspectReport> inspect(const std::filesystem::path& input, const std::string& password,
                               HeadingMode headings, double margin_band) {
-    auto analysed = analyse(input, {password, OcrMode::Off, {}, false, margin_band, headings, {}});
+    auto analysed = analyse(input, {password, false, 120, OcrMode::Off, {}, false, margin_band, headings, {}});
     if (!analysed) return std::unexpected(analysed.error());
     Analysis& a = *analysed;
 

@@ -12,8 +12,9 @@ stands. HTPD gives the AI the document in a form made for it:
 
 * **The converter** turns a document into an HTPD file: the document's own
   sections, every paragraph, table and code block with its page, the
-  tree of headings, the links between sections, and the text inside
-  pictures read by OCR. It never summarises or rewrites.
+  tree of headings, the links between sections, its figures as pictures
+  with their captions, and the text inside pictures read by OCR. It never
+  summarises or rewrites.
 * **The reader** finds, for a question, the few sections that answer it and
   hands exactly that text, with its pages, to any AI - or says "Not found
   in this file." with the reason. It also comes as an MCP server for AI

@@ -86,7 +86,7 @@ bool has_letter_or_digit(std::string_view s) {
 
 }  // namespace
 
-std::string pgm_bytes(const GrayImage& image) {
+std::string pgm_bytes(const Image& image) {
     std::string out = std::format("P5\n{} {}\n255\n", image.width, image.height);
     out.append(reinterpret_cast<const char*>(image.pixels.data()), image.pixels.size());
     return out;
@@ -184,6 +184,7 @@ void drop_known_text(std::vector<Line>& found, const std::vector<Line>& page) {
     std::erase_if(found, [&](const Line& f) {
         const float area = std::max(1.0f, (f.x1 - f.x0) * (f.y1 - f.y0));
         return std::ranges::any_of(page, [&](const Line& l) {
+            if (l.figure > 0) return false;   // the place of a figure is no text
             const float w = std::min(f.x1, l.x1) - std::max(f.x0, l.x0);
             const float h = std::min(f.y1, l.y1) - std::max(f.y0, l.y0);
             return w > 0 && h > 0 && w * h > 0.3f * area;
@@ -208,7 +209,8 @@ void insert_picture_lines(std::vector<Line>& page, std::vector<Line> found, cons
         const float centre = (f.y0 + f.y1) / 2;
         std::size_t at = 0;
         for (std::size_t i = 0; i < page.size(); ++i) {
-            const float c = (page[i].y0 + page[i].y1) / 2;
+            // the place of a figure counts at its top: the words of the figure follow it
+            const float c = page[i].figure > 0 ? page[i].y0 : (page[i].y0 + page[i].y1) / 2;
             if (c < centre && c < box.y1) at = i + 1;
         }
         page.insert(page.begin() + static_cast<std::ptrdiff_t>(at), std::move(f));

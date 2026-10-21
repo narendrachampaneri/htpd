@@ -38,8 +38,8 @@ in the document at all.
 
 | | Part | What it does |
 |---|---|---|
-| **A** | **Converter** (`htpd`, C++) | Turns a PDF into HTPD: the exact text, cut into sections at the document's own headings, every paragraph with its page, tables kept as rows, code kept as code, headers and footers removed. |
-| **B** | **Reader** (`htpd-read`, skill, MCP server, Python) | Lets any AI use an HTPD document: it finds the few sections that answer a question and hands over only that text - with pages - or says **"Not found in this file."** |
+| **A** | **Converter** (`htpd`, C++) | Turns a PDF into HTPD: the exact text, cut into sections at the document's own headings (or into parts of a few pages when it has none), every paragraph with its page, tables kept as rows, code kept as code, headers and footers removed, figures stored as pictures with their caption, and text inside pictures read by OCR. |
+| **B** | **Reader** (`htpd-read`, skill, MCP server, Python) | Lets any AI use an HTPD document: it finds the few sections that answer a question and hands over only that text - with pages - or says **"Not found in this file."** It can also hand over any figure as an image. |
 
 ```mermaid
 flowchart LR
@@ -173,7 +173,8 @@ claude mcp add htpd -- htpd-mcp --bundles ~/manuals        # Claude Code
 
 For Antigravity, Codex or any MCP client: command `htpd-mcp`, arguments
 `--bundles /path/to/your/htpd/files`. Tools: `list_bundles`, `contents`,
-`open_section`, `search`, `ask`, `check`. Standard library only.
+`open_section`, `search`, `ask`, `figure` (the picture of a figure, as an
+image), `check`. Standard library only.
 
 ---
 
@@ -216,39 +217,41 @@ The full specification - every field and every rule - is in
 
 ## Results
 
-Measured with the converter on real public documents:
+The converter on real documents (single file, figures and OCR on, a 2-core
+cloud machine):
 
-| Document | Pages | Sections | PDF → `.htpd` | Time |
-|---|---:|---:|---|---:|
-| NXP i.MX 93 Automotive Data Sheet | 109 | 109 | 1.7 MB → 230 KB | 0.6 s |
-| NXP i.MX 93 Reference Manual | 5 652 | 5 641 | 56.3 MB → 11.6 MB | 14 s |
-| RISC-V Debug Specification | 119 | 164 | – | 0.3 s |
-| Arm AAPCS64 | 65 | 125 | – | 0.2 s |
-| RISC-V Instruction Set Manual | 906 | 1 015 | – | 2.6 s |
+| Document | Pages | Sections | Figures | PDF → `.htpd` | Time |
+|---|---:|---:|---:|---|---:|
+| NXP i.MX 93 Automotive Data Sheet | 109 | 114 | 53 | 1.7 MB → 2.5 MB | 2.1 s |
+| NXP i.MX 93 Reference Manual | 5 652 | 5 929 | 637 | 56.3 MB → 39.8 MB | 67 s |
+| RISC-V Debug Specification | 119 | 164 | 3 | 2.4 MB → 0.7 MB | 3.4 s |
+| Arm AAPCS64 | 65 | 125 | 5 | 0.4 MB → 0.3 MB | 0.3 s |
+| RISC-V Unprivileged ISA | 670 | 760 | 25 | 4.5 MB → 2.8 MB | 4.9 s |
 
-The two i.MX 93 documents were converted to the single file on a 2-core
-cloud machine; the other three, to bundle folders, with version 0.1.0.
+Most of a file with figures is their pictures, which stand at its very end:
+the text comes first. `--figures off` leaves them out (the i.MX 93 Reference
+Manual is then 14 MB). Without the Tesseract program the converter skips
+OCR and says which pages it could not read.
+
+The reader on 133 test questions about two public manuals
+([`eval/report.md`](eval/report.md), written by the evaluation harness):
+
+| | Right section first | Right section in the first 5 | Right page | Answer in the text for the AI | "Not found" right / wrong |
+|---|---:|---:|---:|---:|---:|
+| HTPD reader | **0.77** | **0.95** | **0.63** | **0.86** | **0.95 / 0.01** |
+| Plain word search over HTPD sections (B3) | 0.64 | 0.87 | 0.55 | 0.83 | never says it |
+| Plain word search over 500-token chunks (B1) | 0.32 | 0.72 | 0.51 | 0.83 | never says it |
+
+The text handed to the AI is about 6 % of the whole document.
 
 **Robustness.** A stress test makes 34 difficult PDFs locally - two
 columns, sideways tables, rotated pages, 1500 pages, huge tables, CJK and
-Unicode text, encrypted, truncated and corrupted files, LaTeX and Word
-exports - and checks that the converter never crashes or hangs, that every
-bundle is valid, and that no word is lost compared with `pdftotext`. Earlier
-versions were also run on 301 damaged PDFs from PDFium's test collection.
+Unicode text, encrypted, truncated and corrupted files, a scanned page,
+LaTeX and Word exports - and checks that the converter never crashes or
+hangs, that every bundle is valid, and that no word is lost.
 
-**Tests.** 70 C++ tests and 129 Python tests, run on every change. The
-Python tests also run without PyYAML, as the skill does in a chat sandbox.
-
-**Answering.** A first check on the i.MX 93 data sheet: of 12 questions
-with known answers the right section came first for 7, and both questions
-about things the data sheet does not contain (PCIe, HDMI) were answered
-*"Not found in this file."* Measured numbers on public manuals (133 test
-questions) are in [`eval/report.md`](eval/report.md), written by the
-evaluation harness in [`eval/`](eval/README.md). On the test manuals the
-reader finds the right section and page more often than plain word search,
-puts the exact answer into the text it hands to the AI more often, and says
-"Not found in this file." for almost every question the manuals do not
-answer - while almost never saying it for one they do.
+**Tests.** 96 C++ tests and 150 Python tests run on every change, the
+Python tests also without PyYAML, as the skill does in a chat sandbox.
 
 ---
 
@@ -257,20 +260,18 @@ answer - while almost never saying it for one they do.
 HTPD is version 0.1. It works today; these are the known next steps.
 
 - [x] Converter: sections, pages, tables, code, headers/footers, sideways pages, damaged files
+- [x] Structure for documents without headings (parts of a few pages) and a map of the document
+- [x] Figures stored as pictures with caption and page; OCR of scanned pages and text in pictures (Tesseract, optional)
 - [x] Single-file `.htpd` with reading rules for AI models
-- [x] Reader, word search, "not found" rule, `ask`, MCP server, skill for AI apps
-- [ ] **Better search on very large manuals** - better ranking for register and table questions; a question on 5600 pages takes about 2 s from the command line (was 7 s), 0.02 s in the MCP server
-- [ ] Optional meaning search (small open embedding model, CPU only) - measured, then kept only if it helps
-- [x] Evaluation on public test sets, with the numbers in `eval/report.md` (questions still to be checked by a person)
-- [x] **Fewer false "not found"** answers (see the report)
-- [x] Rank the first section at least as well as plain BM25 over HTPD sections (see the report)
-- [x] A small trained re-ranker (tiny neural networks, standard library, no GPU) that puts the right section first more often (77 % instead of 67 % of test questions); trained on training manuals only ([`model/README.md`](model/README.md))
-- [x] OCR for scanned pages and text inside pictures (Tesseract, local, optional; marked in the file)
+- [x] Reader, "not found" rule, `ask`, MCP server, skill for AI apps; figures handed to the AI as images
+- [x] A small trained re-ranker (no GPU, a few kilobytes) - the right section first for 77 % of test questions instead of 66 % without it ([`model/README.md`](model/README.md))
+- [ ] Other document types: Word, HTML, plain text, images
+- [ ] "Not found" for questions in the user's own words (a word the document writes differently)
 - [ ] Windows build
 
-**Known limits:** figures are not stored as pictures (words in them only
-with OCR); formulas lose their layout; scanned pages need the free
-Tesseract program; tables are rows of text (a table whose
+**Known limits:** PDF only; what a chart or diagram means is only in its
+picture (an AI must look at it); formulas lose their layout; scanned pages
+need the free Tesseract program; tables are rows of text (a table whose
 first column wraps can come apart); tested mainly with English technical
 documents. Details: [`docs/CONVERTER.md`](docs/CONVERTER.md#limits-please-read).
 
@@ -283,12 +284,12 @@ documents. Details: [`docs/CONVERTER.md`](docs/CONVERTER.md#limits-please-read).
 
 ```
 include/ src/ cli/      the converter (C++23, PDFium is used in one file only)
-reader/htpd_reader/     the reader: bundle, check, search, retriever, packer, ask, MCP server
+reader/htpd_reader/     the reader: bundle, check, search, retriever, re-ranker, packer, answer, MCP server
 skills/htpd/            the skill for AI apps (scripts/build_skill.py packs it)
 eval/                   evaluation harness, baselines, report
-model/                  the re-ranker's training (used by default) and the optional decider model
+model/                  the training of the re-ranker
 tests/                  C++ tests, test PDFs, the stress test
-docs/                   FORMAT.md · CONVERTER.md · PART-B.md · BACKGROUND.md
+docs/                   FORMAT.md · CONVERTER.md · READER.md · BACKGROUND.md
 examples/               a converted document in both forms
 ```
 
@@ -297,7 +298,7 @@ examples/               a converted document in both forms
 | [`docs/FORMAT.md`](docs/FORMAT.md) | The format: anyone can write a reader from it |
 | [`docs/CONVERTER.md`](docs/CONVERTER.md) | Building, options, how the converter works, what was tested, limits |
 | [`reader/README.md`](reader/README.md) | The reader, its commands and its Python API |
-| [`docs/PART-B.md`](docs/PART-B.md) | The plan and measures for the reader |
+| [`docs/READER.md`](docs/READER.md) | How the reader finds the answer, and how it is measured |
 | [`docs/BACKGROUND.md`](docs/BACKGROUND.md) | Why HTPD is built the way it is |
 | [`AGENTS.md`](AGENTS.md) | Rules for contributors and coding agents |
 

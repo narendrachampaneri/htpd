@@ -39,7 +39,7 @@ class McpServer(unittest.TestCase):
         self.assertEqual(r[0]["result"]["protocolVersion"], "2025-03-26")
         self.assertIn("tools", r[0]["result"]["capabilities"])
         names = [t["name"] for t in r[1]["result"]["tools"]]
-        self.assertEqual(names, ["list_bundles", "contents", "open_section", "search", "ask", "check"])
+        self.assertEqual(names, ["list_bundles", "contents", "open_section", "search", "ask", "figure", "check"])
         for t in TOOLS:
             self.assertEqual(t["inputSchema"]["type"], "object")
 

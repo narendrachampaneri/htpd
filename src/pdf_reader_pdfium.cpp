@@ -64,6 +64,32 @@ constexpr int kMaxOutlineDepth = 32;
 // The page's user-space -> display-space transform. PDFium is asked for it
 // (via FPDF_PageToDevice) so that /Rotate and the crop box are handled by the
 // same code that Chrome uses to draw the page.
+// A hash of the stored data of a picture and its size in pixels: a picture
+// that a PDF shows on many pages has the same key on each of them.
+std::uint64_t image_key(FPDF_PAGEOBJECT object) {
+    const unsigned long size = FPDFImageObj_GetImageDataRaw(object, nullptr, 0);
+    std::uint64_t h = 1469598103934665603ull;   // FNV-1a
+    const auto mix = [&](std::uint64_t v) {
+        for (int i = 0; i < 8; ++i) {
+            h ^= (v >> (8 * i)) & 0xFF;
+            h *= 1099511628211ull;
+        }
+    };
+    if (size > 0) {
+        std::vector<unsigned char> data(size);
+        FPDFImageObj_GetImageDataRaw(object, data.data(), size);
+        for (const unsigned char c : data) {
+            h ^= c;
+            h *= 1099511628211ull;
+        }
+    }
+    unsigned int w = 0, ht = 0;
+    FPDFImageObj_GetImagePixelSize(object, &w, &ht);
+    mix(size);
+    mix((static_cast<std::uint64_t>(w) << 32) | ht);
+    return h;
+}
+
 Affine page_affine(FPDF_PAGE page, float width, float height) {
     constexpr double kScale = 100.0;    // device units per point, for precision
     constexpr double kProbe = 1000.0;
@@ -402,15 +428,11 @@ std::vector<OutlineEntry> PdfDocument::outline() const {
     return out;
 }
 
-Result<GrayImage> PdfDocument::render(int index, const Box& region, float scale) const {
+Result<Image> PdfDocument::render(int index, const Box& region, float scale, bool colour) const {
     const PagePtr page(FPDF_LoadPage(impl_->doc, index));
     if (!page) return fail(std::format("cannot load page {}: {}", index + 1, last_error_text()));
-    float width = FPDF_GetPageWidthF(page.get());
-    float height = FPDF_GetPageHeightF(page.get());
-    const Affine t = page_affine(page.get(), width, height);
-    if (std::fabs(t.a) < 0.5f && std::fabs(t.b) > 0.5f) std::swap(width, height);
-
-    GrayImage image;
+    Image image;
+    image.channels = colour ? 3 : 1;
     image.width = std::max(1, static_cast<int>(std::lround(region.width() * scale)));
     image.height = std::max(1, static_cast<int>(std::lround(region.height() * scale)));
     constexpr long long kMaxPixels = 60'000'000;   // about 7700 x 7700
@@ -421,20 +443,30 @@ Result<GrayImage> PdfDocument::render(int index, const Box& region, float scale)
         FPDFBitmap_Create(image.width, image.height, 0), &FPDFBitmap_Destroy);
     if (!bitmap) return fail(std::format("page {}: cannot draw the page", index + 1));
     FPDFBitmap_FillRect(bitmap.get(), 0, 0, image.width, image.height, 0xFFFFFFFF);
-    // The whole page at `scale`, moved so that the region lands on the bitmap.
-    FPDF_RenderPageBitmap(bitmap.get(), page.get(), static_cast<int>(std::lround(-region.x0 * scale)),
-                          static_cast<int>(std::lround(-region.y0 * scale)),
-                          static_cast<int>(std::lround(width * scale)), static_cast<int>(std::lround(height * scale)),
-                          0, FPDF_GRAYSCALE | FPDF_PRINTING);
+    // The page at `scale`, moved exactly (to a fraction of a pixel) so that the
+    // region starts at the corner of the bitmap: the same picture gives the
+    // same pixels wherever it stands on a page.
+    // (PDFium applies the page's own turn first: the matrix works in display space.)
+    const FS_MATRIX matrix{scale, 0, 0, scale, -region.x0 * scale, -region.y0 * scale};
+    const FS_RECTF clip{0, 0, static_cast<float>(image.width), static_cast<float>(image.height)};
+    FPDF_RenderPageBitmapWithMatrix(bitmap.get(), page.get(), &matrix, &clip,
+                                    colour ? FPDF_PRINTING : (FPDF_GRAYSCALE | FPDF_PRINTING));
     const auto* buffer = static_cast<const std::uint8_t*>(FPDFBitmap_GetBuffer(bitmap.get()));
     const int stride = FPDFBitmap_GetStride(bitmap.get());
-    image.pixels.resize(static_cast<std::size_t>(image.width) * static_cast<std::size_t>(image.height));
+    const auto row_bytes = static_cast<std::ptrdiff_t>(image.width) * image.channels;
+    image.pixels.resize(static_cast<std::size_t>(row_bytes) * static_cast<std::size_t>(image.height));
     for (int y = 0; y < image.height; ++y) {
         const std::uint8_t* row = buffer + static_cast<std::ptrdiff_t>(y) * stride;
-        std::uint8_t* to = image.pixels.data() + static_cast<std::ptrdiff_t>(y) * image.width;
+        std::uint8_t* to = image.pixels.data() + static_cast<std::ptrdiff_t>(y) * row_bytes;
         for (int x = 0; x < image.width; ++x) {
             const std::uint8_t* px = row + 4 * x;   // B G R x
-            to[x] = static_cast<std::uint8_t>((29 * px[0] + 150 * px[1] + 77 * px[2]) >> 8);
+            if (colour) {
+                to[3 * x] = px[2];
+                to[3 * x + 1] = px[1];
+                to[3 * x + 2] = px[0];
+            } else {
+                to[x] = static_cast<std::uint8_t>((29 * px[0] + 150 * px[1] + 77 * px[2]) >> 8);
+            }
         }
     }
     return image;
@@ -472,7 +504,11 @@ Result<PageText> PdfDocument::read_page(int index) const {
     out.objects = static_cast<std::size_t>(std::max(objects, 0));
     for (int i = 0; i < objects; ++i) {
         FPDF_PAGEOBJECT object = FPDFPage_GetObject(page.get(), i);
-        if (FPDFPageObj_GetType(object) != FPDF_PAGEOBJ_IMAGE) continue;
+        const int type = FPDFPageObj_GetType(object);
+        if (type != FPDF_PAGEOBJ_IMAGE && type != FPDF_PAGEOBJ_PATH && type != FPDF_PAGEOBJ_FORM &&
+            type != FPDF_PAGEOBJ_SHADING) {
+            continue;
+        }
         float left = 0, bottom = 0, right = 0, top = 0;
         if (!FPDFPageObj_GetBounds(object, &left, &bottom, &right, &top)) continue;
         float xs[2], ys[2];
@@ -483,7 +519,16 @@ Result<PageText> PdfDocument::read_page(int index) const {
         box.y0 = std::max(box.y0, 0.0f);
         box.x1 = std::min(box.x1, out.width);
         box.y1 = std::min(box.y1, out.height);
-        if (box.width() > 1 && box.height() > 1) out.images.push_back(box);
+        if (type == FPDF_PAGEOBJ_IMAGE) {
+            if (box.width() > 1 && box.height() > 1) {
+                out.images.push_back(box);
+                out.image_keys.push_back(image_key(object));
+            }
+        } else if (type == FPDF_PAGEOBJ_FORM) {
+            if (box.width() > 1 && box.height() > 1) out.forms.push_back(box);
+        } else if (box.width() > 0.1f || box.height() > 0.1f) {   // a line has no height, a dot no size
+            out.paths.push_back(box);
+        }
     }
 
     const TextPagePtr text_page(FPDFText_LoadPage(page.get()));
