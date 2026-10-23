@@ -243,7 +243,7 @@ One PDF goes through seven steps. Each step is one small file.
 | 1b. OCR | `src/ocr.cpp` | Pages without a text layer and pictures without text of the PDF on them are drawn (by PDFium, in `pdf_reader_pdfium.cpp`) and read by the Tesseract program, several at a time, when it is installed. See "OCR" above. |
 | 1c. Figures | `src/figures.cpp`, `src/png.cpp` | The pictures and drawings of each page that are figures, with their caption; drawn by PDFium and packed as PNG (several at a time). See "Figures" above. |
 | 2. Lines | `src/layout.cpp` | Characters become lines. Wide gaps are marked (table columns); raised and lowered numbers stay raised (2³¹). |
-| 3. Headers and footers | `src/furniture.cpp` | Lines that repeat at the page edge on many pages are taken out and reported (in a document of two or three pages: on every page). |
+| 3. Headers and footers | `src/furniture.cpp` | Lines that repeat at the page edge on many pages are taken out and reported (in a document of two or three pages: on every page). A running header is set apart from the text: a line that stands right on top of the text below it (closer than 2.5 of its font sizes) stays in the text - a heading or the header row of a table at the top of the page - unless it holds the number of its page or stands on almost every page. |
 | 3b. Columns | `src/columns.cpp` | A table set tight (LaTeX, web pages, slides) has column gaps narrower than two font sizes. Its rows leave the same strips of the page free; the spaces on those strips become column gaps, also in the header row. Running text crosses the strips and is left alone. |
 | 4. Headings | `src/headings.cpp` | From the bookmarks of the PDF; or from a table of contents printed in the document, whose titles are looked for in the text after it, in order (also when the text shows them without their number); or from the text: section numbers, font size, bold, another font. |
 | 4b. Structure | `src/structure.cpp` | For documents with few headings: a running header that changes starts a section with its text as title. Text longer than a few pages is cut into parts of about 2 pages, where a sentence ends (FORMAT.md 3.3). |
@@ -295,7 +295,7 @@ as values (`std::expected`); the library does not throw for a bad PDF.
 
 ## What was tested
 
-* **102 automatic tests** (`make test`). Most build their input in memory.
+* **105 automatic tests** (`make test`). Most build their input in memory.
   The others convert small PDFs in `tests/data` through the real PDF
   library: rotated pages, scaled fonts, text spaced only by kerning,
   two columns, code listings, fonts whose names lie about their widths,
@@ -388,7 +388,9 @@ honest about the rest.
   of about 2 pages, titled by their pages.
 * **Headers and footers** in a document of two or three pages are only
   removed when they stand on every page; a one-page document keeps them. A header that is different on every page and follows no pattern
-  stays in the text. Everything that is removed is listed in
+  stays in the text, and so does a header printed right on top of the text
+  (closer than 2.5 of its font sizes) that has no page number and is not on
+  almost every page. Everything that is removed is listed in
   `document.md`.
 * **Footnotes** stay where they stand on the page, so they can sit in the
   middle of a section's text.

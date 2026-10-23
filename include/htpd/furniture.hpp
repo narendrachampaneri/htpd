@@ -10,7 +10,11 @@
 //   - nothing but other furniture lies between the slot and the page edge,
 //   - the lines of the slot repeat: either the same text (digits ignored) on
 //     most pages, or the same first/last two words ("... | Page 12"), or a
-//     page number at their start or end ("6 CHAPTER 3. RESULTS", "iv CONTENTS").
+//     page number at their start or end ("6 CHAPTER 3. RESULTS", "iv CONTENTS"),
+//   - it is set apart from the text body: a line closer than 2.5 of its font
+//     sizes to the next line of the body (further in) is content - a heading
+//     or a table header row right below the running header - unless it holds
+//     the number of its page or stands on almost every page.
 // A document of two or three pages needs the line on every page. An empty page
 // that shows only its running header (the back of a chapter page in a book)
 // does not count against the header.

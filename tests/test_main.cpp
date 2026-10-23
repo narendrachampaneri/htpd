@@ -594,6 +594,81 @@ TEST(furniture_running_headers_with_a_page_number_on_empty_pages) {
     CHECK(!pages[0].empty());
 }
 
+TEST(furniture_keeps_a_line_glued_to_the_text_below_the_running_header) {
+    // A register manual: under the real running header, each page starts
+    // with a register heading, a section heading or the header row of a
+    // table. The texts differ, but with digits ignored they repeat on many
+    // pages. They stand right on top of the text below them; a running
+    // header is set apart from it.
+    std::vector<std::vector<Line>> pages(12);
+    const std::vector<float> heights(12, 792.0f);
+    for (int p = 0; p < 12; ++p) {
+        auto& page = pages[static_cast<std::size_t>(p)];
+        page.push_back(make_line(p, "HTPD-MCU-32 HARDWARE REFERENCE MANUAL", 30, 8));
+        const std::string n = std::to_string(p / 3 + 2);   // a new chapter every three pages
+        if (p % 3 == 0) {
+            page.push_back(make_line(p, n + ".1 Register Map Summary", 71, 10.5f, true));
+            page.push_back(make_line(p, "Offset Register Name Access Reset", 89, 8, true));
+        } else if (p % 3 == 1) {
+            page.push_back(make_line(p, "Register " + n + ".2.4" + std::to_string(p) + ": I2C_REG_" + n + " (Offset: 0x00A8)",
+                                     71, 10.5f));
+        } else {
+            page.push_back(make_line(p, "Offset Register Name Access Reset", 71, 8, true));
+        }
+        page.push_back(make_line(p, "0x00" + n + " Control register of block " + n, p % 3 == 0 ? 105 : 89, 7.5f));
+        page.push_back(make_line(p, "Body text in the middle of page " + n, 400, 7.5f));
+        page.push_back(make_line(p, "CONFIDENTIAL Page " + std::to_string(p + 1), 768, 8));
+    }
+    const FurnitureReport report = remove_furniture(pages, heights);
+    CHECK_EQ(report.removed_lines, std::size_t{24});   // the running header and the footer, nothing else
+    CHECK_EQ(report.patterns.size(), std::size_t{2});
+    CHECK_EQ(pages[0][0].text, std::string("2.1 Register Map Summary"));
+    CHECK_EQ(pages[0][1].text, std::string("Offset Register Name Access Reset"));
+    CHECK_EQ(pages[1][0].text, std::string("Register 2.2.41: I2C_REG_2 (Offset: 0x00A8)"));
+    CHECK_EQ(pages[2][0].text, std::string("Offset Register Name Access Reset"));
+}
+
+TEST(furniture_on_every_page_stays_furniture_close_to_the_body) {
+    // A web page printed to PDF: its bar is printed on top of the text of
+    // every page, so it lies right above the first line of the body.
+    std::vector<std::vector<Line>> pages(6);
+    const std::vector<float> heights(6, 843.0f);
+    const char* openings[] = {"Overview of the controller", "Safety microcontroller", "Pin Name Description",
+                              "Power supply limits",        "Charging sequence",      "Ordering information"};
+    for (int p = 0; p < 6; ++p) {
+        auto& page = pages[static_cast<std::size_t>(p)];
+        page.push_back(make_line(p, openings[p], 62, 11, true));
+        page.push_back(make_line(p, "Body text of page " + std::to_string(p + 1), 80, 11));
+        page.push_back(make_line(p, "Team Space Log in | Try it free", 46, 9.8f));
+    }
+    const FurnitureReport report = remove_furniture(pages, heights);
+    CHECK_EQ(report.removed_lines, std::size_t{6});
+    for (std::size_t p = 0; p < pages.size(); ++p) {
+        REQUIRE(pages[p].size() == 2);
+        CHECK_EQ(pages[p][0].text, std::string(openings[p]));
+    }
+}
+
+TEST(furniture_with_the_page_number_stays_furniture_close_to_the_body) {
+    // A datasheet: a two-line footer, the first line with the page number,
+    // only two lines below the last line of the body.
+    std::vector<std::vector<Line>> pages(8);
+    const std::vector<float> heights(8, 792.0f);
+    for (int p = 0; p < 8; ++p) {
+        auto& page = pages[static_cast<std::size_t>(p)];
+        page.push_back(make_line(p, "Body text of page " + std::to_string(p + 1), 400, 9));
+        page.push_back(make_line(p, "Table continues on the next page...", 716.5f, 9));
+        const std::string number = std::to_string(p + 3);
+        page.push_back(make_line(p, p % 2 == 0 ? number + " Kinetis KM35 Data Sheet, Rev. 2, March 2020"
+                                               : "Kinetis KM35 Data Sheet, Rev. 2, March 2020 " + number,
+                                 737.2f, 9));
+        page.push_back(make_line(p, "NXP Semiconductors", 751, 9));
+    }
+    const FurnitureReport report = remove_furniture(pages, heights);
+    CHECK_EQ(report.removed_lines, std::size_t{16});
+    for (const auto& page : pages) CHECK_EQ(page.size(), std::size_t{2});
+}
+
 // ---- columns of tables set tight -----------------------------------------------
 
 namespace {

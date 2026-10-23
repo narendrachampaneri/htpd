@@ -1,6 +1,7 @@
 #include "htpd/furniture.hpp"
 
 #include <algorithm>
+#include <optional>
 #include <unordered_map>
 #include <utility>
 
@@ -20,6 +21,14 @@ constexpr double kMinRepeated = 0.6;
 constexpr double kMinSameAffix = 0.8;
 // Share of a slot's pages on which only furniture lies further out.
 constexpr double kMinAttached = 0.8;
+// A running header is set apart from the text body. A line whose baseline is
+// closer than this many of its font sizes to the next line of the body (further in)
+// belongs to the body: a heading or the header row of a table that starts
+// right below the running header ("Register 30.2.43: ...", "2.1 Summary").
+constexpr float kGluedToBody = 2.5f;
+// A line with the number of its page stays furniture, however close, and so
+// does a text on this share of the pages (the bar of a web page printed over the text).
+constexpr double kEverywhere = 0.9;
 
 // "iv", "xii" ... page numbers of front matter.
 bool is_roman_numeral(std::string_view s) {
@@ -39,7 +48,27 @@ struct BandLine {
     std::string head;         // first two words of the key ("" if it has fewer)
     std::string tail;         // last two words of the key
     bool remove = false;
+    std::size_t pattern = 0;  // the slot (index into the report's patterns) it is removed with
+    bool page_number = false; // holds the number of its page (one that grows with the page)
+    bool everywhere = false;  // the same text (digits ignored) stands on almost every page
 };
+
+// The numbers written in a line (runs of up to five digits).
+std::vector<long> numbers_in(std::string_view text) {
+    std::vector<long> out;
+    for (std::size_t i = 0; i < text.size();) {
+        if (text[i] < '0' || text[i] > '9') {
+            ++i;
+            continue;
+        }
+        std::size_t j = i;
+        long value = 0;
+        while (j < text.size() && text[j] >= '0' && text[j] <= '9') value = value * 10 + (text[j++] - '0');
+        if (j - i <= 5) out.push_back(value);
+        i = j;
+    }
+    return out;
+}
 
 // Number of different pages on which each value occurs.
 class PageCounter {
@@ -226,6 +255,32 @@ FurnitureReport remove_furniture(std::vector<std::vector<Line>>& pages,
                 ++numbered_pages;
             }
         }
+        // The number of the page: a number in the line that grows with the
+        // page ("10 Kinetis ... Rev. 2" on page 10, "11 ..." on page 11).
+        {
+            PageCounter offsets;
+            // Only a number at the start or the end of the line, where page numbers stand.
+            const auto page_number_of = [&](const BandLine& line) -> std::optional<long> {
+                const std::vector<long> numbers = numbers_in(pages[line.page][line.index].text);
+                if (numbers.empty()) return std::nullopt;
+                if (line.key == "#" || line.key.starts_with("# ")) return numbers.front();
+                if (line.key.ends_with(" #")) return numbers.back();
+                return std::nullopt;
+            };
+            for (const BandLine* line : by_page) {
+                if (const auto n = page_number_of(*line)) {
+                    offsets.add(std::to_string(*n - static_cast<long>(line->page)), line->page);
+                }
+            }
+            const auto [best_offset, offset_pages] = offsets.most_common();
+            if (offset_pages >= min_pages && static_cast<double>(offset_pages) >= 0.5 * page_count) {
+                const long offset = std::stol(best_offset);
+                for (BandLine& line : slot) {
+                    const auto n = page_number_of(line);
+                    line.page_number = n && *n - static_cast<long>(line.page) == offset;
+                }
+            }
+        }
         const bool same_number = numbered_pages >= min_pages &&
                                  static_cast<double>(numbered_pages) >= kMinSameAffix * page_count;
 
@@ -245,10 +300,7 @@ FurnitureReport remove_furniture(std::vector<std::vector<Line>>& pages,
         // slot stays (and blocks the slots further in on its page).
         FurniturePattern pattern;
         pattern.top = slot.front().top;
-        pattern.variants = 0;
-        const BandLine* first_removed = nullptr;
-        std::vector<std::size_t> removed_pages;
-        std::vector<std::string_view> removed_keys;
+        const std::size_t pattern_index = report.patterns.size();
         for (BandLine& line : slot) {
             const bool repeats = keys.pages(line.key) >= min_pages;
             const bool same_affix = (same_head && line.head == best_head) || (same_tail && line.tail == best_tail);
@@ -260,25 +312,76 @@ FurnitureReport remove_furniture(std::vector<std::vector<Line>>& pages,
             const bool with_number = numbered(line.key);
             line.remove = repeats || (same_number && with_number) ||
                           (same_affix && (pages[line.page].size() > 1 || with_number));
-            if (!line.remove) {
-                zone_blocked[line.page] = true;
-                continue;
-            }
-            removed_pages.push_back(line.page);
-            removed_keys.push_back(line.key);
-            if (pattern.page_text.empty()) pattern.page_text.resize(pages.size());
-            if (pattern.page_text[line.page].empty()) pattern.page_text[line.page] = pages[line.page][line.index].text;
-            if (first_removed == nullptr || line.page < first_removed->page) first_removed = &line;
+            line.pattern = pattern_index;
+            line.everywhere = static_cast<double>(keys.pages(line.key)) >= kEverywhere * static_cast<double>(text_pages);
+            if (!line.remove) zone_blocked[line.page] = true;
         }
-        if (first_removed == nullptr) continue;
-        std::ranges::sort(removed_pages);
-        removed_pages.erase(std::unique(removed_pages.begin(), removed_pages.end()), removed_pages.end());
-        std::ranges::sort(removed_keys);
-        removed_keys.erase(std::unique(removed_keys.begin(), removed_keys.end()), removed_keys.end());
-        pattern.pages = removed_pages.size();
-        pattern.variants = removed_keys.size();
-        pattern.sample = pages[first_removed->page][first_removed->index].text;
         report.patterns.push_back(std::move(pattern));
+    }
+
+    // 3b. A marked line glued to the text body is content: put it back. From
+    // the body outwards, so that a heading above a table header row that is
+    // put back is put back too.
+    {
+        std::vector<std::vector<BandLine*>> by_page(pages.size());
+        for (BandLine& line : band) {
+            if (line.remove) by_page[line.page].push_back(&line);
+        }
+        for (std::size_t p = 0; p < by_page.size(); ++p) {
+            if (by_page[p].empty()) continue;
+            std::vector<bool> removed(pages[p].size(), false);
+            for (const BandLine* line : by_page[p]) removed[line->index] = true;
+            // Innermost first: band is sorted from the page edge inwards.
+            std::ranges::sort(by_page[p], [](const BandLine* a, const BandLine* b) {
+                if (a->top != b->top) return a->top;
+                return a->offset > b->offset;
+            });
+            for (BandLine* line : by_page[p]) {
+                if (line->page_number || line->everywhere) continue;   // never text of the body
+                const Line& l = pages[p][line->index];
+                float nearest = -1;
+                for (std::size_t i = 0; i < pages[p].size(); ++i) {
+                    const Line& other = pages[p][i];
+                    if (removed[i] || other.figure > 0 || other.text.empty()) continue;
+                    const float distance = line->top ? other.baseline - l.baseline : l.baseline - other.baseline;
+                    if (distance <= kSlotTolerance) continue;   // the same slot, or further out
+                    if (nearest < 0 || distance < nearest) nearest = distance;
+                }
+                if (nearest > 0 && nearest < kGluedToBody * l.size) {
+                    line->remove = false;
+                    removed[line->index] = false;
+                }
+            }
+        }
+    }
+
+    // What each slot removed, after the lines glued to the body were put back.
+    {
+        std::vector<const BandLine*> by_page;
+        for (const BandLine& line : band) {
+            if (line.remove) by_page.push_back(&line);
+        }
+        std::ranges::stable_sort(by_page, {}, &BandLine::page);
+        std::vector<std::vector<std::size_t>> removed_pages(report.patterns.size());
+        std::vector<std::vector<std::string_view>> removed_keys(report.patterns.size());
+        for (const BandLine* line : by_page) {
+            FurniturePattern& pattern = report.patterns[line->pattern];
+            const std::string& text = pages[line->page][line->index].text;
+            if (pattern.sample.empty() && removed_pages[line->pattern].empty()) pattern.sample = text;
+            if (pattern.page_text.empty()) pattern.page_text.resize(pages.size());
+            if (pattern.page_text[line->page].empty()) pattern.page_text[line->page] = text;
+            removed_pages[line->pattern].push_back(line->page);
+            removed_keys[line->pattern].push_back(line->key);
+        }
+        for (std::size_t k = 0; k < report.patterns.size(); ++k) {
+            auto& pages_of = removed_pages[k];
+            pages_of.erase(std::unique(pages_of.begin(), pages_of.end()), pages_of.end());
+            std::ranges::sort(removed_keys[k]);
+            removed_keys[k].erase(std::unique(removed_keys[k].begin(), removed_keys[k].end()), removed_keys[k].end());
+            report.patterns[k].pages = pages_of.size();
+            report.patterns[k].variants = removed_keys[k].size();
+        }
+        std::erase_if(report.patterns, [](const FurniturePattern& p) { return p.pages == 0; });
     }
 
     // 4. Take the marked lines out of the pages.
