@@ -32,7 +32,7 @@
 
   <text x="330" y="148" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="96" font-weight="800" fill="url(#ink)" letter-spacing="2">HTPD</text>
   <text x="334" y="196" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="30" font-weight="600" fill="#1e293b">Hyper Text Portable Document</text>
-  <text x="334" y="240" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="21" fill="#475569">Long PDFs, made for AI: exact answers with page numbers - or "Not found in this file."</text>
+  <text x="334" y="240" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="21" fill="#475569">Long PDFs, made for AI: exact answers with page numbers, from the document itself.</text>
 
   <g font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="600">
     <rect x="334" y="268" width="168" height="34" rx="17" fill="#ffffff" stroke="#bfdbfe"/>

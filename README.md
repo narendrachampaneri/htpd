@@ -11,19 +11,86 @@
 </p>
 
 <p align="center">
-  <a href="#what-is-htpd"><b>What it is</b></a> &nbsp;·&nbsp;
+  <b>Turn long PDFs into documents AI reads correctly - exact text, every answer with its page.</b>
+</p>
+
+<p align="center">
+  <a href="https://htpd-studio.ai.studio/"><img src="https://img.shields.io/badge/Open-HTPD%20Studio-1d4ed8?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Open HTPD Studio"></a>
+  &nbsp;
+  <a href="https://github.com/narendrachampaneri/htpd/releases/latest"><img src="https://img.shields.io/badge/Download-v0.1.2-0f766e?style=for-the-badge&logo=github&logoColor=white" alt="Download"></a>
+</p>
+
+<p align="center">
+  <a href="#in-plain-words"><b>In plain words</b></a> &nbsp;·&nbsp;
+  <a href="#see-it-work"><b>See it work</b></a> &nbsp;·&nbsp;
   <a href="#install-in-one-minute"><b>Install</b></a> &nbsp;·&nbsp;
-  <a href="#quick-start"><b>Quick start</b></a> &nbsp;·&nbsp;
   <a href="#use-it-with-your-ai"><b>Use with your AI</b></a> &nbsp;·&nbsp;
-  <a href="#the-format"><b>Format</b></a> &nbsp;·&nbsp;
-  <a href="#results"><b>Results</b></a> &nbsp;·&nbsp;
+  <a href="#for-developers"><b>For developers</b></a> &nbsp;·&nbsp;
+  <a href="#quality"><b>Quality</b></a> &nbsp;·&nbsp;
   <a href="#roadmap"><b>Roadmap</b></a>
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/narendrachampaneri/htpd/main/docs/assets/demo.gif" alt="Converting a data sheet with htpd and asking questions with htpd-read" width="88%">
-  <br><sub>Real commands and output of htpd 0.1.2 on the NXP i.MX 93 data sheet (shortened).</sub>
+  <img src="https://raw.githubusercontent.com/narendrachampaneri/htpd/main/docs/assets/how-it-works.gif" alt="A PDF becomes an HTPD file; a question uses only the sections it needs; the answer is exact text with its page" width="100%">
 </p>
+
+---
+
+## In plain words
+
+You have a long PDF - a 300-page datasheet, a 5000-page reference manual, a
+policy, a report - and a question about it. Given the whole PDF, an AI often
+answers slowly, misses details, mixes up tables and cannot show where its
+answer comes from.
+
+**HTPD prepares the document for the AI.** The converter turns the PDF into
+one `.htpd` file: the same text, word for word, cut into the document's own
+chapters and sections, with the page of every paragraph, the tables as rows,
+and the figures as pictures. The AI then reads only the few sections a
+question needs and answers from the exact text - with the page, so you can
+check it.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/narendrachampaneri/htpd/main/docs/assets/features.svg" alt="Exact text - Every fact has a page - Honest answers - 100 % local" width="100%">
+</p>
+
+| What you get | What it means for you |
+|---|---|
+| **Exact text** | Values, part numbers and register names exactly as in the PDF. Nothing is summarised or rewritten. |
+| **A page for every fact** | Every answer can be checked in the original document in seconds. |
+| **Honest answers** | When the document does not hold the answer, HTPD says so instead of guessing. |
+| **Tables and figures** | Tables stay rows with their columns; diagrams and photos are kept as pictures with their caption. |
+| **Scanned pages too** | Text in scans and pictures is read by OCR (free Tesseract), marked so you know. |
+| **Private and free** | Runs on your own computer. No GPU, no account, no cloud. Open source. |
+
+**Try it in the browser:** [**HTPD Studio**](https://htpd-studio.ai.studio/).
+
+---
+
+## See it work
+
+Real commands and their output on a public 109-page data sheet (NXP i.MX 93, shortened where long).
+
+**1. Convert the PDF once** - about a second for 100 pages:
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/narendrachampaneri/htpd/main/docs/assets/demo-convert.gif" alt="htpd convert turns the 109-page data sheet into one .htpd file in 1.2 seconds" width="92%">
+</p>
+
+**2. Ask in your own words** - the exact line from the document, with its page and section:
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/narendrachampaneri/htpd/main/docs/assets/demo-ask.gif" alt="htpd-read shows the contents and answers two questions with the exact table row and page" width="92%">
+</p>
+
+**3. Figures stay pictures** - an AI that can see images looks at the diagram itself:
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/narendrachampaneri/htpd/main/docs/assets/demo-figure.gif" alt="htpd-read figure writes the block diagram of the data sheet as a picture" width="92%">
+</p>
+
+In daily use you do not type these commands: you give the `.htpd` file to
+your AI, or let the plugin, the skill or the MCP server do it for you.
 
 ---
 
@@ -31,180 +98,63 @@
 
 | You use | Do this |
 |---|---|
-| **Claude Code** | `/plugin marketplace add narendrachampaneri/htpd` then `/plugin install htpd@htpd` - converts PDFs and answers from them, MCP server included |
+| **Claude Code** | `/plugin marketplace add narendrachampaneri/htpd` then `/plugin install htpd@htpd` - converts PDFs and answers from them; the MCP server is included |
 | **Claude app** and other apps with skills | Add [`htpd-skill.zip`](https://github.com/narendrachampaneri/htpd/releases/latest) under *Customize → Skills* |
 | **Any MCP client** (Antigravity, Codex, Cursor, ...) | `pip install htpd-reader`, then the command `htpd-mcp --bundles <folder>` - or find `io.github.narendrachampaneri/htpd` in the MCP registry |
 | **ChatGPT, Gemini** | Upload the `.htpd` file, or make a custom GPT / Gem with the [ready instructions](https://github.com/narendrachampaneri/htpd/blob/main/docs/AI-APPS.md) |
-| **The converter** (PDF → `.htpd`) | [Download](https://github.com/narendrachampaneri/htpd/releases/latest) `htpd-0.1.2-linux-x64.tar.gz` (Linux, WSL) and run `./htpd convert manual.pdf --single` |
+| **The converter** (PDF → `.htpd`) | [Download](https://github.com/narendrachampaneri/htpd/releases/latest) `htpd-0.1.2-linux-x64.tar.gz` (Linux, Windows with WSL) and run `./htpd convert manual.pdf --single` |
 
-The converter and the reader run on your computer: free, open source, no GPU, no account. What reaches an AI is only the text you give it.
-
----
-
-## What is HTPD?
-
-You have a 300-page datasheet or a 5000-page reference manual and a question
-about it. You upload the PDF to an AI, and it answers slowly, misses details,
-mixes up tables, cannot tell you the page - or invents an answer that is not
-in the document at all.
-
-**HTPD fixes the input instead of the model.** It has two parts:
-
-| | Part | What it does |
-|---|---|---|
-| **A** | **Converter** (`htpd`, C++) | Turns a PDF into HTPD: the exact text, cut into sections at the document's own headings (or into parts of a few pages when it has none), every paragraph with its page, tables kept as rows, code kept as code, headers and footers removed, figures stored as pictures with their caption, and text inside pictures read by OCR. |
-| **B** | **Reader** (`htpd-read`, skill, MCP server, Python) | Lets any AI use an HTPD document: it finds the few sections that answer a question and hands over only that text - with pages - or says **"Not found in this file."** It can also hand over any figure as an image. |
-
-```mermaid
-flowchart LR
-    PDF["📄 PDF<br/>56 MB, 5652 pages"] -->|htpd convert| H["HTPD<br/>sections · pages · tree"]
-    H -->|upload| CHAT["AI chat<br/>(file + skill)"]
-    H -->|htpd-read / MCP| AGENT["AI agent<br/>(Claude Code, Antigravity, Codex)"]
-    CHAT --> ANS["Answer from the file<br/>with page numbers"]
-    AGENT --> ANS
-```
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/narendrachampaneri/htpd/main/docs/assets/features.svg" alt="Exact text - Every fact has a page - Says not found - 100 % local" width="100%">
-</p>
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/narendrachampaneri/htpd/main/docs/assets/before-after.svg" alt="A PDF page becomes a clean HTPD section with its place in the document and page marks" width="100%">
-</p>
-
----
-
-## Quick start
-
-### Download (no build needed)
-
-Get the files from the [**release page**](https://github.com/narendrachampaneri/htpd/releases):
-
-| File | What it is |
-|---|---|
-| `htpd-0.1.2-linux-x64.tar.gz` | The converter, ready to run - Linux x64, Ubuntu 24.04 or newer, also WSL on Windows |
-| `htpd-skill.zip` | The skill for AI apps ([how to add it](#2-apps-with-skills---the-htpd-skill)) |
-
-```sh
-tar xzf htpd-0.1.2-linux-x64.tar.gz
-cd htpd-0.1.2-linux-x64
-./htpd convert manual.pdf --single           # writes manual.htpd - give it to your AI
-```
-
-### Build from source
-
-**Requirements:** Linux (tested on Ubuntu 24.04, also in WSL), g++ 13+, make or CMake, Python 3.10+.
-
-```sh
-git clone https://github.com/narendrachampaneri/htpd.git
-cd htpd
-
-./scripts/get_pdfium.sh        # downloads the PDF engine once (PDFium, about 4 MB)
-make                           # builds build/htpd
-make test                      # optional: the C++ tests
-```
-
-**Convert a PDF**
-
-```sh
-./build/htpd convert manual.pdf --single     # one file: manual.htpd  (for AI chats)
-./build/htpd convert manual.pdf              # a folder: manual.htpd/ (for tools and agents)
-```
-
-**Ask a question from the command line**
-
-```sh
-python3 -m pip install -e .                  # installs htpd-read and htpd-mcp
-
-# try it on the sample file that comes with the repository
-htpd-read ask examples/single-file/sample.htpd "What is the maximum bus voltage?"
-```
-
-```
-[page 2, 2.1.1 Limits]
-  Parameter | Min | Typ | Max | Unit
-  Bus voltage | 200 | 400 | 480 | V
-...
-```
-
-Each answer line is copied word for word from the file, with its page and
-section; `--context` adds the whole sections for the AI to read.
-
-```sh
-htpd-read ask examples/single-file/sample.htpd "Which OCPP version is supported?"
-```
-
-```
-Not found in this file. (the file never mentions OCPP)
-```
-
-Then use your own file the same way: `htpd-read ask manual.htpd "your question"`.
+The converter and the reader run on your computer. What reaches an AI is
+only the text you give it.
 
 ---
 
 ## Use it with your AI
 
-### 1. Any AI chat - just upload the file
+<details open>
+<summary><b>Any AI chat - just upload the file</b></summary>
+
+<br>
 
 `htpd convert manual.pdf --single` writes **one `.htpd` file**. It begins
 with the reading rules for the model - *answer only from this file, give the
-page of every fact, say "Not found in this file." when the answer is not
-there* - followed by the contents and every section with its pages.
+page of every fact, say so when the answer is not there* - then the contents
+and every section with its pages.
 
-Upload it to Claude, ChatGPT or any other assistant instead of the PDF.
-If an app does not accept the extension, rename it to `manual.htpd.txt` -
-it is plain text.
+Upload it to Claude, ChatGPT, Gemini or any other assistant instead of the
+PDF. If an app does not accept the extension, rename it to
+`manual.htpd.txt` - it is plain text. For a ChatGPT custom GPT or a Gemini
+Gem that always has your document, see
+[`docs/AI-APPS.md`](https://github.com/narendrachampaneri/htpd/blob/main/docs/AI-APPS.md)
+(instructions ready to paste).
 
-> Best for documents that fit in the chat's context (a datasheet of a few
-> hundred pages). For very large manuals, use the skill below.
+Best for documents that fit in the chat (a datasheet of a few hundred
+pages). For very large manuals use the skill, the plugin or MCP below.
 
-For a ChatGPT custom GPT or a Gemini Gem that always has your document and
-follows the rules, see [`docs/AI-APPS.md`](https://github.com/narendrachampaneri/htpd/blob/main/docs/AI-APPS.md) (instructions
-ready to paste).
+</details>
 
-### 2. Apps with skills - the `htpd` skill
+<details>
+<summary><b>Claude app and apps with skills - the <code>htpd</code> skill</b></summary>
 
-Download `htpd-skill.zip` from the [release page](https://github.com/narendrachampaneri/htpd/releases),
-or build it from the repository:
-
-```sh
-python3 scripts/build_skill.py               # writes dist/htpd-skill.zip
-```
+<br>
 
 | App | How to add it |
 |---|---|
 | **Claude app** | *Customize → Skills*, upload `htpd-skill.zip`, switch it on (code execution must be on). Then upload a `.htpd` file to a chat and ask. |
-| **Claude Code** | Install the plugin ([section 4](#4-claude-code---the-htpd-plugin)), or unzip into `~/.claude/skills/` (gives `~/.claude/skills/htpd/`). |
+| **Claude Code** | Install the plugin (below), or unzip into `~/.claude/skills/`. |
 | **Other agents** that read `SKILL.md` | Unzip into their skills folder. |
 
 The skill runs a small script that needs **only Python** - no packages, no
-model. It searches the file, returns the exact lines with `[page, section]`,
-and says why when something is not in the file. Because the model reads only
-what the script returns, this also works for manuals far too large for any
-chat.
+model. It finds the right sections and returns the exact lines with
+`[page, section]`. Because the AI reads only what the script returns, this
+works even for manuals of thousands of pages.
 
-### 3. Agents with MCP - the `htpd-mcp` server
+</details>
 
-```sh
-pip install htpd-reader        # the reader: htpd-read and htpd-mcp, nothing else needed
-```
+<details>
+<summary><b>Claude Code - the <code>htpd</code> plugin</b></summary>
 
-The server is also listed in the official MCP registry as
-`io.github.narendrachampaneri/htpd` (MCP clients start it with `uvx htpd-reader`).
-
-```sh
-claude mcp add htpd -- htpd-mcp --bundles ~/manuals        # Claude Code
-```
-
-For Antigravity, Codex or any MCP client: command `htpd-mcp`, arguments
-`--bundles /path/to/your/htpd/files`. Tools: `list_bundles`, `contents`,
-`open_section`, `search`, `ask`, `figure` (the picture of a figure, as an
-image), `check`. Standard library only.
-
-### 4. Claude Code - the `htpd` plugin
-
-One install gives Claude Code everything: the skill that answers from
-`.htpd` files, a skill that converts PDFs, and the MCP server.
+<br>
 
 ```
 /plugin marketplace add narendrachampaneri/htpd
@@ -213,20 +163,103 @@ One install gives Claude Code everything: the skill that answers from
 
 Then ask in plain words - *"convert datasheet.pdf to htpd"*, *"what is the
 maximum NPU frequency in datasheet.htpd?"* - or run `/htpd:convert
-datasheet.pdf --single`. The first conversion downloads the converter of the
-release (Linux x64 and WSL, about 4 MB, checked by SHA-256) once; an `htpd`
-already on the PATH is used instead. Only Python 3.10+ is needed; the PDF
+datasheet.pdf --single`. The first conversion downloads the released
+converter once (Linux and WSL, about 4 MB, checked by SHA-256). The PDF
 never leaves the computer.
+
+</details>
+
+<details>
+<summary><b>Agents with MCP - the <code>htpd-mcp</code> server</b></summary>
+
+<br>
+
+```sh
+pip install htpd-reader                                   # htpd-read and htpd-mcp, nothing else needed
+claude mcp add htpd -- htpd-mcp --bundles ~/manuals       # Claude Code
+```
+
+For Antigravity, Codex, Cursor or any MCP client: command `htpd-mcp`,
+arguments `--bundles /path/to/your/htpd/files`. The server is also listed in
+the official MCP registry as `io.github.narendrachampaneri/htpd` (clients
+start it with `uvx htpd-reader`). Tools: `list_bundles`, `contents`,
+`open_section`, `search`, `ask`, `figure` (the picture of a figure, as an
+image), `check`.
+
+</details>
 
 ---
 
-## The format
+## For developers
 
-An HTPD document is plain UTF-8 text: Markdown with a few fields. Any
-model, editor or `grep` can read it.
+### How it works
+
+```mermaid
+flowchart LR
+    PDF["📄 PDF<br/>scanned or digital"] -->|htpd convert| H["HTPD<br/>sections · pages · tables · figures"]
+    H -->|upload| CHAT["AI chat<br/>(file + reading rules)"]
+    H -->|skill · plugin · MCP| AGENT["AI agent<br/>(Claude, Antigravity, Codex)"]
+    CHAT --> ANS["Answer from the exact text<br/>with page numbers"]
+    AGENT --> ANS
+```
+
+| Part | What it does |
+|---|---|
+| **Converter** `htpd` (C++23, PDFium) | Reads every character with its position and font, removes headers and footers, finds the headings (bookmarks, a printed table of contents, numbering, font size), cuts the text into sections, keeps tables as rows and code as code, stores figures as PNG with their caption, reads scans with OCR. |
+| **Reader** `htpd-read` (Python, standard library only) | Finds the sections that answer a question (word search, the tree of titles, a small trained re-ranker), packs only that text with its pages, picks the exact answer lines, and says when the file cannot answer. Also as a skill, a plugin and an MCP server. |
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/narendrachampaneri/htpd/main/docs/assets/before-after.svg" alt="A PDF page becomes a clean HTPD section with its place in the document and page marks" width="100%">
+</p>
+
+### Quick start
+
+**Download** (no build needed) from the [release page](https://github.com/narendrachampaneri/htpd/releases/latest):
+
+```sh
+tar xzf htpd-0.1.2-linux-x64.tar.gz
+cd htpd-0.1.2-linux-x64
+./htpd convert manual.pdf --single           # writes manual.htpd
+sudo apt install tesseract-ocr               # optional: read scanned pages too
+```
+
+**Build from source** - Linux (Ubuntu 24.04, also WSL), g++ 13+, make or CMake, Python 3.10+:
+
+```sh
+git clone https://github.com/narendrachampaneri/htpd.git && cd htpd
+./scripts/get_pdfium.sh        # the PDF engine, once (about 4 MB)
+make                           # builds build/htpd
+make test                      # the C++ tests
+```
+
+**Convert and ask:**
+
+```sh
+./build/htpd convert manual.pdf --single     # one file: manual.htpd  (for AI chats)
+./build/htpd convert manual.pdf              # a folder: manual.htpd/ (for tools and agents)
+
+pip install htpd-reader                      # or: python3 -m pip install -e .
+htpd-read ask examples/single-file/sample.htpd "What is the maximum bus voltage?"
+```
+
+```
+[page 2, 2.1.1 Limits]
+  Parameter | Min | Typ | Max | Unit
+  Bus voltage | 200 | 400 | 480 | V
+```
+
+Every answer line is copied word for word from the file; `--context` adds
+the whole sections for the AI. More commands: `contents`, `section`,
+`search`, `figure`, `check` - see
+[`reader/README.md`](https://github.com/narendrachampaneri/htpd/blob/main/reader/README.md).
+
+### The format
+
+An HTPD document is plain UTF-8 text: Markdown with a few fields. Any model,
+editor or `grep` can read it.
 
 <details>
-<summary><b>See one section of an HTPD file</b> (shortened)</summary>
+<summary><b>One section of an HTPD file</b> (shortened)</summary>
 
 ````markdown
 <!-- htpd section {"n":14,"id":"sections/0014-4-1-5-maximum-frequency-of-main-modules","number":"4.1.5","level":3,"pages":[18,18,18],"parent":"sections/0008-4-1-chip-level-conditions"} -->
@@ -245,61 +278,53 @@ NPU | 500 MHz | 800 MHz | 1000 MHz
 
 </details>
 
-- **Sections** follow the document's own headings (bookmarks, numbered headings, font sizes) and form a tree: parent, children, previous, next.
+- **Sections** follow the document's own headings and form a tree: parent, children, previous, next.
 - **Page marks** `<!-- page N -->` stand above the text of every page.
 - **Tables** are rows with ` | ` between cells; **code and listings** keep their spacing.
-- **Two forms, same content:** a single `.htpd` file (for chats) and a bundle folder with one file per section (for tools), which is also a valid [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) bundle.
+- **Figures** are PNG pictures with caption and page, stored inside the file.
+- **Two forms, same content:** a single `.htpd` file (for chats) and a folder with one file per section (for tools), which is also a valid [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) bundle.
 
-The full specification - every field and every rule - is in
-[`docs/FORMAT.md`](https://github.com/narendrachampaneri/htpd/blob/main/docs/FORMAT.md). Examples:
-[`examples/single-file/sample.htpd`](https://github.com/narendrachampaneri/htpd/blob/main/examples/single-file/sample.htpd) and
-[`examples/sample.htpd/`](https://github.com/narendrachampaneri/htpd/blob/main/examples/sample.htpd/).
+The full specification is [`docs/FORMAT.md`](https://github.com/narendrachampaneri/htpd/blob/main/docs/FORMAT.md).
+Examples: [`examples/single-file/sample.htpd`](https://github.com/narendrachampaneri/htpd/blob/main/examples/single-file/sample.htpd) and
+[`examples/sample.htpd/`](https://github.com/narendrachampaneri/htpd/tree/main/examples/sample.htpd).
 
 ---
 
-## Results
+## Quality
 
-The converter on real documents (single file, figures and OCR on, a 2-core
-cloud machine):
+**Speed and size** - single file, figures and OCR on, a 2-core cloud machine:
 
 | Document | Pages | Sections | Figures | PDF → `.htpd` | Time |
 |---|---:|---:|---:|---|---:|
-| NXP i.MX 93 Automotive Data Sheet | 109 | 114 | 53 | 1.7 MB → 2.5 MB | 2.1 s |
+| NXP i.MX 93 Automotive Data Sheet | 109 | 114 | 53 | 1.7 MB → 2.5 MB | 1.2 s |
 | NXP i.MX 93 Reference Manual | 5 652 | 5 929 | 637 | 56.3 MB → 39.8 MB | 67 s |
 | RISC-V Debug Specification | 119 | 164 | 3 | 2.4 MB → 0.7 MB | 3.4 s |
 | Arm AAPCS64 | 65 | 125 | 5 | 0.4 MB → 0.3 MB | 0.3 s |
 | RISC-V Unprivileged ISA | 670 | 760 | 25 | 4.5 MB → 2.8 MB | 4.9 s |
 
-Most of a file with figures is their pictures, which stand at its very end:
-the text comes first. `--figures off` leaves them out (the i.MX 93 Reference
-Manual is then 14 MB). Without the Tesseract program the converter skips
-OCR and says which pages it could not read.
+Most of a file with figures is their pictures, at its very end; the text comes first. `--figures off` leaves them out.
 
-The reader on 133 test questions about two public manuals
-([`eval/report.md`](https://github.com/narendrachampaneri/htpd/blob/main/eval/report.md), written by the evaluation harness):
+**Finding the answer** - 133 test questions about two public manuals ([`eval/report.md`](https://github.com/narendrachampaneri/htpd/blob/main/eval/report.md), written by the evaluation harness):
 
-| | Right section first | Right section in the first 5 | Right page | Answer in the text for the AI | "Not found" right / wrong |
-|---|---:|---:|---:|---:|---:|
-| HTPD reader | **0.78** | **0.95** | **0.64** | **0.86** | **0.95 / 0.01** |
-| Plain word search over HTPD sections (B3) | 0.64 | 0.87 | 0.55 | 0.83 | never says it |
-| Plain word search over 500-token chunks (B1) | 0.32 | 0.72 | 0.51 | 0.83 | never says it |
+| | Right section first | Right section in the first 5 | Right page | Answer in the text for the AI |
+|---|---:|---:|---:|---:|
+| **HTPD reader** | **0.78** | **0.95** | **0.64** | **0.86** |
+| Plain word search over HTPD sections | 0.64 | 0.87 | 0.55 | 0.83 |
+| Plain word search over 500-token chunks | 0.32 | 0.72 | 0.51 | 0.83 |
 
-The text handed to the AI is about 6 % of the whole document.
+The text handed to the AI is about 6 % of the whole document, and the reader
+correctly says "not in this file" for 95 % of the questions the manuals do
+not answer.
 
-The converter on 45 PDFs of known text, made by Word, LaTeX, Chrome,
-wkhtmltopdf and LibreOffice slides, scanned, and with letters drawn as
-shapes (`tests/zoo`): 99 % of the text of the English ones in order, 96 %
-of their headings, 89 % of their table rows exact; Hindi and Gujarati from
-Word 91 % and 99 % of the text.
+**Many kinds of PDF** - 45 PDFs of known text, made by Word, LaTeX, Chrome,
+wkhtmltopdf and slide software, scanned, and with letters drawn as shapes
+([`tests/zoo`](https://github.com/narendrachampaneri/htpd/tree/main/tests/zoo)):
+99 % of the text in order, 96 % of the headings, 89 % of the table rows exact.
 
-**Robustness.** A stress test makes 34 difficult PDFs locally - two
-columns, sideways tables, rotated pages, 1500 pages, huge tables, CJK and
-Unicode text, encrypted, truncated and corrupted files, a scanned page,
-LaTeX and Word exports - and checks that the converter never crashes or
-hangs, that every bundle is valid, and that no word is lost.
-
-**Tests.** 102 C++ tests and 155 Python tests run on every change, the
-Python tests also without PyYAML, as the skill does in a chat sandbox.
+**Robustness** - a stress test of 34 difficult PDFs (two columns, sideways
+tables, rotated pages, 1500 pages, encrypted, truncated and corrupted
+files): no crash, no hang, every file valid, no word lost. 102 C++ tests
+and 155 Python tests run on every change.
 
 ---
 
@@ -308,22 +333,19 @@ Python tests also without PyYAML, as the skill does in a chat sandbox.
 HTPD is version 0.1.2. It works today; these are the known next steps.
 
 - [x] Converter: sections, pages, tables, code, headers/footers, sideways pages, damaged files
-- [x] Structure for documents without headings (parts of a few pages) and a map of the document
-- [x] Figures stored as pictures with caption and page; OCR of scanned pages and text in pictures (Tesseract, optional)
-- [x] Single-file `.htpd` with reading rules for AI models
-- [x] Reader, "not found" rule, `ask`, MCP server, skill for AI apps; figures handed to the AI as images
-- [x] Claude Code plugin, `pip install htpd-reader`, listed in the MCP registry, ready instructions for ChatGPT and Gemini
-- [x] Tested on 45 kinds of PDF of known text: Word, LaTeX, Chrome, slides, scans, letters drawn as shapes ([`tests/zoo`](https://github.com/narendrachampaneri/htpd/tree/main/tests/zoo))
-- [x] A small trained re-ranker (no GPU, a few kilobytes) - the right section first for 78 % of test questions instead of 66 % without it ([`model/README.md`](https://github.com/narendrachampaneri/htpd/blob/main/model/README.md))
+- [x] Headings from bookmarks, a printed table of contents, numbering and font size; parts of a few pages for documents without headings
+- [x] Figures as pictures with caption and page; OCR of scanned pages and text in pictures
+- [x] Reader, answer lines, MCP server, skill; a small trained re-ranker ([`model/README.md`](https://github.com/narendrachampaneri/htpd/blob/main/model/README.md))
+- [x] Claude Code plugin, `pip install htpd-reader`, MCP registry, instructions for ChatGPT and Gemini, [HTPD Studio](https://htpd-studio.ai.studio/)
+- [x] Tested on 45 kinds of PDF of known text
 - [ ] Other document types: Word, HTML, plain text, images
-- [ ] "Not found" for questions in the user's own words (a word the document writes differently)
-- [ ] Windows build
+- [ ] Questions in the user's own words (a word the document writes differently)
+- [ ] Windows build without WSL
 
 **Known limits:** PDF only; what a chart or diagram means is only in its
-picture (an AI must look at it); formulas lose their layout; scanned pages
-need the free Tesseract program; tables are rows of text (a table whose
-first column wraps can come apart); tested mainly with English technical
-documents. Details: [`docs/CONVERTER.md`](https://github.com/narendrachampaneri/htpd/blob/main/docs/CONVERTER.md#limits-please-read).
+picture (an AI must look at it); formulas lose their layout; OCR can misread
+a number on a scan (check it against the page); tested mainly with English
+technical documents. Details: [`docs/CONVERTER.md`](https://github.com/narendrachampaneri/htpd/blob/main/docs/CONVERTER.md#limits-please-read).
 
 ---
 
@@ -341,7 +363,7 @@ skills/convert/         the plugin's skill that converts PDFs
 eval/                   evaluation harness, baselines, report
 model/                  the training of the re-ranker
 tests/                  C++ tests, test PDFs, the stress test, the document zoo
-docs/                   FORMAT.md · CONVERTER.md · READER.md · BACKGROUND.md
+docs/                   FORMAT.md · CONVERTER.md · READER.md · AI-APPS.md · BACKGROUND.md
 examples/               a converted document in both forms
 ```
 
@@ -351,12 +373,11 @@ examples/               a converted document in both forms
 | [`docs/CONVERTER.md`](https://github.com/narendrachampaneri/htpd/blob/main/docs/CONVERTER.md) | Building, options, how the converter works, what was tested, limits |
 | [`reader/README.md`](https://github.com/narendrachampaneri/htpd/blob/main/reader/README.md) | The reader, its commands and its Python API |
 | [`docs/READER.md`](https://github.com/narendrachampaneri/htpd/blob/main/docs/READER.md) | How the reader finds the answer, and how it is measured |
+| [`docs/AI-APPS.md`](https://github.com/narendrachampaneri/htpd/blob/main/docs/AI-APPS.md) | ChatGPT custom GPT and Gemini Gem |
 | [`docs/BACKGROUND.md`](https://github.com/narendrachampaneri/htpd/blob/main/docs/BACKGROUND.md) | Why HTPD is built the way it is |
 | [`AGENTS.md`](https://github.com/narendrachampaneri/htpd/blob/main/AGENTS.md) | Rules for contributors and coding agents |
 
 </details>
-
----
 
 ## Contributing
 
@@ -385,7 +406,7 @@ with `libpdfium.so`, give them those files too.
 
 <div align="center">
 
-Made by **Narendra Champaneri**
+Made by **Narendra Champaneri** &nbsp;·&nbsp; [HTPD Studio](https://htpd-studio.ai.studio/) &nbsp;·&nbsp; [Releases](https://github.com/narendrachampaneri/htpd/releases) &nbsp;·&nbsp; [PyPI](https://pypi.org/project/htpd-reader/)
 
 </div>
 
