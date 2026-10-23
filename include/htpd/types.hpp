@@ -197,7 +197,7 @@ struct Paragraph {
     std::string text;
     // Text that runs on over a page break: where in `text` (byte offset) each
     // later page begins, and that page. The page mark is written there.
-    std::vector<std::pair<std::size_t, int>> page_starts;
+    std::vector<std::pair<std::size_t, int>> page_starts = {};
 };
 
 // A link from the text of a section to another section.
