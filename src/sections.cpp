@@ -312,21 +312,85 @@ std::string rows_text(std::span<const Line* const> rows, std::span<const std::ui
 
 namespace {
 
+// A space between two cells is at least this many font sizes wide (columns.hpp).
+constexpr float kMinGutter = 0.8f;
+
+// A cell that runs across the start of the next column, set so tight that
+// the line builder saw no column gap ("Requests votes, increments term
+// counter Election timeout elapses"): it is split at the space in which that
+// column starts, when the space is wider than one between words. Nothing
+// when there is no such space (then it is not certain where the cell ends).
+std::vector<Cell> split_at_columns(const Line& line, const Cell& cell, std::span<const float> left, float slack) {
+    const std::size_t spaces = static_cast<std::size_t>(std::ranges::count(line.text, ' '));
+    if (line.space_begin.size() != spaces || line.space_end.size() != spaces) return {};
+    const std::string_view text = line.text;
+    const std::size_t offset = static_cast<std::size_t>(cell.text.data() - text.data());
+    if (offset > text.size()) return {};
+    std::size_t k = static_cast<std::size_t>(std::count(text.begin(), text.begin() + static_cast<std::ptrdiff_t>(offset), ' '));
+    std::vector<Cell> out;
+    Cell rest = cell;
+    std::size_t c = 0;
+    while (c + 1 < left.size() && rest.x0 >= left[c + 1] - slack) ++c;
+    for (std::size_t pos = offset; pos < offset + cell.text.size(); ++pos) {
+        if (text[pos] != ' ') continue;
+        const std::size_t space = k++;
+        if (c + 1 >= left.size() || rest.x1 <= left[c + 1] + slack) break;   // the rest fits its column
+        // The column starts inside this space, and the space is wider than one between words.
+        const float next_word = line.space_end[space];
+        if (line.space_begin[space] > left[c + 1] + slack || next_word < left[c + 1] - slack) continue;
+        if (next_word - line.space_begin[space] < kMinGutter * std::max(line.size, 1.0f)) continue;
+        const std::size_t begin = static_cast<std::size_t>(rest.text.data() - text.data());
+        out.push_back({rest.x0, line.space_begin[space], text.substr(begin, pos - begin)});
+        rest = {next_word, cell.x1, text.substr(pos + 1, offset + cell.text.size() - pos - 1)};
+        ++c;
+    }
+    if (out.empty()) return {};
+    out.push_back(rest);
+    return out;
+}
+
 // A table that the PDF stores cell by cell: after its header row come the
 // lines of one cell after the other (the name, every line of a long
 // description, then the short cells to the right, which stand back up beside
 // the first line). Read in that order, the rows come apart. Starting at a
 // header row with at least three cells, this takes the following lines as
 // long as every piece of each line stays inside one column, and puts the
-// rows together again by position: each piece in the first column starts a
-// row, every other piece joins the row it stands beside. Text that crosses
-// the columns ends the table. Returns the end of the table (`start` when
-// there is nothing to rebuild: the lines already read row by row), and the
-// rows in `out`. Every piece of text is kept.
-std::size_t rebuild_table(std::span<const Line> lines, std::size_t start, std::span<const ParagraphKind> kinds,
-                          float line_pitch, std::string& out) {
-    const Line& header = lines[start];
-    const std::vector<Cell> head = cells_of(header);
+// rows together again by position: the rows are the bands the pieces share
+// across the page (see below). Text that crosses the columns ends the
+// table. Returns the end of the table (`start` when there is nothing to
+// rebuild: the lines already read row by row), and the rows in `out`. Every
+// piece of text is kept.
+std::size_t rebuild_table(std::span<const Line> lines, std::size_t header_begin, std::size_t start,
+                          std::span<const ParagraphKind> kinds, float line_pitch, std::string& out) {
+    // The header: the line at `start`, or the lines [header_begin, start) when
+    // the header is printed in pieces above the first row ("Gross" over "Revenue").
+    const bool band_header = header_begin < start;
+    const auto is_head = [&](std::size_t line) { return band_header ? line >= header_begin && line < start : line == start; };
+    const Line& header = lines[header_begin];
+    std::vector<Cell> head;           // the columns of the header, left to right
+    std::vector<std::pair<std::size_t, Cell>> head_cells;   // every cell of the header lines, with its line
+    float header_top = header.baseline, header_bottom = header.baseline, header_right = header.x1;
+    for (std::size_t i = header_begin; i < (band_header ? start : start + 1); ++i) {
+        if (lines[i].text.empty()) continue;
+        const std::vector<Cell> cells = cells_of(lines[i]);
+        if (cells.empty()) return start;
+        for (const Cell& cell : cells) head_cells.emplace_back(i, cell);
+        header_top = std::min(header_top, lines[i].baseline);
+        header_bottom = std::max(header_bottom, lines[i].baseline);
+        header_right = std::max(header_right, lines[i].x1);
+    }
+    {
+        std::vector<Cell> sorted;
+        for (const auto& [i, cell] : head_cells) sorted.push_back(cell);
+        std::ranges::stable_sort(sorted, {}, &Cell::x0);
+        for (const Cell& cell : sorted) {
+            if (band_header && !head.empty() && cell.x0 < head.back().x1) {
+                head.back().x1 = std::max(head.back().x1, cell.x1);   // stacked pieces of one column
+            } else {
+                head.push_back(cell);
+            }
+        }
+    }
     const std::size_t columns = head.size();
     if (columns < 3) return start;
     const float size = std::max(header.size, 1.0f);
@@ -336,7 +400,7 @@ std::size_t rebuild_table(std::span<const Line> lines, std::size_t start, std::s
     for (std::size_t c = 0; c + 1 < columns; ++c) {
         if (head[c].x1 >= left[c + 1]) return start;
     }
-    const float right_edge = std::max(header.x1, left.back()) + 15.0f * size;
+    const float right_edge = std::max(header_right, left.back()) + 15.0f * size;
 
     struct Piece {
         float baseline, x0, x1;
@@ -345,88 +409,267 @@ std::size_t rebuild_table(std::span<const Line> lines, std::size_t start, std::s
         std::size_t line;   // index in `lines`
     };
     std::vector<Piece> pieces;
-    const auto column_of = [&](const Cell& cell) -> std::optional<std::size_t> {
+    const auto column_of = [&](const Cell& cell, bool centred = false) -> std::optional<std::size_t> {
         if (cell.x0 < left[0] - slack) return std::nullopt;
         std::size_t c = 0;
         while (c + 1 < columns && cell.x0 >= left[c + 1] - slack) ++c;
         const float limit = c + 1 < columns ? left[c + 1] + slack : right_edge;
-        if (cell.x1 > limit) return std::nullopt;
-        return c;
+        if (cell.x1 <= limit) return c;
+        // With `centred`: a cell set in the middle of its column ("See note"
+        // under "Max."): its centre in the column, and clear of the header
+        // text of the columns beside it.
+        if (!centred) return std::nullopt;
+        const float centre = (cell.x0 + cell.x1) / 2;
+        std::size_t m = 0;
+        while (m + 1 < columns && centre >= left[m + 1]) ++m;
+        if (m == 0 || cell.x0 < head[m - 1].x1) return std::nullopt;
+        if (m + 1 < columns ? cell.x1 > left[m + 1] - slack : cell.x1 > right_edge) return std::nullopt;
+        return m;
     };
-    for (const Cell& cell : head) pieces.push_back({header.baseline, cell.x0, cell.x1, *column_of(cell), cell.text, start});
+    for (const auto& [i, cell] : head_cells) {
+        const auto c = column_of(cell);
+        if (!c) return start;
+        pieces.push_back({lines[i].baseline, cell.x0, cell.x1, *c, cell.text, i});
+    }
 
     std::vector<std::size_t> out_of_order, wraps;   // lines that go back up, lines that are not rows
-    float lowest = header.baseline;
-    float previous_baseline = header.baseline;
-    std::size_t end = start + 1;
+    float lowest = header_bottom;
+    float previous_baseline = header_bottom;
+    std::size_t end = band_header ? start : start + 1;
     for (; end < lines.size(); ++end) {
         const Line& line = lines[end];
+        if (line.figure > 0) break;   // a figure stands here: the table ends before it
         if (line.text.empty()) continue;
         if (line.page != header.page || kinds[end] == ParagraphKind::Code) break;
-        if (std::fabs(line.size - header.size) > 0.15f * size) break;
-        if (line.baseline < header.baseline - slack || line.baseline > lowest + 4.0f * line_pitch * size) break;
+        // Text larger than the header, or much smaller, is not part of the table
+        // (a symbol with a subscript, "VLVW1H", is a little smaller).
+        if (line.size > header.size + 0.15f * size || line.size < 0.7f * header.size) break;
+        if (line.baseline < header_top - slack || line.baseline > lowest + 4.0f * line_pitch * size) break;
         const std::vector<Cell> cells = cells_of(line);
         if (cells.empty()) break;
         std::vector<Piece> found;
+        bool fits = true;
         for (const Cell& cell : cells) {
-            const auto c = column_of(cell);
-            if (!c) break;
-            found.push_back({line.baseline, cell.x0, cell.x1, *c, cell.text, end});
+            if (const auto c = column_of(cell)) {
+                found.push_back({line.baseline, cell.x0, cell.x1, *c, cell.text, end});
+                continue;
+            }
+            const std::vector<Cell> parts = split_at_columns(line, cell, left, slack);
+            // Set in the middle of its column - but not a line alone, set in the
+            // middle of the table: that is a heading between the rows
+            // ("Debug/Trace Registers").
+            if (parts.empty() && cells.size() > 1) {
+                if (const auto c = column_of(cell, true)) {
+                    found.push_back({line.baseline, cell.x0, cell.x1, *c, cell.text, end});
+                    continue;
+                }
+            }
+            for (const Cell& part : parts) {
+                const auto c = column_of(part);
+                if (!c) break;
+                found.push_back({line.baseline, part.x0, part.x1, *c, part.text, end});
+            }
+            if (parts.empty() || found.empty() || found.back().text.data() != parts.back().text.data()) {
+                fits = false;
+                break;
+            }
         }
-        if (found.size() != cells.size()) break;
+        if (!fits) break;
         if (line.baseline < previous_baseline - slack) out_of_order.push_back(end);
         if (kinds[end] != ParagraphKind::Rows) wraps.push_back(end);
         previous_baseline = line.baseline;
         lowest = std::max(lowest, line.baseline);
         pieces.insert(pieces.end(), found.begin(), found.end());
     }
-    // The rows: one for each piece in the first column, by height on the page.
-    const auto row_starts = [&] {
-        std::vector<float> starts;
-        for (const Piece& p : pieces) {
-            if (p.column == 0) starts.push_back(p.baseline);
+    // The rows, as bands across the page. Pieces in different columns whose
+    // baselines lie closer than a line (a cell set in the middle of a row
+    // whose other cells wrap: "US-GAAP-101" above and "0" below the line of
+    // the values) belong to one row. A band with text in one column only, or
+    // nothing in the first column, holds the rest of a cell that wraps: it
+    // joins the band above, or the one below when that one is clearly nearer.
+    // Returns for each piece the number of its row (0 = the header).
+    const float link = 0.9f * size;
+    struct Band {
+        float top = 1e30f, bottom = -1e30f;
+        std::vector<bool> columns;
+        bool header = false;
+        bool cells = false;   // holds a line with two or more cells: a row of its own
+    };
+    struct Bands {
+        std::vector<Band> rows;            // from top to bottom
+        std::vector<std::size_t> of;       // for each piece: its band
+    };
+    const auto find_bands = [&]() {
+        const std::size_t n = pieces.size();
+        std::vector<std::size_t> parent(n);
+        for (std::size_t i = 0; i < n; ++i) parent[i] = i;
+        const auto find = [&](std::size_t i) {
+            while (parent[i] != i) i = parent[i] = parent[parent[i]];
+            return i;
+        };
+        std::vector<std::size_t> order(n);
+        for (std::size_t i = 0; i < n; ++i) order[i] = i;
+        std::ranges::stable_sort(order, [&](std::size_t x, std::size_t y) { return pieces[x].baseline < pieces[y].baseline; });
+        for (std::size_t a = 0; a < n; ++a) {
+            for (std::size_t b = a + 1; b < n; ++b) {
+                const Piece& p = pieces[order[a]];
+                const Piece& q = pieces[order[b]];
+                const float d = q.baseline - p.baseline;
+                if (d >= link) break;
+                if (p.column != q.column || d < 0.3f * size) parent[find(order[a])] = find(order[b]);
+            }
         }
-        std::ranges::sort(starts);
-        std::vector<float> at;
-        for (const float y : starts) {
-            if (at.empty() || y > at.back() + 0.3f * size) at.push_back(y);
+        // The linked groups from top to bottom; groups whose extents overlap are one band.
+        std::vector<Band> groups;
+        std::vector<std::size_t> group_of(n), root_group(n, n);
+        for (const std::size_t i : order) {
+            const std::size_t r = find(i);
+            if (root_group[r] == n) {
+                root_group[r] = groups.size();
+                groups.push_back({});
+                groups.back().columns.assign(columns, false);
+            }
+            group_of[i] = root_group[r];
+            Band& g = groups[group_of[i]];
+            g.top = std::min(g.top, pieces[i].baseline);
+            g.bottom = std::max(g.bottom, pieces[i].baseline);
+            g.columns[std::min(pieces[i].column, columns - 1)] = true;
+            g.header = g.header || is_head(pieces[i].line);
+            g.cells = g.cells || (i > 0 && pieces[i - 1].line == pieces[i].line) ||
+                      (i + 1 < n && pieces[i + 1].line == pieces[i].line);
         }
-        return at;
+        Bands bands;
+        std::vector<std::size_t> band_of_group(groups.size());
+        for (std::size_t k = 0; k < groups.size(); ++k) {
+            if (bands.rows.empty() || groups[k].top > bands.rows.back().bottom + 0.3f * size) {
+                bands.rows.push_back(groups[k]);
+            } else {
+                Band& row = bands.rows.back();
+                row.bottom = std::max(row.bottom, groups[k].bottom);
+                for (std::size_t c = 0; c < columns; ++c) row.columns[c] = row.columns[c] || groups[k].columns[c];
+                row.header = row.header || groups[k].header;
+                row.cells = row.cells || groups[k].cells;
+            }
+            band_of_group[k] = bands.rows.size() - 1;
+        }
+        bands.of.resize(n);
+        for (std::size_t i = 0; i < n; ++i) bands.of[i] = band_of_group[group_of[i]];
+        return bands;
     };
     // A real row has cells beside its first one. Lines at the end that only
-    // hold first-column text in the last row are the text after the table.
-    for (std::vector<float> at = row_starts(); at.size() >= 2 && end > start + 1;) {
-        const float last = at.back();
-        const bool alone = std::ranges::none_of(pieces, [&](const Piece& p) {
-            return p.column != 0 && p.baseline >= last - slack;
-        });
-        if (!alone) break;
-        // drop the lines from the end while they belong to that last row
-        const auto first_of_last = std::ranges::find_if(pieces, [&](const Piece& p) {
-            return p.baseline >= last - slack;
-        });
-        if (first_of_last == pieces.begin()) break;
-        const std::size_t keep = static_cast<std::size_t>(first_of_last - pieces.begin());
-        if (std::any_of(pieces.begin() + static_cast<std::ptrdiff_t>(keep), pieces.end(),
-                        [&](const Piece& p) { return p.baseline < last - slack; })) break;
-        while (end > start + 1 && lines[end - 1].baseline >= last - slack) --end;
-        pieces.resize(keep);
-        at = row_starts();
+    // hold first-column text in the last band are the text after the table.
+    Bands bands = find_bands();
+    while (bands.rows.size() >= 2 && end > start + 1) {
+        const std::size_t last = bands.rows.size() - 1;
+        const Band& band = bands.rows[last];
+        if (band.header || std::ranges::count(band.columns, true) != 1 || !band.columns[0]) break;
+        std::size_t first_line = end;
+        for (std::size_t i = 0; i < pieces.size(); ++i) {
+            if (bands.of[i] == last) first_line = std::min(first_line, pieces[i].line);
+        }
+        // only when the lines of that band are the last lines read
+        bool tail = first_line > start;
+        for (std::size_t i = 0; i < pieces.size(); ++i) {
+            if (pieces[i].line >= first_line && bands.of[i] != last) tail = false;
+        }
+        if (!tail) break;
+        end = first_line;
+        while (end > start + 1 && lines[end - 1].text.empty()) --end;
+        std::erase_if(pieces, [&](const Piece& p) { return p.line >= first_line; });
+        bands = find_bands();
+    }
+    // A band with text in one column only, or nothing in the first column,
+    // and no line with two cells, holds the rest of a cell that wraps: it
+    // joins the band above, or the one below when that one is clearly nearer -
+    // never one further away than two lines.
+    std::vector<std::size_t> rows(pieces.size(), 0);   // for each piece the number of its row (0 = the header)
+    std::size_t row_total = 0;
+    {
+        const std::vector<Band>& b = bands.rows;
+        const auto rest = [&](const Band& band) {
+            const auto filled = std::ranges::count(band.columns, true);
+            return !band.header && !band.cells && (filled == 1 || !band.columns[0]);
+        };
+        const float reach = 2.0f * line_pitch * size;   // the next line or list item of a wrapped cell
+        std::vector<std::size_t> target(b.size());
+        for (std::size_t r = 0; r < b.size(); ++r) target[r] = r;
+        for (std::size_t r = 1; r < b.size(); ++r) {
+            if (!rest(b[r])) continue;
+            const float above = b[r].top - b[r - 1].bottom;
+            const bool below_exists = r + 1 < b.size() && !rest(b[r + 1]);
+            const float below = below_exists ? b[r + 1].top - b[r].bottom : 1e30f;
+            if (below < 0.75f * above && below <= reach) {
+                target[r] = r + 1;
+            } else if (above <= reach) {
+                target[r] = target[r - 1];
+            }
+        }
+        // A rest that joins the row below takes the number of that row.
+        for (std::size_t r = b.size(); r-- > 0;) {
+            if (target[r] == r + 1) target[r] = target[r + 1];
+        }
+        std::vector<std::size_t> number(b.size(), 0);
+        for (std::size_t r = 0; r < b.size(); ++r) {
+            if (target[r] == r) number[r] = row_total++;
+        }
+        for (std::size_t i = 0; i < pieces.size(); ++i) rows[i] = number[target[bands.of[i]]];
     }
     // Lines read row by row are handled as before (rows_text).
     const auto within = [&](const std::vector<std::size_t>& at) {
         return std::ranges::any_of(at, [&](std::size_t i) { return i < end; });
     };
-    if (!within(out_of_order) && !within(wraps)) return start;
-    const std::vector<float> rows_at = row_starts();
-    if (rows_at.size() < 2) return start;   // the header and at least one row
+    if (!band_header && !within(out_of_order) && !within(wraps)) return start;
+    if (row_total < 2) return start;   // the header and at least one row
+
+    // A header cell printed as one block over two columns ("GAAP Code Q1 ($k)"
+    // over the codes and the values): the cells below it fall into two groups
+    // with a free strip between them. The header is split at its space on
+    // that strip, and the second part starts a column of its own.
+    std::vector<float> split_lefts;
+    for (std::size_t h = 0; h < pieces.size() && is_head(pieces[h].line); ++h) {
+        std::vector<std::pair<float, float>> below;
+        for (const Piece& p : pieces) {
+            if (!is_head(p.line) && p.column == pieces[h].column) below.emplace_back(p.x0, p.x1);
+        }
+        std::ranges::sort(below);
+        std::vector<std::pair<float, float>> groups;
+        for (const auto& [x0, x1] : below) {
+            if (!groups.empty() && x0 < groups.back().second + kMinGutter * size) {
+                groups.back().second = std::max(groups.back().second, x1);
+            } else {
+                groups.emplace_back(x0, x1);
+            }
+        }
+        if (groups.size() != 2) continue;
+        const Line& line = lines[pieces[h].line];
+        const std::size_t spaces = static_cast<std::size_t>(std::ranges::count(line.text, ' '));
+        if (line.space_begin.size() != spaces || line.space_end.size() != spaces) continue;
+        const std::string_view text = line.text;
+        const std::size_t offset = static_cast<std::size_t>(pieces[h].text.data() - text.data());
+        std::size_t k = static_cast<std::size_t>(std::count(text.begin(), text.begin() + static_cast<std::ptrdiff_t>(offset), ' '));
+        for (std::size_t pos = offset; pos < offset + pieces[h].text.size(); ++pos) {
+            if (text[pos] != ' ') continue;
+            const std::size_t space = k++;
+            if (line.space_end[space] < groups[0].second || line.space_begin[space] > groups[1].first) continue;
+            Piece second = pieces[h];
+            second.x0 = line.space_end[space];
+            second.text = text.substr(pos + 1, offset + pieces[h].text.size() - pos - 1);
+            pieces[h].x1 = line.space_begin[space];
+            pieces[h].text = text.substr(offset, pos - offset);
+            split_lefts.push_back(std::min(second.x0, groups[1].first));
+            pieces.insert(pieces.begin() + static_cast<std::ptrdiff_t>(h) + 1, second);
+            rows.insert(rows.begin() + static_cast<std::ptrdiff_t>(h) + 1, rows[h]);
+            ++h;
+            break;
+        }
+    }
 
     // Columns the header does not show: when two pieces of one line stand in
     // the same column (a header "Access Reset" printed as one block above the
     // cells "WARZ" and "-"), the later piece starts a column of its own.
     std::vector<float> lefts = left;
     {
-        std::vector<float> found;
+        std::vector<float> found = split_lefts;
         // The pieces of one line stand next to each other in `pieces`.
         for (std::size_t first = 0; first < pieces.size();) {
             std::size_t last = first;
@@ -452,34 +695,209 @@ std::size_t rebuild_table(std::span<const Line> lines, std::size_t start, std::s
         std::ranges::sort(lefts);
     }
     const std::size_t all_columns = lefts.size();
+    // A piece that runs across the start of a column found here is split
+    // there, as above ("VLVDH Falling low-voltage ..." under "Symbol" and
+    // "Description").
+    if (all_columns > columns) {
+        std::vector<Piece> split;
+        std::vector<std::size_t> split_rows;
+        for (std::size_t i = 0; i < pieces.size(); ++i) {
+            const Piece& p = pieces[i];
+            std::size_t c = 0;
+            while (c + 1 < all_columns && p.x0 >= lefts[c + 1] - slack) ++c;
+            std::vector<Cell> parts;
+            if (c + 1 < all_columns && p.x1 > lefts[c + 1] + slack) {
+                parts = split_at_columns(lines[p.line], Cell{p.x0, p.x1, p.text}, lefts, slack);
+            }
+            if (parts.empty()) {
+                split.push_back(p);
+                split_rows.push_back(rows[i]);
+                continue;
+            }
+            for (const Cell& part : parts) {
+                split.push_back({p.baseline, part.x0, part.x1, p.column, part.text, p.line});
+                split_rows.push_back(rows[i]);
+            }
+        }
+        pieces = std::move(split);
+        rows = std::move(split_rows);
+    }
     for (Piece& p : pieces) {
         std::size_t c = 0;
         while (c + 1 < all_columns && p.x0 >= lefts[c + 1] - slack) ++c;
+        if (c + 1 < all_columns && p.x1 > lefts[c + 1] + slack) {
+            // set in the middle of the next column (as in column_of above)
+            const float centre = (p.x0 + p.x1) / 2;
+            std::size_t m = c;
+            while (m + 1 < all_columns && centre >= lefts[m + 1]) ++m;
+            if (m + 1 == all_columns || p.x1 <= lefts[m + 1] - slack) c = m;
+        }
         p.column = c;
     }
 
-    std::vector<std::vector<std::vector<const Piece*>>> table(rows_at.size(),
+    std::vector<std::vector<std::vector<const Piece*>>> table(row_total,
                                                               std::vector<std::vector<const Piece*>>(all_columns));
-    for (const Piece& p : pieces) {
-        std::size_t r = 0;
-        while (r + 1 < rows_at.size() && p.baseline >= rows_at[r + 1] - slack) ++r;
-        table[r][p.column].push_back(&p);
-    }
-    out.clear();
-    for (auto& row : table) {
+    for (std::size_t i = 0; i < pieces.size(); ++i) table[rows[i]][pieces[i].column].push_back(&pieces[i]);
+    // The lines of one cell: its pieces by height (baselines within a third
+    // of the size are one line), each line from left to right.
+    using CellLines = std::vector<std::vector<const Piece*>>;
+    const auto lines_of = [&](std::vector<const Piece*> cell) {
+        std::ranges::stable_sort(cell, [](const Piece* a, const Piece* b) { return a->baseline < b->baseline; });
+        CellLines out_lines;
+        for (std::size_t k = 0; k < cell.size(); ++k) {
+            if (k == 0 || cell[k]->baseline - cell[k - 1]->baseline >= 0.3f * size) out_lines.emplace_back();
+            out_lines.back().push_back(cell[k]);
+        }
+        for (auto& l : out_lines) std::ranges::stable_sort(l, {}, &Piece::x0);
+        return out_lines;
+    };
+    // A value: a number ("386", "($1,433.60)", "-0.5"), or a dash for none.
+    const auto is_value = [](const std::vector<const Piece*>& line) {
+        bool digit = false, dashes_only = true;
+        for (const Piece* p : line) {
+            std::string_view t = p->text;
+            if (t == "\xE2\x80\x94" || t == "\xE2\x80\x93" || t == "-") continue;   // em dash, en dash, minus
+            dashes_only = false;
+            for (std::size_t i = 0; i < t.size(); ++i) {
+                const char ch = t[i];
+                if (is_digit(ch)) {
+                    digit = true;
+                } else if (std::string_view("$.,()+-%").find(ch) == std::string_view::npos) {
+                    // U+2212 MINUS SIGN and U+2013 EN DASH before a number
+                    if (t.substr(i).starts_with("\xE2\x88\x92") || t.substr(i).starts_with("\xE2\x80\x93")) {
+                        i += 2;
+                        continue;
+                    }
+                    return false;
+                }
+            }
+        }
+        return dashes_only ? !line.empty() : digit;
+    };
+    const auto write_row = [&](const std::vector<CellLines>& cells) {
         std::string line;
         for (std::size_t c = 0; c < all_columns; ++c) {
-            std::ranges::sort(row[c], [](const Piece* a, const Piece* b) {
-                return a->baseline != b->baseline ? a->baseline < b->baseline : a->x0 < b->x0;
-            });
             std::string cell;
-            for (const Piece* p : row[c]) join_line(cell, p->text, false);
+            for (const auto& l : cells[c]) {
+                for (const Piece* p : l) join_line(cell, p->text, false);
+            }
             if (c > 0) line += " | ";
             line += cell;
         }
         if (!out.empty()) out.push_back('\n');
         if (const std::size_t first = line.find_first_not_of(' '); first != std::string::npos) {
             out += line.substr(first, line.find_last_not_of(' ') - first + 1);
+        }
+    };
+    // Sub-rows: values stacked in a cell ("406" over "386" over "792") never
+    // wrap; they belong to the stacked labels beside them ("• 25 °C",
+    // "• -40 °C", "• 105 °C"), one by one. Only when every stacked column has
+    // the same number of lines and a label column names them (above them it
+    // may hold the title of the row). Nothing when that is not so.
+    const auto sub_rows = [&](const std::vector<CellLines>& cells) -> std::optional<std::vector<std::vector<CellLines>>> {
+        std::size_t stacked = 0, count = 0;
+        bool even = true;
+        for (std::size_t c = 0; c < all_columns; ++c) {
+            if (cells[c].size() < 2 || !std::ranges::all_of(cells[c], is_value)) continue;
+            if (count == 0) count = cells[c].size();
+            even = even && cells[c].size() == count;
+            ++stacked;
+        }
+        if (stacked == 0 || !even) return std::nullopt;
+        // A label column with more lines: the lines above the last `count`
+        // are the title of the row; the last ones must be list items set at
+        // the same place ("• 25 °C", "• -40 °C", "• 105 °C").
+        std::size_t title = 0;
+        bool named = false;
+        for (std::size_t c = 0; c < all_columns; ++c) {
+            const CellLines& l = cells[c];
+            if (l.size() <= 1 || std::ranges::all_of(l, is_value)) continue;
+            if (l.size() < count) return std::nullopt;
+            const std::size_t extra = l.size() - count;
+            if (extra > 0) {
+                if (title != 0 && title != extra) return std::nullopt;
+                title = extra;
+                for (std::size_t k = extra; k < l.size(); ++k) {
+                    if (!starts_list_item(l[k].front()->text) ||
+                        std::fabs(l[k].front()->x0 - l[extra].front()->x0) > slack) {
+                        return std::nullopt;
+                    }
+                }
+            }
+            named = true;
+        }
+        if (!named) return std::nullopt;
+        for (std::size_t c = 0; c < all_columns; ++c) {
+            const CellLines& l = cells[c];
+            if (std::ranges::all_of(l, is_value) && l.size() > 1 && l.size() != count) return std::nullopt;
+        }
+        const CellLines* values = nullptr;   // a stacked value column
+        for (std::size_t c = 0; c < all_columns && values == nullptr; ++c) {
+            if (cells[c].size() == count && std::ranges::all_of(cells[c], is_value)) values = &cells[c];
+        }
+        std::vector<std::vector<CellLines>> subs(count + (title > 0 ? 1 : 0), std::vector<CellLines>(all_columns));
+        const std::size_t first_sub = title > 0 ? 1 : 0;
+        for (std::size_t c = 0; c < all_columns; ++c) {
+            const CellLines& l = cells[c];
+            if (l.size() >= count && l.size() > 1) {
+                const std::size_t extra = l.size() - count;
+                for (std::size_t k = 0; k < l.size(); ++k) {
+                    if (k < extra) subs[0][c].push_back(l[k]);
+                    else subs[first_sub + k - extra][c].push_back(l[k]);
+                }
+            } else if (l.size() == 1) {
+                std::size_t at = 0;   // the title, when there is one; else the nearest value
+                if (title == 0) {
+                    float best = 1e30f;
+                    for (std::size_t k = 0; k < count; ++k) {
+                        const float d = std::fabs((*values)[k].front()->baseline - l[0].front()->baseline);
+                        if (d < best) {
+                            best = d;
+                            at = k;
+                        }
+                    }
+                }
+                subs[at][c].push_back(l[0]);
+            }
+        }
+        return subs;
+    };
+    // The rows after a row, with nothing in the first column or only list
+    // items as labels ("• 105 °C"), may hold its sub-rows, when the labels
+    // and the values are set at different heights: tried as one group.
+    const auto list_items_only = [&](const std::vector<std::vector<const Piece*>>& row) {
+        for (const auto& cell : row) {
+            if (cell.empty()) continue;
+            // the labels: the first column with text
+            return std::ranges::all_of(cell, [](const Piece* p) { return starts_list_item(p->text); });
+        }
+        return false;
+    };
+    out.clear();
+    for (std::size_t r = 0; r < table.size(); ++r) {
+        const auto cells_from = [&](std::size_t from, std::size_t to) {
+            std::vector<CellLines> cells(all_columns);
+            for (std::size_t c = 0; c < all_columns; ++c) {
+                std::vector<const Piece*> all;
+                for (std::size_t k = from; k < to; ++k) all.insert(all.end(), table[k][c].begin(), table[k][c].end());
+                cells[c] = lines_of(all);
+            }
+            return cells;
+        };
+        std::size_t to = r + 1;
+        while (to < table.size() && (table[to][0].empty() || list_items_only(table[to]))) ++to;
+        if (to > r + 1) {
+            if (const auto subs = sub_rows(cells_from(r, to))) {
+                for (const auto& sub : *subs) write_row(sub);
+                r = to - 1;
+                continue;
+            }
+        }
+        const std::vector<CellLines> cells = cells_from(r, r + 1);
+        if (const auto subs = sub_rows(cells)) {
+            for (const auto& sub : *subs) write_row(sub);
+        } else {
+            write_row(cells);
         }
     }
     return end;
@@ -502,12 +920,74 @@ float typical_line_pitch(std::span<const Line> lines) {
     return std::clamp(*middle, 1.0f, 2.6f);
 }
 
+namespace {
+
+// The header of a table printed in pieces above its first row (each column
+// heading on one or two lines of its own: "Gross" over "Revenue", "Cost of
+// Sales"), read as the last lines of the paragraph before the table. They
+// are taken as the header when they lie right above the row, close together,
+// and stand in at least three separate blocks side by side, none of them
+// running across another (a caption or a sentence does). Returns the index
+// of the first of them, or `row` when there is no such header.
+std::size_t header_above(std::span<const Line> lines, std::span<const std::size_t> text_lines, std::size_t row,
+                         float line_pitch) {
+    const Line& first_row = lines[row];
+    const float size = std::max(first_row.size, 1.0f);
+    std::size_t taken = 0;
+    float top = first_row.baseline, bottom = -1e30f;
+    for (std::size_t k = text_lines.size(); k-- > 0;) {
+        const Line& line = lines[text_lines[k]];
+        if (line.page != first_row.page || line.baseline >= first_row.baseline - 0.3f * size) break;
+        if (line.baseline < first_row.baseline - 4.0f * line_pitch * size) break;
+        if (line.size > 1.3f * first_row.size || line.size < 0.7f * first_row.size) break;
+        // one band: the pieces of the header lie close together
+        if (std::max(bottom, line.baseline) - std::min(top, line.baseline) > 2.0f * size && bottom > -1e30f) break;
+        top = std::min(top, line.baseline);
+        bottom = std::max(bottom, line.baseline);
+        ++taken;
+    }
+    if (taken < 2) return row;
+    const std::size_t first = text_lines[text_lines.size() - taken];
+    // nothing else between them and the row
+    for (std::size_t i = first; i < row; ++i) {
+        if (std::ranges::find(text_lines.subspan(text_lines.size() - taken), i) == text_lines.end() &&
+            (lines[i].figure > 0 || !lines[i].text.empty())) {
+            return row;
+        }
+    }
+    // blocks side by side; a cell that overlaps two others joins them, which a caption does
+    std::vector<Cell> cells;
+    for (std::size_t k = text_lines.size() - taken; k < text_lines.size(); ++k) {
+        const std::vector<Cell> found = cells_of(lines[text_lines[k]]);
+        if (found.empty()) return row;
+        cells.insert(cells.end(), found.begin(), found.end());
+    }
+    std::ranges::stable_sort(cells, {}, &Cell::x0);
+    std::size_t blocks = 0;
+    float reach = -1e30f;
+    for (const Cell& cell : cells) {
+        if (cell.x0 >= reach) ++blocks;
+        reach = std::max(reach, cell.x1);
+    }
+    for (const Cell& cell : cells) {
+        std::size_t overlapped = 0;
+        for (const Cell& other : cells) {
+            if (&other != &cell && other.x0 < cell.x1 && other.x1 > cell.x0) ++overlapped;
+        }
+        if (overlapped >= 2) return row;
+    }
+    return blocks >= 3 ? first : row;
+}
+
+}  // namespace
+
 std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_pitch,
                                         const SectionOptions& options) {
     std::vector<Paragraph> paragraphs;
     Paragraph current;
     std::vector<const Line*> code;   // the lines of `current` when it is a code block
     std::vector<const Line*> rows;   // the lines of `current` when it holds table rows
+    std::vector<std::size_t> text_lines;   // the lines of `current` when it is text (their index)
     std::vector<std::uint8_t> rest;  // for each of `rows`: 1 when the line holds the rest of a cell
     const Line* last_row = nullptr;  // the last line of `rows` that is a row of its own
     float table_right = 0;           // right edge of the rows so far
@@ -539,6 +1019,7 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
         code.clear();
         if (!rows.empty()) current.text = rows_text(rows, rest);
         rows.clear();
+        text_lines.clear();
         rest.clear();
         last_row = nullptr;
         if (!current.text.empty()) paragraphs.push_back(std::move(current));
@@ -574,7 +1055,23 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
                                   (previous != nullptr && line.page != previous->page);
         if (kind == ParagraphKind::Rows && table_starts) {
             std::string rebuilt;
-            if (const std::size_t end = rebuild_table(lines, index, kinds, line_pitch, rebuilt); end > index) {
+            // The header printed in pieces above the first row: it leaves the paragraph before.
+            const std::size_t first = current.kind == ParagraphKind::Text
+                                          ? header_above(lines, text_lines, index, line_pitch) : index;
+            if (first < index) {
+                if (const std::size_t end = rebuild_table(lines, first, index, kinds, line_pitch, rebuilt); end > index) {
+                    std::vector<std::size_t> kept(text_lines.begin(), text_lines.end());
+                    std::erase_if(kept, [&](std::size_t i) { return i >= first; });
+                    current.text.clear();
+                    for (const std::size_t i : kept) join_line(current.text, lines[i].text, options.dehyphenate);
+                    flush();
+                    paragraphs.push_back(Paragraph{lines[first].page, ParagraphKind::Rows, std::move(rebuilt)});
+                    index = end - 1;
+                    previous = nullptr;
+                    continue;
+                }
+            }
+            if (const std::size_t end = rebuild_table(lines, index, index, kinds, line_pitch, rebuilt); end > index) {
                 flush();
                 paragraphs.push_back(Paragraph{line.page, ParagraphKind::Rows, std::move(rebuilt)});
                 index = end - 1;
@@ -629,6 +1126,7 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
             last_row = &line;
         } else {
             join_line(current.text, line.text, options.dehyphenate);
+            text_lines.push_back(index);
         }
         previous = &line;
     }

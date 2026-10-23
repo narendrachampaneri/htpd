@@ -1605,6 +1605,182 @@ TEST(a_table_stored_cell_by_cell_is_rebuilt_from_the_positions) {
                                         "haltreq | Writing 0 clears the halt request bit. | WARZ | -"));
 }
 
+TEST(a_cell_set_tight_against_the_next_column_is_split_there) {
+    // Raft roles: in the rows below the first, the third column follows the
+    // second after a space of only 1.3 font sizes. The column starts in that
+    // space: the row keeps its three cells.
+    std::vector<Line> lines;
+    lines.push_back(placed_line(74, {{60, "Role"}, {228, "Responsibilities"}, {382, "Transition"}, {442, "Trigger"}}));
+    lines.push_back(placed_line(94.5f, {{60, "Leader"}, {228, "Handles"}, {271, "client"}, {308, "requests"}}));
+    lines.push_back(placed_line(105.5f, {{228, "heartbeats"}}));
+    lines.push_back(placed_line(94.5f, {{382, "Elected"}, {424, "by"}, {440, "majority"}}));
+    lines.push_back(placed_line(126.5f, {{60, "Candidate"}, {228, "Requests"}, {274.5f, "votes"}, {304.5f, "term"},
+                                         {329, "counter"}, {382, "Election"}, {430, "timeout"}}));
+    lines.push_back(placed_line(147.5f, {{60, "Follower"}, {228, "Responds"}, {280, "to"}, {296, "RPCs"},
+                                         {382, "Discovers"}, {436, "term"}}));
+    const auto paragraphs = build_paragraphs(lines, 1.2f);
+    REQUIRE(paragraphs.size() == 1);
+    CHECK_EQ(paragraphs[0].text, std::string("Role | Responsibilities | Transition Trigger\n"
+                                             "Leader | Handles client requests heartbeats | Elected by majority\n"
+                                             "Candidate | Requests votes term counter | Election timeout\n"
+                                             "Follower | Responds to RPCs | Discovers term"));
+}
+
+TEST(a_table_row_is_the_band_its_cells_share) {
+    // A ledger: the cells of a row are set in the middle of the row. A code
+    // that wraps stands half a line above and below the values; the header
+    // prints "GAAP Code" and "Q1" as one block. Every cell stays in its row
+    // and in its column.
+    std::vector<Line> lines;
+    lines.push_back(placed_line(165, {{58, "Line"}, {85, "Item"}, {198, "GAAP"}, {225, "Code"}, {262, "Q1"}, {340, "Q2"}}));
+    lines.push_back(placed_line(200, {{58, "Cash"}, {85, "and"}, {106, "Cash"}}));
+    lines.push_back(placed_line(193, {{198, "UG-101"}}));
+    lines.push_back(placed_line(207, {{198, "(old)"}}));
+    lines.push_back(placed_line(200, {{272, "$24,262.50"}, {340, "$55,766.70"}}));
+    lines.push_back(placed_line(229, {{58, "Accounts"}, {106, "Receivable"}}));
+    lines.push_back(placed_line(243, {{58, "(Net)"}}));
+    lines.push_back(placed_line(229, {{198, "UG-103"}}));
+    lines.push_back(placed_line(243, {{198, "(new)"}}));
+    lines.push_back(placed_line(236, {{272, "$30,112.50"}, {340, "$24,732.80"}}));
+    const auto paragraphs = build_paragraphs(lines, 1.4f);
+    REQUIRE(paragraphs.size() == 1);
+    CHECK_EQ(paragraphs[0].text, std::string("Line Item | GAAP Code | Q1 | Q2\n"
+                                             "Cash and Cash | UG-101 (old) | $24,262.50 | $55,766.70\n"
+                                             "Accounts Receivable (Net) | UG-103 (new) | $30,112.50 | $24,732.80"));
+}
+
+TEST(a_table_header_printed_in_pieces_above_the_rows_is_its_header) {
+    // Each column heading on its own ("Gross" over "Revenue"), read before
+    // the first row as a paragraph of text: it is the header of the table.
+    std::vector<Line> lines;
+    lines.push_back(make_line(0, "Revenue Channel", 93, 10, false, 58));
+    lines.push_back(make_line(0, "Ref", 93, 10, false, 150));
+    lines.push_back(make_line(0, "Gross", 88, 10, false, 248));
+    lines.push_back(make_line(0, "Revenue", 99, 10, false, 248));
+    lines.push_back(make_line(0, "Cost", 93, 10, false, 312));
+    lines.push_back(make_line(0, "Net", 93, 10, false, 430));
+    lines.push_back(row_line({{"Cloud SaaS", 58}, {"IFRS-A", 150}, {"$4,385.00", 248}}, 121.8f));
+    lines.push_back(row_line({{"($1,534.00", 312}}, 116.6f));
+    lines.push_back(row_line({{")", 361}}, 127));
+    lines.push_back(row_line({{"$2,251.50", 430}}, 121.8f));
+    lines.push_back(row_line({{"Licensing", 58}, {"IFRS-B", 150}, {"$3,759.40", 248}}, 148.8f));
+    lines.push_back(row_line({{"($1,315.79", 312}}, 143.6f));
+    lines.push_back(row_line({{")", 361}}, 154));
+    lines.push_back(row_line({{"$1,930.45", 430}}, 148.8f));
+    const auto paragraphs = build_paragraphs(lines, 1.3f);
+    REQUIRE(paragraphs.size() == 1);
+    CHECK(paragraphs[0].kind == ParagraphKind::Rows);
+    CHECK_EQ(paragraphs[0].text, std::string("Revenue Channel | Ref | Gross Revenue | Cost | Net\n"
+                                             "Cloud SaaS | IFRS-A | $4,385.00 | ($1,534.00 ) | $2,251.50\n"
+                                             "Licensing | IFRS-B | $3,759.40 | ($1,315.79 ) | $1,930.45"));
+
+    // A caption above the rows runs across the columns: it stays text.
+    std::vector<Line> captioned = {make_line(0, "Table 6. Segment income by channel and region of the group", 93),
+                                   make_line(0, "Gross", 99, 10, false, 248)};
+    captioned.insert(captioned.end(), lines.begin() + 6, lines.end());
+    const auto apart = build_paragraphs(captioned, 1.3f);
+    REQUIRE(!apart.empty());
+    CHECK(apart[0].kind == ParagraphKind::Text);
+}
+
+TEST(stacked_values_belong_to_the_stacked_labels_beside_them) {
+    // A datasheet: the labels of the conditions are set 12 points apart, the
+    // values 18 points apart and lower. One value line for each label, in
+    // order; the line above the labels is the title of the row.
+    std::vector<Line> lines;
+    lines.push_back(row_line({{"Symbol", 54}, {"Min.", 312}, {"Typ.", 358}, {"Max.", 407}, {"Unit", 458}}, 178));
+    lines.push_back(row_line({{"IDD_STOP Stop mode current", 80}}, 202.2f));
+    lines.push_back(row_line({{"\xE2\x80\xA2 25 C", 138}}, 214.4f));
+    lines.push_back(row_line({{"\xE2\x80\xA2 -40 C", 138}}, 226.7f));
+    lines.push_back(row_line({{"\xE2\x80\xA2 105 C", 138}}, 238.9f));
+    lines.push_back(row_line({{"\xE2\x80\x94", 339}, {"406", 386}, {"730", 436}, {"uA", 487}}, 220.2f));
+    lines.push_back(row_line({{"\xE2\x80\x94", 339}, {"386", 386}, {"700", 436}, {"uA", 487}}, 238.4f));
+    lines.push_back(row_line({{"\xE2\x80\x94", 339}, {"792", 386}, {"898", 436}, {"uA", 487}}, 256.7f));
+    const auto paragraphs = build_paragraphs(lines, 1.2f);
+    REQUIRE(paragraphs.size() == 1);
+    CHECK_EQ(paragraphs[0].text, std::string("Symbol | Min. | Typ. | Max. | Unit\n"
+                                             "IDD_STOP Stop mode current |  |  |  |\n"
+                                             "\xE2\x80\xA2 25 C | \xE2\x80\x94 | 406 | 730 | uA\n"
+                                             "\xE2\x80\xA2 -40 C | \xE2\x80\x94 | 386 | 700 | uA\n"
+                                             "\xE2\x80\xA2 105 C | \xE2\x80\x94 | 792 | 898 | uA"));
+}
+
+TEST(a_cell_set_in_the_middle_of_its_column_stays_in_it) {
+    // "See note" starts left of its column heading "Max.", in the middle of
+    // the column. A heading alone between the rows is no cell.
+    std::vector<Line> lines;
+    lines.push_back(row_line({{"Symbol", 54}, {"Description", 150}, {"Min.", 309}, {"Typ.", 358}, {"Max.", 407},
+                              {"Unit", 458}}, 100));
+    lines.push_back(row_line({{"IDDA", 62}, {"Analog", 150}, {"-", 312}, {"-", 362}, {"See note", 398}, {"mA", 459}}, 116));
+    lines.push_back(row_line({{"IDD_RUN", 62}, {"Run mode", 150}, {"8.82", 358}, {"9.15", 407}, {"mA", 459}}, 132));
+    lines.push_back(row_line({{"code executing", 150}}, 144));
+    lines.push_back(make_line(0, "Other currents", 168, 10, false, 140));
+    lines.push_back(row_line({{"IDD_WAIT", 62}, {"Wait mode", 150}, {"5.78", 358}, {"5.90", 407}, {"mA", 459}}, 192));
+    const auto paragraphs = build_paragraphs(lines, 1.2f);
+    REQUIRE(paragraphs.size() >= 2);
+    CHECK_EQ(paragraphs[0].text, std::string("Symbol | Description | Min. | Typ. | Max. | Unit\n"
+                                             "IDDA | Analog | - | - | See note | mA\n"
+                                             "IDD_RUN | Run mode code executing |  | 8.82 | 9.15 | mA"));
+    CHECK_EQ(paragraphs[1].text, std::string("Other currents"));
+}
+
+TEST(a_row_of_two_cells_under_one_header_cell_is_a_row) {
+    // "VOL" and its description stand under one header block "Symbol
+    // Description" and nowhere else: a row of its own, not the rest of the header.
+    std::vector<Line> lines;
+    lines.push_back(row_line({{"Symbol Description", 54}, {"Min.", 309}, {"Max.", 407}, {"Unit", 458}}, 100));
+    lines.push_back(row_line({{"VOL", 92}, {"Output low voltage", 144}}, 118));
+    lines.push_back(row_line({{"\xE2\x80\xA2 2.7 V", 144}, {"-", 312}, {"0.5", 407}, {"V", 459}}, 134.4f));
+    lines.push_back(row_line({{"\xE2\x80\xA2 1.7 V", 144}, {"-", 312}, {"0.6", 407}, {"V", 459}}, 150.8f));
+    const auto paragraphs = build_paragraphs(lines, 1.2f);
+    REQUIRE(paragraphs.size() == 1);
+    CHECK_EQ(paragraphs[0].text, std::string("Symbol Description |  | Min. | Max. | Unit\n"
+                                             "VOL | Output low voltage |  |  |\n"
+                                             "| \xE2\x80\xA2 2.7 V | - | 0.5 | V\n"
+                                             "| \xE2\x80\xA2 1.7 V | - | 0.6 | V"));
+}
+
+TEST(a_cell_runs_across_a_column_found_in_the_rows) {
+    // The header prints "Symbol Description" as one block; the rows show the
+    // two columns. A symbol set close to its description is split from it.
+    std::vector<Line> lines;
+    lines.push_back(placed_line(101.9f, {{54, "Symbol"}, {99, "Description"}, {309, "Min."}, {358, "Typ."}}));
+    lines.push_back(placed_line(118, {{57, "VLVDH"}, {96, "Falling"}, {140, "low"}, {309, "2.48"}, {358, "2.56"}}));
+    lines.push_back(placed_line(129, {{96.5f, "range"}}));
+    Line small = placed_line(146, {{57, "VLVW1H"}}, 7.6f);   // a symbol with a subscript: a smaller size
+    lines.push_back(small);
+    lines.push_back(placed_line(146.5f, {{99, "Level"}, {131, "1"}}));
+    lines.push_back(placed_line(146.5f, {{309, "2.62"}, {358, "2.70"}}));
+    lines.push_back(placed_line(170, {{61, "VBG"}, {99, "Bandgap"}, {144, "voltage"}, {309, "0.97"}, {358, "1.00"}}));
+    const auto paragraphs = build_paragraphs(lines, 1.2f);
+    REQUIRE(paragraphs.size() == 1);
+    CHECK_EQ(paragraphs[0].text, std::string("Symbol | Description | Min. | Typ.\n"
+                                             "VLVDH | Falling low range | 2.48 | 2.56\n"
+                                             "VLVW1H | Level 1 | 2.62 | 2.70\n"
+                                             "VBG | Bandgap voltage | 0.97 | 1.00"));
+}
+
+TEST(a_figure_ends_a_table_and_keeps_its_place) {
+    std::vector<Line> lines;
+    lines.push_back(row_line({{"Name", 72}, {"Mask", 250}, {"Comment", 320}}, 100));
+    lines.push_back(row_line({{"VARIANT_PCS", 72}, {"0x80", 250}, {"The function may follow a", 320}}, 113));
+    lines.push_back(row_line({{"variant procedure call standard.", 320}}, 126));
+    Line figure;
+    figure.figure = 1;
+    figure.x0 = 72;
+    figure.x1 = 400;
+    figure.y0 = 130;
+    figure.y1 = 200;
+    figure.baseline = 200;
+    lines.push_back(figure);
+    lines.push_back(row_line({{"OTHER_FLAG", 72}, {"0x40", 250}, {"Short.", 320}}, 220));
+    const auto paragraphs = build_paragraphs(lines, 1.3f);
+    REQUIRE(paragraphs.size() == 3);
+    CHECK(paragraphs[0].kind == ParagraphKind::Rows);
+    CHECK(paragraphs[1].kind == ParagraphKind::Figure);
+    CHECK_EQ(paragraphs[1].text, std::string("1"));
+}
+
 TEST(a_justified_line_is_text_not_a_table_row) {
     // Every space of the line is wide, and all of them alike: a justified
     // paragraph line, not the cells of a table.

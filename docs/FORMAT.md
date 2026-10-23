@@ -269,10 +269,29 @@ How the converter decides:
 * **A table stored cell by cell** (the name, then every line of a long
   description, then the short cells beside it) is put together by the
   positions on the page: after a header row with three or more cells, the
-  lines that stay inside the columns belong to the table; each piece in
-  the first column starts a row, and every other piece joins the row it
-  stands beside. Text that crosses the columns ends the table. Pieces of
-  one cell are joined with one space.
+  lines that stay inside the columns belong to the table. A header printed
+  in pieces right above the first row ("Gross" over "Revenue", each
+  heading on its own) is the header too, when its pieces stand in three or
+  more blocks side by side and none runs across another (a caption does).
+  Text that crosses the columns ends the table, and so does a figure or a
+  heading set alone between the rows. A cell set so tight against the next
+  column that no wide gap shows is split where that column starts, when a
+  space wider than one between words lies there; a cell set in the middle
+  of its column belongs to it. Pieces of one cell are joined with one space.
+* **The rows of such a table** are bands across the page: pieces in
+  different columns whose baselines lie less than a line apart form one
+  row (a cell in the middle of a row whose other cells wrap). A band with
+  text in only one column, or none in the first, and no line with two
+  cells, is the rest of a cell that wraps: it joins the row above, or the
+  row below when that one is clearly nearer, never one more than two lines
+  away. A header cell printed over two columns of the rows ("GAAP Code Q1"
+  over the codes and the values) is split at its space between them.
+* **Sub-rows**: values stacked in one cell ("406" over "386" over "792")
+  are never a cell that wraps. When every stacked column has the same
+  number of lines and a column of labels beside them ends with as many list
+  items set at one place ("• 25 °C", "• -40 °C", "• 105 °C"), each value
+  line becomes the row of its label, in order; the lines above the labels
+  are the title row. When the counts differ, the row stays as it is.
 * When the columns are not certain, the lines are written as they stand,
   one per line, inside the block. No text is moved into a cell it does
   not stand in, and none is left out.

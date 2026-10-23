@@ -295,7 +295,7 @@ as values (`std::expected`); the library does not throw for a bad PDF.
 
 ## What was tested
 
-* **105 automatic tests** (`make test`). Most build their input in memory.
+* **113 automatic tests** (`make test`). Most build their input in memory.
   The others convert small PDFs in `tests/data` through the real PDF
   library: rotated pages, scaled fonts, text spaced only by kerning,
   two columns, code listings, fonts whose names lie about their widths,
@@ -362,8 +362,10 @@ honest about the rest.
   (`ocr_pages`).
 * **Tables are rows of text.** Cells are split by ` | `. A cell that wraps
   onto several lines is joined, and a table that the PDF stores cell by
-  cell (register field tables) is put together by position, when the
-  columns are certain; otherwise the lines stay as they stand. A row with
+  cell (register field tables, ledgers whose cells are set in the middle of
+  the row, datasheet tables with stacked conditions and values) is put
+  together by position, when the columns are certain; otherwise the lines
+  stay as they stand. A row with
   only two cells is written as a plain paragraph, and a cell that spans
   several columns is not shown as such. Empty cells are only marked
   when another row of the same table (on the same page) has all cells, so
