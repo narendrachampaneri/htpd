@@ -145,7 +145,7 @@ it is plain text.
 > hundred pages). For very large manuals, use the skill below.
 
 For a ChatGPT custom GPT or a Gemini Gem that always has your document and
-follows the rules, see [`docs/AI-APPS.md`](docs/AI-APPS.md) (instructions
+follows the rules, see [`docs/AI-APPS.md`](https://github.com/narendrachampaneri/htpd/blob/main/docs/AI-APPS.md) (instructions
 ready to paste).
 
 ### 2. Apps with skills - the `htpd` skill
@@ -170,6 +170,10 @@ what the script returns, this also works for manuals far too large for any
 chat.
 
 ### 3. Agents with MCP - the `htpd-mcp` server
+
+```sh
+pip install htpd-reader        # the reader: htpd-read and htpd-mcp, nothing else needed
+```
 
 ```sh
 claude mcp add htpd -- htpd-mcp --bundles ~/manuals        # Claude Code
@@ -230,9 +234,9 @@ NPU | 500 MHz | 800 MHz | 1000 MHz
 - **Two forms, same content:** a single `.htpd` file (for chats) and a bundle folder with one file per section (for tools), which is also a valid [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) bundle.
 
 The full specification - every field and every rule - is in
-[`docs/FORMAT.md`](docs/FORMAT.md). Examples:
-[`examples/single-file/sample.htpd`](examples/single-file/sample.htpd) and
-[`examples/sample.htpd/`](examples/sample.htpd/).
+[`docs/FORMAT.md`](https://github.com/narendrachampaneri/htpd/blob/main/docs/FORMAT.md). Examples:
+[`examples/single-file/sample.htpd`](https://github.com/narendrachampaneri/htpd/blob/main/examples/single-file/sample.htpd) and
+[`examples/sample.htpd/`](https://github.com/narendrachampaneri/htpd/blob/main/examples/sample.htpd/).
 
 ---
 
@@ -255,7 +259,7 @@ Manual is then 14 MB). Without the Tesseract program the converter skips
 OCR and says which pages it could not read.
 
 The reader on 133 test questions about two public manuals
-([`eval/report.md`](eval/report.md), written by the evaluation harness):
+([`eval/report.md`](https://github.com/narendrachampaneri/htpd/blob/main/eval/report.md), written by the evaluation harness):
 
 | | Right section first | Right section in the first 5 | Right page | Answer in the text for the AI | "Not found" right / wrong |
 |---|---:|---:|---:|---:|---:|
@@ -291,7 +295,7 @@ HTPD is version 0.1. It works today; these are the known next steps.
 - [x] Figures stored as pictures with caption and page; OCR of scanned pages and text in pictures (Tesseract, optional)
 - [x] Single-file `.htpd` with reading rules for AI models
 - [x] Reader, "not found" rule, `ask`, MCP server, skill for AI apps; figures handed to the AI as images
-- [x] A small trained re-ranker (no GPU, a few kilobytes) - the right section first for 78 % of test questions instead of 66 % without it ([`model/README.md`](model/README.md))
+- [x] A small trained re-ranker (no GPU, a few kilobytes) - the right section first for 78 % of test questions instead of 66 % without it ([`model/README.md`](https://github.com/narendrachampaneri/htpd/blob/main/model/README.md))
 - [ ] Other document types: Word, HTML, plain text, images
 - [ ] "Not found" for questions in the user's own words (a word the document writes differently)
 - [ ] Windows build
@@ -300,7 +304,7 @@ HTPD is version 0.1. It works today; these are the known next steps.
 picture (an AI must look at it); formulas lose their layout; scanned pages
 need the free Tesseract program; tables are rows of text (a table whose
 first column wraps can come apart); tested mainly with English technical
-documents. Details: [`docs/CONVERTER.md`](docs/CONVERTER.md#limits-please-read).
+documents. Details: [`docs/CONVERTER.md`](https://github.com/narendrachampaneri/htpd/blob/main/docs/CONVERTER.md#limits-please-read).
 
 ---
 
@@ -324,12 +328,12 @@ examples/               a converted document in both forms
 
 | Document | For |
 |---|---|
-| [`docs/FORMAT.md`](docs/FORMAT.md) | The format: anyone can write a reader from it |
-| [`docs/CONVERTER.md`](docs/CONVERTER.md) | Building, options, how the converter works, what was tested, limits |
-| [`reader/README.md`](reader/README.md) | The reader, its commands and its Python API |
-| [`docs/READER.md`](docs/READER.md) | How the reader finds the answer, and how it is measured |
-| [`docs/BACKGROUND.md`](docs/BACKGROUND.md) | Why HTPD is built the way it is |
-| [`AGENTS.md`](AGENTS.md) | Rules for contributors and coding agents |
+| [`docs/FORMAT.md`](https://github.com/narendrachampaneri/htpd/blob/main/docs/FORMAT.md) | The format: anyone can write a reader from it |
+| [`docs/CONVERTER.md`](https://github.com/narendrachampaneri/htpd/blob/main/docs/CONVERTER.md) | Building, options, how the converter works, what was tested, limits |
+| [`reader/README.md`](https://github.com/narendrachampaneri/htpd/blob/main/reader/README.md) | The reader, its commands and its Python API |
+| [`docs/READER.md`](https://github.com/narendrachampaneri/htpd/blob/main/docs/READER.md) | How the reader finds the answer, and how it is measured |
+| [`docs/BACKGROUND.md`](https://github.com/narendrachampaneri/htpd/blob/main/docs/BACKGROUND.md) | Why HTPD is built the way it is |
+| [`AGENTS.md`](https://github.com/narendrachampaneri/htpd/blob/main/AGENTS.md) | Rules for contributors and coding agents |
 
 </details>
 
@@ -338,7 +342,7 @@ examples/               a converted document in both forms
 ## Contributing
 
 Issues and pull requests are welcome. Before you change anything, read
-[`AGENTS.md`](AGENTS.md); the short version:
+[`AGENTS.md`](https://github.com/narendrachampaneri/htpd/blob/main/AGENTS.md); the short version:
 
 - All tests pass before a change is merged: `make test` and `python3 -m pytest`.
 - Every new rule in the code comes with a test that fails without it.
@@ -347,9 +351,9 @@ Issues and pull requests are welcome. Before you change anything, read
 
 ## License
 
-HTPD is open source under the [Apache License 2.0](LICENSE): you may use,
+HTPD is open source under the [Apache License 2.0](https://github.com/narendrachampaneri/htpd/blob/main/LICENSE): you may use,
 change and share it, also in commercial products, as long as you keep the
-copyright and license notices ([`NOTICE`](NOTICE)) and mark what you changed.
+copyright and license notices ([`NOTICE`](https://github.com/narendrachampaneri/htpd/blob/main/NOTICE)) and mark what you changed.
 The license includes a patent grant from every contributor.
 
 PDFium, which the converter uses, is not part of this repository and has its
