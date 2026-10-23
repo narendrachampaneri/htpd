@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <numeric>
+#include <optional>
 
 #include "htpd/text.hpp"
 
@@ -112,14 +114,20 @@ std::vector<Figure> find_figures(int page, float width, float height, std::span<
                                  std::span<const Box> paths, std::span<const Box> forms,
                                  std::span<const Line> lines, bool turned, const FigureOptions& o,
                                  std::span<const char> code, std::span<const std::uint64_t> image_keys) {
+    // A frame or a background over the whole page is no figure, and must not
+    // join the figures on the page into one region with it.
+    const float page_area = std::max(1.0f, width * height);
+    const auto whole_page = [&](const Box& b) { return b.width() * b.height() > 0.85f * page_area; };
     std::vector<Region> regions = clusters(images, o.join_gap, true);
     if (!turned) {
-        std::vector<Box> shapes(paths.begin(), paths.end());
+        std::vector<Box> shapes;
+        std::ranges::copy_if(paths, std::back_inserter(shapes), [&](const Box& b) { return !whole_page(b); });
         // A form is a group of drawn objects: as one shape it counts like many lines.
         std::vector<Region> drawn = clusters(shapes, o.join_gap, false);
         for (const Box& f : forms) drawn.push_back(Region{f, o.min_paths, false, {}, 0});
         regions.insert(regions.end(), drawn.begin(), drawn.end());
     }
+    std::erase_if(regions, [&](const Region& r) { return whole_page(r.box); });
     // Pictures and drawings that touch are one figure (a photo with arrows on it).
     for (bool merged = true; merged;) {
         merged = false;
@@ -139,36 +147,88 @@ std::vector<Figure> find_figures(int page, float width, float height, std::span<
         }
     }
 
-    const float page_area = std::max(1.0f, width * height);
     const float band = static_cast<float>(o.margin_band) * height;
-    std::vector<Figure> out;
-    for (const Region& r : regions) {
-        const Box& b = r.box;
-        if (b.width() < o.min_width || b.height() < 10) continue;
-        if (b.width() * b.height() > 0.85f * page_area) continue;      // a frame around the page
-        if (b.y1 <= band || b.y0 >= height - band) continue;           // a logo or a rule in the margin
+    struct Judged {
+        Figure figure;
+        std::size_t caption_line = static_cast<std::size_t>(-1);   // the "Figure N" line, if any
+        float caption_distance = 0;
+        bool caption_below = false;   // the caption stands below the figure
+    };
+    // Whether region r is a figure, and with what caption; `skip` is a caption
+    // line it may not take (it belongs to a nearer figure).
+    const auto judge = [&](const Region& r, std::size_t skip) -> std::optional<Judged> {
+        Box b = r.box;
+        if (b.width() < o.min_width || b.height() < 10) return std::nullopt;
+        if (whole_page(b)) return std::nullopt;                         // a frame around the page
+        if (b.y1 <= band || b.y0 >= height - band) return std::nullopt; // a logo or a rule in the margin
 
-        // Captions next to it: below first, then above.
+        // Captions next to it: the nearest "Figure N" below or above. A
+        // "Table N" nearer than that makes it a table.
         std::string caption;
+        std::size_t caption_line = static_cast<std::size_t>(-1);
+        bool caption_below = false;
         bool table = false;
-        float best = o.caption_reach + 1;
-        for (const Line& l : lines) {
+        float best = o.caption_reach + 1, table_at = o.caption_reach + 1;
+        const auto take_caption = [&](std::size_t li) {
+            const Line& l = lines[li];
+            caption = text::collapse_spaces(l.text);
+            caption_line = li;
+            // "Figure 1." alone on its line: its title is the line right below
+            if (text::word_count(caption) <= 2 && li + 1 < lines.size()) {
+                const Line& next = lines[li + 1];
+                const float step = next.baseline - l.baseline;
+                if (!next.text.empty() && next.figure == 0 && step > 0 && step < 2.0f * std::max(l.size, 1.0f) &&
+                    std::abs(next.x0 - l.x0) < 4 * std::max(l.size, 1.0f)) {
+                    caption += ' ' + text::collapse_spaces(next.text);
+                }
+            }
+        };
+        for (std::size_t li = 0; li < lines.size(); ++li) {
+            const Line& l = lines[li];
             if (l.x1 < b.x0 || l.x0 > b.x1) continue;
             const float below = l.y0 - b.y1, above = b.y0 - l.y1;
             const float d = below >= -2 ? below : (above >= -2 ? above : -1);
             if (d < -2 || d > o.caption_reach) continue;
-            if (is_figure_caption(l.text) && d < best) {
+            if (li != skip && is_figure_caption(l.text) && d < best) {
                 best = d;
-                caption = text::collapse_spaces(l.text);
+                take_caption(li);
+                caption_below = below >= -2;
             } else if (is_table_caption(l.text)) {
                 table = true;
+                table_at = std::min(table_at, d);
+            }
+        }
+        if (!caption.empty() && table && table_at < best) {
+            caption.clear();   // the table's own caption stands nearer
+            caption_line = static_cast<std::size_t>(-1);
+        }
+        // A "Figure N" further below, with only short labels between (the
+        // legend of a block diagram): its caption; the figure reaches down to it.
+        if (caption.empty() && !table) {
+            for (std::size_t li = 0; li < lines.size(); ++li) {
+                const Line& l = lines[li];
+                const float d = l.y0 - b.y1;
+                if (li == skip || l.x1 < b.x0 || l.x0 > b.x1 || d <= o.caption_reach || d > 3 * o.caption_reach ||
+                    !is_figure_caption(l.text)) {
+                    continue;
+                }
+                const bool labels_only = std::ranges::all_of(lines, [&](const Line& m) {
+                    const bool between = m.y0 >= b.y1 - 2 && m.y1 <= l.y0 + 2 && m.x1 >= b.x0 && m.x0 <= b.x1;
+                    return &m == &l || !between || m.text.empty() || text::word_count(m.text) <= 4;
+                });
+                if (!labels_only) continue;
+                best = d;
+                take_caption(li);
+                caption_below = true;
+                b.y1 = l.y0 - 2;
+                break;
             }
         }
 
         // A caption "Figure N" lets a thin drawing count (a register layout);
         // the size rule below holds for everything else.
         const bool numbered = !caption.empty();
-        if (!numbered && (b.height() < o.min_height || b.width() * b.height() < o.min_area)) continue;
+        if (!numbered && (b.height() < o.min_height || b.width() * b.height() < o.min_area)) return std::nullopt;
 
         // No "Figure N": a short line of words centred just below it, narrower
         // than the text column, is its title ("Memory layout of big-endian data object").
@@ -214,22 +274,59 @@ std::vector<Figure> find_figures(int page, float width, float height, std::span<
             }
             const auto rules = static_cast<std::size_t>(
                 std::ranges::count_if(at, [&](const auto& p) { return p.second >= 0.9f * b.width(); }));
-            const bool table_rows = (rows >= 3 && 2 * rows >= inside) || rules >= 3 ||
-                                    (listing >= 3 && 5 * listing >= 3 * inside);   // a framed listing
+            const bool text_rows = (rows >= 3 && 2 * rows >= inside) ||
+                                   (listing >= 3 && 5 * listing >= 3 * inside);   // a framed listing
             if (numbered) {
-                keep = !table_rows || r.shapes >= 4 * o.min_paths;
+                // the author calls it a figure: rules across it are the grid of a chart
+                keep = !text_rows || r.shapes >= 4 * o.min_paths;
             } else {
-                keep = !table && !table_rows && r.shapes >= o.min_paths &&
+                keep = !table && !text_rows && rules < 3 && r.shapes >= o.min_paths &&
                        cover <= o.max_text_cover * b.width() * b.height();
             }
         }
-        if (!keep) continue;
-        Figure f{page, b, r.picture ? Figure::Kind::Picture : Figure::Kind::Drawing, caption, 0};
+        if (!keep) return std::nullopt;
+        Judged j{Figure{page, b, r.picture ? Figure::Kind::Picture : Figure::Kind::Drawing, caption, 0}, caption_line,
+                 best, caption_below};
         // one picture and nothing else: its key tells a repeat of it on other pages
         if (r.picture && r.shapes == 1 && r.members.empty() && r.first < image_keys.size()) {
-            f.picture = image_keys[r.first];
+            j.figure.picture = image_keys[r.first];
         }
-        out.push_back(std::move(f));
+        return j;
+    };
+
+    std::vector<std::optional<Judged>> judged;
+    for (const Region& r : regions) judged.push_back(judge(r, static_cast<std::size_t>(-1)));
+    // One caption, one figure. Where two regions take the same caption, the
+    // one on the side where the captions of this page stand gets it (below
+    // the figure, unless the page's other captions stand above), else the
+    // nearer; the other is judged again without it.
+    std::size_t below_count = 0, above_count = 0;
+    for (std::size_t i = 0; i < judged.size(); ++i) {
+        if (!judged[i] || judged[i]->caption_line == static_cast<std::size_t>(-1)) continue;
+        const bool shared = std::ranges::any_of(judged, [&](const std::optional<Judged>& o2) {
+            return o2 && &*o2 != &*judged[i] && o2->caption_line == judged[i]->caption_line;
+        });
+        if (!shared) (judged[i]->caption_below ? below_count : above_count) += 1;
+    }
+    const bool captions_below = below_count >= above_count;
+    for (std::size_t i = 0; i < judged.size(); ++i) {
+        if (!judged[i] || judged[i]->caption_line == static_cast<std::size_t>(-1)) continue;
+        for (std::size_t k = 0; k < judged.size(); ++k) {
+            if (k == i || !judged[k] || judged[k]->caption_line != judged[i]->caption_line) continue;
+            std::size_t loser;
+            if (judged[i]->caption_below != judged[k]->caption_below) {
+                loser = judged[i]->caption_below == captions_below ? k : i;
+            } else {
+                loser = judged[k]->caption_distance < judged[i]->caption_distance ? i : k;
+            }
+            const std::size_t line = judged[loser]->caption_line;
+            judged[loser] = judge(regions[loser], line);
+            if (loser == i) break;
+        }
+    }
+    std::vector<Figure> out;
+    for (auto& j : judged) {
+        if (j) out.push_back(std::move(j->figure));
     }
     std::ranges::sort(out, [](const Figure& a, const Figure& b) { return a.box.y0 < b.box.y0; });
     return out;

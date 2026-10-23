@@ -122,7 +122,9 @@ no library is added. A drawing counts as a figure when a caption "Figure N"
 stands next to it, or when it has many shapes and little text; a caption
 "Table N", table rows, rules across its whole width, or a frame around code
 make it a table or a listing instead. Icons, logos in the page margin and
-frames around the whole page are left out. `--figures off` stores none.
+frames or backgrounds over the whole page are left out. Each "Figure N"
+caption gives one figure, and its caption is that line (with the next line
+when it holds only the number). `--figures off` stores none.
 
 A picture the PDF shows on many pages (a logo, a repeated photo) is drawn,
 stored and read by OCR once: the later figures point at the first one. A
@@ -295,7 +297,7 @@ as values (`std::expected`); the library does not throw for a bad PDF.
 
 ## What was tested
 
-* **122 automatic tests** (`make test`). Most build their input in memory.
+* **126 automatic tests** (`make test`). Most build their input in memory.
   The others convert small PDFs in `tests/data` through the real PDF
   library: rotated pages, scaled fonts, text spaced only by kerning,
   two columns, code listings, fonts whose names lie about their widths,

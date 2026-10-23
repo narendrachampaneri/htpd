@@ -371,7 +371,9 @@ text:
   first one (`../figures/F0003.png`, or `#F3` in the single file). It shows the region of the page the figure covers, at 120 dpi by
   default (`--figure-dpi`), in grey when it has no colour.
 * The words of the image line are the caption: the line "Figure N ..." next
-  to the figure, or a short title centred just below it; without one, what
+  to the figure (with the line below it when it holds only the number, and
+  also further below when only short labels stand between), or a short
+  title centred just below it; without one, what
   it is and its page (`picture on page 16`, `drawing on page 62`). They are
   written like the words of a Markdown link (`[`, `]` and `\` get a
   backslash). The caption also stays in the text where the PDF has it.
@@ -381,9 +383,15 @@ text:
 * What is a figure: a picture larger than an icon (about 2 x 1.3 cm), not
   in the page margin and not covering almost the whole page; lines and
   shapes that form one region with a caption "Figure N", or with ten or more
-  shapes and little text. A region with a caption "Table N", table rows, or
-  rules across its whole width at three or more heights is a table (section
-  4.2); a frame around lines of code is a listing.
+  shapes and little text. A region with a caption "Table N" nearer than any
+  "Figure N", or table rows, is a table (section 4.2); so is one without a
+  caption with rules across its whole width at three or more heights (with
+  a caption those are the grid of a chart); a frame around lines of code is
+  a listing. A background or frame over the whole page is never part of a
+  region. Each caption belongs to one figure only: where two regions stand
+  next to the same caption, it goes to the one on the side where the other
+  captions of the page stand (below the figure when they say nothing),
+  else to the nearer.
 * `--figures off` stores no figures; the text is then the same as without
   this section.
 

@@ -2154,6 +2154,91 @@ TEST(a_ruled_table_a_listing_a_frame_and_a_logo_are_no_figures) {
     CHECK(find_figures(0, 612, 792, {}, paths, {}, {}, true).empty());
 }
 
+TEST(a_background_over_the_whole_page_hides_no_figure) {
+    // A datasheet whose pages are drawn on a background over the whole page,
+    // with a rule at the top and the bottom: the photo below its caption
+    // "Figure 1." (its title on the next line) is a figure.
+    const std::vector<Box> background = {{0, 0, 595, 842}, {70, 48.6f, 525, 50.6f}, {70, 791, 525, 793}};
+    const std::vector<Box> photo = {{71, 171, 524, 578}};
+    std::vector<Line> lines;
+    lines.push_back(make_line(0, "Figure 1.", 153.7f, 8, true, 71));
+    lines.push_back(make_line(0, "Both sides of the board.", 165.8f, 8, false, 71));
+    const auto figures = find_figures(0, 595, 842, photo, background, {}, lines, false);
+    REQUIRE(figures.size() == 1);
+    CHECK_EQ(figures[0].caption, std::string("Figure 1. Both sides of the board."));
+
+    // A drawing on that background: its many shapes stay a region of their own.
+    std::vector<Box> drawing = background;
+    for (const float x : {100.0f, 200.0f, 300.0f}) {
+        for (const Box& b : grid_box(x, 450)) drawing.push_back(b);
+    }
+    std::vector<Line> caption = {make_line(0, "Figure 2. The pinout of the board", 430, 8, true, 100)};
+    REQUIRE(find_figures(0, 595, 842, {}, drawing, {}, caption, false).size() == 1);
+}
+
+TEST(each_figure_caption_gives_one_figure) {
+    std::vector<Line> lines;
+    // A register drawing, its caption below it, and right below that the next
+    // drawing, whose caption stands on the next page. The captions of this
+    // page stand below their figures.
+    std::vector<Box> paths;
+    for (const float y : {100.0f, 300.0f, 360.0f}) {
+        for (int k = 0; k < 6; ++k) paths.push_back({72.0f + k * 70, y, 132.0f + k * 70, y + 18});
+    }
+    lines.push_back(make_line(0, "Figure 6. Hart ID register", 135, 9, false, 200));
+    lines.push_back(make_line(0, "Figure 7. Machine status register", 345, 9, false, 200));   // nearer the lower one
+    const auto figures = find_figures(0, 612, 792, {}, paths, {}, lines, false);
+    std::vector<std::string> captions;
+    for (const Figure& f : figures) captions.push_back(f.caption);
+    CHECK_EQ(std::ranges::count(captions, std::string("Figure 7. Machine status register")), 1);
+    REQUIRE(figures.size() >= 2);
+    CHECK_EQ(figures[1].caption, std::string("Figure 7. Machine status register"));
+    CHECK(figures[1].box.y0 < 340);   // the drawing above its caption, as on the rest of the page
+
+    // A table right below the caption of a figure: its own caption "Table 36" is nearer.
+    std::vector<Box> both;
+    for (const float x : {100.0f, 200.0f, 300.0f}) {
+        for (const Box& b : grid_box(x, 255)) both.push_back(b);
+    }
+    for (int i = 0; i < 6; ++i) both.push_back({72.0f, 330.0f + i * 15, 540.0f, 330.5f + i * 15});
+    both.push_back({72, 330, 72.5f, 405.5f});   // the borders of the table
+    both.push_back({539.5f, 330, 540, 405.5f});
+    std::vector<Line> captions2 = {make_line(0, "Figure 8. SPI master mode timing", 316, 12, true, 165),
+                                   make_line(0, "Table 36. SPI slave mode timing", 328, 12, true, 165)};
+    const auto two = find_figures(0, 612, 792, {}, both, {}, captions2, false);
+    REQUIRE(two.size() == 1);
+    CHECK_EQ(two[0].caption, std::string("Figure 8. SPI master mode timing"));
+    // The table alone, below both captions: still no figure.
+    std::vector<Box> table(both.begin() + 12, both.end());
+    CHECK(find_figures(0, 612, 792, {}, table, {}, captions2, false).empty());
+}
+
+TEST(a_chart_with_a_grid_and_a_caption_is_a_figure) {
+    // Grid lines across the whole chart at many heights, few labels: with
+    // its caption "Figure 4" it is a chart, not a table drawn with rules.
+    std::vector<Box> chart;
+    for (int i = 0; i < 12; ++i) chart.push_back({123.0f, 203.0f + i * 14, 489.0f, 203.5f + i * 14});
+    for (int i = 0; i < 12; ++i) chart.push_back({123.0f + i * 30, 203, 123.5f + i * 30, 372});
+    std::vector<Line> lines = {make_line(0, "Figure 4. Typical ENOB vs. ADC_CLK", 419, 12, true, 103)};
+    CHECK_EQ(find_figures(0, 612, 792, {}, chart, {}, lines, false).size(), std::size_t{1});
+}
+
+TEST(a_caption_below_the_legend_of_a_block_diagram) {
+    // The legend boxes ("Modules in ...") stand between the diagram and its
+    // caption, 40 points further down than a caption usually stands.
+    std::vector<Box> paths;
+    for (const float x : {100.0f, 200.0f, 300.0f}) {
+        for (const Box& b : grid_box(x, 520)) paths.push_back(b);
+    }
+    std::vector<Line> lines;
+    for (const float x : {174.0f, 252.0f, 330.0f}) lines.push_back(make_line(0, "Modules in", 600, 7.5f, false, x));
+    lines.push_back(make_line(0, "Figure 1. Functional block diagram", 651, 12, true, 194));
+    const auto figures = find_figures(0, 612, 792, {}, paths, {}, lines, false);
+    REQUIRE(figures.size() == 1);
+    CHECK_EQ(figures[0].caption, std::string("Figure 1. Functional block diagram"));
+    CHECK(figures[0].box.y1 > 600);   // the legend is part of the picture
+}
+
 TEST(a_title_below_without_a_number_is_the_caption_but_bit_widths_are_not) {
     const std::vector<Box> photo = {{200, 400, 400, 500}};
     std::vector<Line> lines;
