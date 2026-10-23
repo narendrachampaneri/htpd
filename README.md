@@ -144,6 +144,10 @@ it is plain text.
 > Best for documents that fit in the chat's context (a datasheet of a few
 > hundred pages). For very large manuals, use the skill below.
 
+For a ChatGPT custom GPT or a Gemini Gem that always has your document and
+follows the rules, see [`docs/AI-APPS.md`](docs/AI-APPS.md) (instructions
+ready to paste).
+
 ### 2. Apps with skills - the `htpd` skill
 
 Download `htpd-skill.zip` from the [release page](https://github.com/narendrachampaneri/htpd/releases),
