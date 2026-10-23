@@ -26,7 +26,7 @@
   <a href="#install-in-one-minute"><b>Install</b></a> &nbsp;·&nbsp;
   <a href="#use-it-with-your-ai"><b>Use with your AI</b></a> &nbsp;·&nbsp;
   <a href="#for-developers"><b>For developers</b></a> &nbsp;·&nbsp;
-  <a href="#quality"><b>Quality</b></a> &nbsp;·&nbsp;
+  <a href="#quality"><b>Quality</b></a> &nbsp;
 </p>
 
 <p align="center">
