@@ -552,9 +552,10 @@ HeadingResult detect_from_text(std::span<const Line> lines) {
 
 // Skeleton without its leading section number: "521clocktree" -> "clocktree",
 // "appendixaregistermap" -> "registermap", "a1statusregister" -> "statusregister".
-std::string_view strip_numbering(std::string_view sk) {
+std::string_view strip_numbering(std::string_view sk, bool keywords = true) {
     std::string_view s = sk;
     for (const std::string_view keyword : kKeywords) {
+        if (!keywords) break;
         if (s.starts_with(keyword)) {
             s.remove_prefix(keyword.size());
             if (!s.empty() && is_alpha(s[0]) && (s.size() == 1 || !is_digit(s[1]))) {
@@ -563,24 +564,38 @@ std::string_view strip_numbering(std::string_view sk) {
             break;
         }
     }
-    if (s.size() > 1 && is_alpha(s[0]) && is_digit(s[1])) s.remove_prefix(1);   // "A.1"
+    if (keywords && s.size() > 1 && is_alpha(s[0]) && is_digit(s[1])) s.remove_prefix(1);   // "A.1"
     while (!s.empty() && is_digit(s[0])) s.remove_prefix(1);
     return s;
 }
 
+// Both ways of reading a skeleton without its number: with a keyword or a
+// letter taken off ("appendixaregistermap" -> "registermap", "a1status" ->
+// "status") and with only the digits taken off, for a title that only starts
+// like one ("partidentification" is "Part identification", not "Part I
+// dentification"; "i2cswitching" is "I2C switching").
 bool titles_match(std::string_view line_sk, std::string_view title_sk) {
     if (line_sk == title_sk) return true;
-    const std::string_view line_bare = strip_numbering(line_sk);
-    const std::string_view title_bare = strip_numbering(title_sk);
-    if (line_bare.size() < 3 || title_bare.size() < 3) return false;
-    return line_bare == title_bare;
+    for (const bool lk : {true, false}) {
+        for (const bool tk : {true, false}) {
+            const std::string_view line_bare = strip_numbering(line_sk, lk);
+            const std::string_view title_bare = strip_numbering(title_sk, tk);
+            if (line_bare.size() >= 3 && title_bare.size() >= 3 && line_bare == title_bare) return true;
+        }
+    }
+    return false;
 }
 
 bool could_be_start_of(std::string_view line_sk, std::string_view title_sk) {
     if (line_sk.empty()) return false;
     if (title_sk.starts_with(line_sk)) return true;
-    const std::string_view line_bare = strip_numbering(line_sk);
-    return line_bare.size() >= 3 && strip_numbering(title_sk).starts_with(line_bare);
+    for (const bool lk : {true, false}) {
+        for (const bool tk : {true, false}) {
+            const std::string_view line_bare = strip_numbering(line_sk, lk);
+            if (line_bare.size() >= 3 && strip_numbering(title_sk, tk).starts_with(line_bare)) return true;
+        }
+    }
+    return false;
 }
 
 struct Match {
@@ -593,30 +608,44 @@ struct Match {
 //
 // The same words can occur several times on a page: in a small table of
 // contents at the start of a chapter, as a term in the text, and as the
-// heading itself. A line that equals the whole bookmark title beats one that
-// only matches without its section number, and among equals the line in the
-// largest font wins, because that is the heading.
+// heading itself. The line in the largest font wins, because that is the
+// heading (the running header "Ratings" in 9 points loses to "1 Ratings" in
+// 17); among lines of about the same size (less than 1.3 times apart) one
+// that equals the whole bookmark title beats one that only matches without
+// its section number, then the larger and the bold one.
 std::optional<Match> find_title(std::span<const Line> lines, std::span<const std::string> skeletons,
                                 std::size_t begin, std::size_t end, std::string_view title_sk) {
     if (title_sk.size() < 2) return std::nullopt;
-    std::optional<Match> best;
-    std::int64_t best_rank = -1;
+    struct Found {
+        Match match;
+        bool exact;
+    };
+    std::vector<Found> found;
     for (std::size_t i = begin; i < end; ++i) {
         std::string joined;
         for (std::size_t k = 0; k < 3 && i + k < end; ++k) {
             joined += skeletons[i + k];
             const bool exact = joined == title_sk;
             if (exact || titles_match(joined, title_sk)) {
-                const std::int64_t rank = (exact ? std::int64_t{1} << 40 : 0) +
-                                          std::int64_t{size_bucket(lines[i].size)} * 2 +
-                                          (lines[i].bold ? 1 : 0);
-                if (rank > best_rank) {
-                    best = Match{i, k + 1};
-                    best_rank = rank;
-                }
+                found.push_back({Match{i, k + 1}, exact});
                 break;
             }
             if (!could_be_start_of(joined, title_sk)) break;
+        }
+    }
+    if (found.empty()) return std::nullopt;
+    float largest = 0;
+    for (const Found& f : found) largest = std::max(largest, lines[f.match.line].size);
+    std::optional<Match> best;
+    std::int64_t best_rank = -1;
+    for (const Found& f : found) {
+        const Line& line = lines[f.match.line];
+        if (line.size * 1.3f < largest) continue;
+        const std::int64_t rank = (f.exact ? std::int64_t{1} << 40 : 0) + std::int64_t{size_bucket(line.size)} * 2 +
+                                  (line.bold ? 1 : 0);
+        if (rank > best_rank) {
+            best = f.match;
+            best_rank = rank;
         }
     }
     return best;
@@ -663,10 +692,17 @@ HeadingResult detect_from_bookmarks(std::span<const Line> lines,
         if (!match && ordered_begin > page_begin) {
             match = find_title(lines, skeletons, page_begin, page_end, title_sk);
         }
+        // A bookmark that points at the end of a page whose heading stands at
+        // the top of the next one.
+        if (!match && page + 1 < page_count) {
+            const std::size_t next_end = std::min(first_line[page + 1] + 3, first_line[page + 2]);
+            match = find_title(lines, skeletons, std::max(first_line[page + 1], ordered_begin), next_end, title_sk);
+        }
         if (match && taken[match->line]) match.reset();   // two bookmarks, one line
 
         if (match) {
             ++result.bookmarks_located;
+            h.page = lines[match->line].page;
             h.line_index = match->line;
             h.line_count = match->count;
             for (std::size_t k = 0; k < match->count; ++k) {

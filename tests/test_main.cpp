@@ -1313,6 +1313,43 @@ TEST(a_bookmark_matches_the_heading_not_the_same_words_elsewhere) {
     CHECK_EQ(result.headings[1].line_index, std::size_t{4});
 }
 
+TEST(a_bookmark_is_placed_at_its_heading_not_at_the_running_header) {
+    // A datasheet: the running header "Ratings" (9 points, at the top of the
+    // page, read last) says what the bookmark says; the heading "1 Ratings"
+    // in 17 points is the place. Titles that start like a keyword ("Part
+    // identification") or with a letter and a digit ("I2C switching") match
+    // their numbered heading; a bookmark that points at the end of a page
+    // finds its heading at the top of the next one.
+    std::vector<Line> lines;
+    lines.push_back(make_line(0, "1 Ratings", 119, 17, true));
+    lines.push_back(make_line(0, "1.1 Thermal handling ratings", 165, 16, true));
+    lines.push_back(make_line(0, "Body text of the ratings.", 200, 9));
+    lines.push_back(make_line(0, "7 Part identification", 263, 17, true));
+    lines.push_back(make_line(0, "3.6.1 I2C switching specifications", 676, 15, true));
+    lines.push_back(make_line(0, "Ratings", 49.5f, 9, true));
+    lines.push_back(make_line(0, "Part identification", 60, 9, true));
+    lines.push_back(make_line(1, "6.1 Determining valid orderable parts", 85, 16, true));
+    lines.push_back(make_line(1, "Body text of the next page.", 120, 9));
+
+    std::vector<OutlineEntry> outline;
+    outline.push_back({"Ratings", 1, 0, {}, {}});
+    outline.push_back({"Thermal handling ratings", 2, 0, {}, {}});
+    outline.push_back({"Part identification", 1, 0, {}, {}});
+    outline.push_back({"I2C switching specifications", 2, 0, {}, {}});
+    outline.push_back({"Determining valid orderable parts", 2, 0, {}, {}});
+    const std::vector<Affine> transforms(2);
+
+    const HeadingResult result = detect_headings(lines, outline, transforms, HeadingOptions{HeadingMode::Bookmarks});
+    CHECK_EQ(result.bookmarks_located, std::size_t{5});
+    const std::vector<std::string> expected = {"1 Ratings", "1.1 Thermal handling ratings", "7 Part identification",
+                                               "3.6.1 I2C switching specifications",
+                                               "6.1 Determining valid orderable parts"};
+    CHECK(titles(result.headings) == expected);
+    REQUIRE(result.headings.size() == 5);
+    CHECK_EQ(result.headings[0].line_index, std::size_t{0});
+    CHECK_EQ(result.headings[4].page, 1);
+}
+
 TEST(headings_from_bookmarks_are_located_in_the_text) {
     std::vector<Line> lines;
     lines.push_back(make_line(0, "Cover page text", 100));

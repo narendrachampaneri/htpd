@@ -245,7 +245,7 @@ One PDF goes through seven steps. Each step is one small file.
 | 2. Lines | `src/layout.cpp` | Characters become lines. Wide gaps are marked (table columns); raised and lowered numbers stay raised (2³¹). |
 | 3. Headers and footers | `src/furniture.cpp` | Lines that repeat at the page edge on many pages are taken out and reported (in a document of two or three pages: on every page). A running header is set apart from the text: a line that stands right on top of the text below it (closer than 2.5 of its font sizes) stays in the text - a heading or the header row of a table at the top of the page - unless it holds the number of its page or stands on almost every page. |
 | 3b. Columns | `src/columns.cpp` | A table set tight (LaTeX, web pages, slides) has column gaps narrower than two font sizes. Its rows leave the same strips of the page free; the spaces on those strips become column gaps, also in the header row. Running text crosses the strips and is left alone. |
-| 4. Headings | `src/headings.cpp` | From the bookmarks of the PDF; or from a table of contents printed in the document, whose titles are looked for in the text after it, in order (also when the text shows them without their number); or from the text: section numbers (also `Register 30.2.43: ...`, one level below its section), font size, bold, another font. A numbered cell of a table row (another cell beside it on its line) is no heading. Large titles in a smaller style than the numbered headings, used three times or more, are headings one level below them. |
+| 4. Headings | `src/headings.cpp` | From the bookmarks of the PDF (each found as its heading line on its page - the line in the largest font, so not a running header with the same words - or at the top of the next page); or from a table of contents printed in the document, whose titles are looked for in the text after it, in order (also when the text shows them without their number); or from the text: section numbers (also `Register 30.2.43: ...`, one level below its section), font size, bold, another font. A numbered cell of a table row (another cell beside it on its line) is no heading. Large titles in a smaller style than the numbered headings, used three times or more, are headings one level below them. |
 | 4b. Structure | `src/structure.cpp` | For documents with few headings: a running header that changes starts a section with its text as title. Text longer than a few pages is cut into parts of about 2 pages, where a sentence ends (FORMAT.md 3.3). |
 | 5. Sections | `src/sections.cpp` | The text is cut at the headings. Lines become paragraphs, table rows (wrapped cells and tables stored cell by cell are put together) and code blocks. The tree of sections is built. |
 | 6. Links | `src/links.cpp` | The links of the pages become links from section to section. |
@@ -295,7 +295,7 @@ as values (`std::expected`); the library does not throw for a bad PDF.
 
 ## What was tested
 
-* **121 automatic tests** (`make test`). Most build their input in memory.
+* **122 automatic tests** (`make test`). Most build their input in memory.
   The others convert small PDFs in `tests/data` through the real PDF
   library: rotated pages, scaled fonts, text spaced only by kerning,
   two columns, code listings, fonts whose names lie about their widths,
