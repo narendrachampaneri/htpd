@@ -99,6 +99,47 @@ void join_line(std::string& paragraph, std::string_view line, bool dehyphenate) 
     paragraph += line;
 }
 
+// Whether the next line of a table cell continues the last word of the cell
+// without a space: a name broken inside itself because the column is too
+// narrow for it ("UART2_" / "RX", "LCD_P2" / "4", "field" / "_2",
+// "($1,433,600.00" / ")"). Only when that is certain; otherwise the line
+// break is a space, as everywhere. `fills` tells that the line before is one
+// word as wide as its column: then a very short rest ("DEFAU" / "LT",
+// "Length-Delimit" / "ed") is the end of that word.
+bool continues_word(std::string_view cell, std::string_view next, bool fills) {
+    const std::size_t space = cell.rfind(' ');
+    const std::string_view a = space == std::string_view::npos ? cell : cell.substr(space + 1);
+    const std::string_view b = next.substr(0, next.find(' '));
+    if (a.empty() || b.empty()) return false;
+    const auto word_char = [](char c) { return is_alnum(c) || c == '_'; };
+    const auto has = [](std::string_view w, auto pred) { return std::ranges::any_of(w, pred); };
+    // "UART2_" + "RX", "PTA4/" + "LLWU_P"
+    if ((a.back() == '_' || a.back() == '/') && a.size() >= 2 && is_alnum(b.front())) return true;
+    // "auth_srv_payload_field" + "_2", "($1,433,600.00" + ")"
+    if ((b.front() == '_' && word_char(a.back())) || (b == ")" && is_digit(a.back()))) return true;
+    if (!word_char(a.back()) || !std::ranges::all_of(b, word_char)) return false;
+    // "LCD_P2" + "4", "LLWU_P" + "15", "US-GAAP-101" + "0": digits after a name with digits or "_"
+    const bool name = has(a, [](char c) { return c == '_' || is_digit(c); });
+    if (name && b.size() <= 4 && is_digit(b.front()) && std::ranges::all_of(b, is_digit)) return true;
+    // "notification_payload_f" + "ield_23": both halves of one name with "_"
+    if (has(a, [](char c) { return c == '_'; }) && has(b, [](char c) { return c == '_'; }) && is_lower(b.front()) &&
+        is_lower(a.back())) {
+        return true;
+    }
+    // "DEFAU" + "LT", "SPI2_MI" + "SO": a very short rest of a word that fills its column
+    return fills && space == std::string_view::npos && a.size() >= 4 && b.size() <= 3 && next.size() == b.size() &&
+           (std::ranges::all_of(b, is_lower) == std::ranges::all_of(a.substr(a.size() - 1), is_lower));
+}
+
+// Appends the next line of a table cell (see continues_word).
+void join_cell_line(std::string& cell, std::string_view next, bool fills) {
+    if (continues_word(cell, next, fills)) {
+        cell += next;
+    } else {
+        join_line(cell, next, false);
+    }
+}
+
 // A block of monospace lines as text: one line each, with the spacing of the
 // page. In a monospace font every character is one column wide, so the pen
 // positions say exactly how many columns a line is indented and how many
@@ -290,7 +331,7 @@ std::string rows_text(std::span<const Line* const> rows, std::span<const std::ui
             while (c + 1 < columns && piece.x0 >= left[c + 1] - kSlack) ++c;
             const bool clear_right = c + 1 == columns || piece.x1 <= left[c + 1] + kSlack;
             if (c == 0 || !clear_right) return plain();
-            join_line(placed_rows[row_index][c], piece.text, false);
+            join_cell_line(placed_rows[row_index][c], piece.text, false);
         }
     }
 
@@ -357,23 +398,23 @@ std::vector<Cell> split_at_columns(const Line& line, const Cell& cell, std::span
 // long as every piece of each line stays inside one column, and puts the
 // rows together again by position: the rows are the bands the pieces share
 // across the page (see below). Text that crosses the columns ends the
-// table. Returns the end of the table (`start` when there is nothing to
+// table. Returns the end of the table (nothing when there is nothing to
 // rebuild: the lines already read row by row), and the rows in `out`. Every
 // piece of text is kept.
-std::size_t rebuild_table(std::span<const Line> lines, std::size_t header_begin, std::size_t start,
-                          std::span<const ParagraphKind> kinds, float line_pitch, std::string& out) {
-    // The header: the line at `start`, or the lines [header_begin, start) when
-    // the header is printed in pieces above the first row ("Gross" over "Revenue").
-    const bool band_header = header_begin < start;
-    const auto is_head = [&](std::size_t line) { return band_header ? line >= header_begin && line < start : line == start; };
+std::optional<std::size_t> rebuild_table(std::span<const Line> lines, std::size_t header_begin, std::size_t header_end,
+                                         std::span<const ParagraphKind> kinds, float line_pitch, std::string& out) {
+    // The header: the lines [header_begin, header_end) - one row, or a header
+    // printed in pieces ("Gross" over "Revenue"). The rows follow.
+    const bool band_header = header_end > header_begin + 1;
+    const auto is_head = [&](std::size_t line) { return line >= header_begin && line < header_end; };
     const Line& header = lines[header_begin];
     std::vector<Cell> head;           // the columns of the header, left to right
     std::vector<std::pair<std::size_t, Cell>> head_cells;   // every cell of the header lines, with its line
     float header_top = header.baseline, header_bottom = header.baseline, header_right = header.x1;
-    for (std::size_t i = header_begin; i < (band_header ? start : start + 1); ++i) {
+    for (std::size_t i = header_begin; i < header_end; ++i) {
         if (lines[i].text.empty()) continue;
         const std::vector<Cell> cells = cells_of(lines[i]);
-        if (cells.empty()) return start;
+        if (cells.empty()) return std::nullopt;
         for (const Cell& cell : cells) head_cells.emplace_back(i, cell);
         header_top = std::min(header_top, lines[i].baseline);
         header_bottom = std::max(header_bottom, lines[i].baseline);
@@ -392,21 +433,24 @@ std::size_t rebuild_table(std::span<const Line> lines, std::size_t header_begin,
         }
     }
     const std::size_t columns = head.size();
-    if (columns < 3) return start;
+    if (columns < 3) return std::nullopt;
     const float size = std::max(header.size, 1.0f);
     const float slack = 0.5f * size;
     std::vector<float> left(columns);
     for (std::size_t c = 0; c < columns; ++c) left[c] = head[c].x0;
     for (std::size_t c = 0; c + 1 < columns; ++c) {
-        if (head[c].x1 >= left[c + 1]) return start;
+        if (head[c].x1 >= left[c + 1]) return std::nullopt;
     }
-    const float right_edge = std::max(header_right, left.back()) + 15.0f * size;
+    // Text further right than this is not part of the table; a last column
+    // wider than its heading moves it along with the rows (as rest_of_cell).
+    float right_edge = std::max(header_right, left.back()) + 15.0f * size;
 
     struct Piece {
         float baseline, x0, x1;
         std::size_t column;
         std::string_view text;
         std::size_t line;   // index in `lines`
+        bool centred = false;   // alone on its line, placed by its centre
     };
     std::vector<Piece> pieces;
     const auto column_of = [&](const Cell& cell, bool centred = false) -> std::optional<std::size_t> {
@@ -428,48 +472,83 @@ std::size_t rebuild_table(std::span<const Line> lines, std::size_t header_begin,
     };
     for (const auto& [i, cell] : head_cells) {
         const auto c = column_of(cell);
-        if (!c) return start;
+        if (!c) return std::nullopt;
         pieces.push_back({lines[i].baseline, cell.x0, cell.x1, *c, cell.text, i});
     }
 
     std::vector<std::size_t> out_of_order, wraps;   // lines that go back up, lines that are not rows
     float lowest = header_bottom;
     float previous_baseline = header_bottom;
-    std::size_t end = band_header ? start : start + 1;
+    std::size_t end = header_end;
     for (; end < lines.size(); ++end) {
         const Line& line = lines[end];
         if (line.figure > 0) break;   // a figure stands here: the table ends before it
         if (line.text.empty()) continue;
-        if (line.page != header.page || kinds[end] == ParagraphKind::Code) break;
+        // A monospace line stays in the table when it fits the columns (a
+        // name in a cell, "CAN_FD_REG_" over "0"), like any other line.
+        if (line.page != header.page) break;
         // Text larger than the header, or much smaller, is not part of the table
         // (a symbol with a subscript, "VLVW1H", is a little smaller).
         if (line.size > header.size + 0.15f * size || line.size < 0.7f * header.size) break;
         if (line.baseline < header_top - slack || line.baseline > lowest + 4.0f * line_pitch * size) break;
         const std::vector<Cell> cells = cells_of(line);
         if (cells.empty()) break;
+        // Places a cell: in its column; split where the next column starts;
+        // set in the middle of its column; or split at a space wider than one
+        // between words into a first part placed so and the rest placed the
+        // same way ("PTI6 UART2_" over "ALT1" and "ALT2"), always from left
+        // to right.
+        const std::size_t spaces = static_cast<std::size_t>(std::ranges::count(line.text, ' '));
+        const bool spaced = line.space_begin.size() == spaces && line.space_end.size() == spaces;
+        const auto place = [&](const auto& self, const Cell& cell, std::size_t from, bool alone, int depth,
+                               std::vector<Piece>& into) -> bool {
+            if (const auto c = column_of(cell); c && *c >= from) {
+                into.push_back({line.baseline, cell.x0, cell.x1, *c, cell.text, end});
+                return true;
+            }
+            const std::vector<Cell> parts = split_at_columns(line, cell, left, slack);
+            if (!parts.empty()) {
+                std::vector<Piece> got;
+                std::size_t next = from;
+                for (const Cell& part : parts) {
+                    const auto c = column_of(part);
+                    if (!c || *c < next) break;
+                    got.push_back({line.baseline, part.x0, part.x1, *c, part.text, end});
+                    next = *c + 1;
+                }
+                if (got.size() == parts.size()) {
+                    into.insert(into.end(), got.begin(), got.end());
+                    return true;
+                }
+            }
+            // (A line alone placed by its centre, with nothing beside it, is a
+            // heading between the rows: see below.)
+            if (const auto c = column_of(cell, true); c && *c >= from) {
+                into.push_back({line.baseline, cell.x0, cell.x1, *c, cell.text, end, alone});
+                return true;
+            }
+            if (depth == 0 || !spaced) return false;
+            const std::string_view text = line.text;
+            const std::size_t offset = static_cast<std::size_t>(cell.text.data() - text.data());
+            std::size_t k = static_cast<std::size_t>(std::count(text.begin(), text.begin() + static_cast<std::ptrdiff_t>(offset), ' '));
+            for (std::size_t pos = offset; pos < offset + cell.text.size(); ++pos) {
+                if (text[pos] != ' ') continue;
+                const std::size_t space = k++;
+                if (line.space_end[space] - line.space_begin[space] < kMinGutter * size) continue;
+                const Cell first{cell.x0, line.space_begin[space], text.substr(offset, pos - offset)};
+                const Cell rest{line.space_end[space], cell.x1, text.substr(pos + 1, offset + cell.text.size() - pos - 1)};
+                std::vector<Piece> got;
+                if (self(self, first, from, false, 0, got) && self(self, rest, got.back().column + 1, false, depth - 1, got)) {
+                    into.insert(into.end(), got.begin(), got.end());
+                    return true;
+                }
+            }
+            return false;
+        };
         std::vector<Piece> found;
         bool fits = true;
         for (const Cell& cell : cells) {
-            if (const auto c = column_of(cell)) {
-                found.push_back({line.baseline, cell.x0, cell.x1, *c, cell.text, end});
-                continue;
-            }
-            const std::vector<Cell> parts = split_at_columns(line, cell, left, slack);
-            // Set in the middle of its column - but not a line alone, set in the
-            // middle of the table: that is a heading between the rows
-            // ("Debug/Trace Registers").
-            if (parts.empty() && cells.size() > 1) {
-                if (const auto c = column_of(cell, true)) {
-                    found.push_back({line.baseline, cell.x0, cell.x1, *c, cell.text, end});
-                    continue;
-                }
-            }
-            for (const Cell& part : parts) {
-                const auto c = column_of(part);
-                if (!c) break;
-                found.push_back({line.baseline, part.x0, part.x1, *c, part.text, end});
-            }
-            if (parts.empty() || found.empty() || found.back().text.data() != parts.back().text.data()) {
+            if (!place(place, cell, 0, cells.size() == 1, 3, found)) {
                 fits = false;
                 break;
             }
@@ -479,6 +558,7 @@ std::size_t rebuild_table(std::span<const Line> lines, std::size_t header_begin,
         if (kinds[end] != ParagraphKind::Rows) wraps.push_back(end);
         previous_baseline = line.baseline;
         lowest = std::max(lowest, line.baseline);
+        right_edge = std::max(right_edge, line.x1 + 6.0f * size);
         pieces.insert(pieces.end(), found.begin(), found.end());
     }
     // The rows, as bands across the page. Pieces in different columns whose
@@ -510,6 +590,10 @@ std::size_t rebuild_table(std::span<const Line> lines, std::size_t header_begin,
         std::vector<std::size_t> order(n);
         for (std::size_t i = 0; i < n; ++i) order[i] = i;
         std::ranges::stable_sort(order, [&](std::size_t x, std::size_t y) { return pieces[x].baseline < pieces[y].baseline; });
+        // The pieces of the header are one row.
+        for (std::size_t i = 0; i < n; ++i) {
+            if (is_head(pieces[i].line) && is_head(pieces[0].line)) parent[find(i)] = find(0);
+        }
         for (std::size_t a = 0; a < n; ++a) {
             for (std::size_t b = a + 1; b < n; ++b) {
                 const Piece& p = pieces[order[a]];
@@ -559,7 +643,7 @@ std::size_t rebuild_table(std::span<const Line> lines, std::size_t header_begin,
     // A real row has cells beside its first one. Lines at the end that only
     // hold first-column text in the last band are the text after the table.
     Bands bands = find_bands();
-    while (bands.rows.size() >= 2 && end > start + 1) {
+    while (bands.rows.size() >= 2 && end > header_end) {
         const std::size_t last = bands.rows.size() - 1;
         const Band& band = bands.rows[last];
         if (band.header || std::ranges::count(band.columns, true) != 1 || !band.columns[0]) break;
@@ -568,15 +652,33 @@ std::size_t rebuild_table(std::span<const Line> lines, std::size_t header_begin,
             if (bands.of[i] == last) first_line = std::min(first_line, pieces[i].line);
         }
         // only when the lines of that band are the last lines read
-        bool tail = first_line > start;
+        bool tail = first_line >= header_end;
         for (std::size_t i = 0; i < pieces.size(); ++i) {
             if (pieces[i].line >= first_line && bands.of[i] != last) tail = false;
         }
         if (!tail) break;
         end = first_line;
-        while (end > start + 1 && lines[end - 1].text.empty()) --end;
+        while (end > header_end && lines[end - 1].text.empty()) --end;
         std::erase_if(pieces, [&](const Piece& p) { return p.line >= first_line; });
         bands = find_bands();
+    }
+    // A line alone, set in the middle of a column, with nothing beside it in
+    // its band and not where other text of that column starts, is a heading
+    // between the rows ("Debug/Trace Registers"): the table ends before it.
+    for (std::size_t i = 0; i < pieces.size(); ++i) {
+        if (!pieces[i].centred) continue;
+        const std::size_t band = bands.of[i];
+        if (std::ranges::count(bands.of, band) != 1) continue;
+        // the next line of a cell starts where that cell starts
+        const bool aligned = std::ranges::any_of(pieces, [&](const Piece& p) {
+            return &p != &pieces[i] && p.column == pieces[i].column && std::fabs(p.x0 - pieces[i].x0) <= slack;
+        });
+        if (aligned) continue;
+        const std::size_t cut = pieces[i].line;
+        end = cut;
+        std::erase_if(pieces, [&](const Piece& p) { return p.line >= cut; });
+        bands = find_bands();
+        i = static_cast<std::size_t>(-1);   // look again from the start
     }
     // A band with text in one column only, or nothing in the first column,
     // and no line with two cells, holds the rest of a cell that wraps: it
@@ -618,8 +720,8 @@ std::size_t rebuild_table(std::span<const Line> lines, std::size_t header_begin,
     const auto within = [&](const std::vector<std::size_t>& at) {
         return std::ranges::any_of(at, [&](std::size_t i) { return i < end; });
     };
-    if (!band_header && !within(out_of_order) && !within(wraps)) return start;
-    if (row_total < 2) return start;   // the header and at least one row
+    if (!band_header && !within(out_of_order) && !within(wraps)) return std::nullopt;
+    if (row_total < 2) return std::nullopt;   // the header and at least one row
 
     // A header cell printed as one block over two columns ("GAAP Code Q1 ($k)"
     // over the codes and the values): the cells below it fall into two groups
@@ -774,12 +876,25 @@ std::size_t rebuild_table(std::span<const Line> lines, std::size_t header_begin,
         }
         return dashes_only ? !line.empty() : digit;
     };
+    // The widest piece of each column: a word as wide as that fills its column.
+    std::vector<float> widest(all_columns, 0);
+    for (const Piece& p : pieces) widest[p.column] = std::max(widest[p.column], p.x1 - p.x0);
     const auto write_row = [&](const std::vector<CellLines>& cells) {
         std::string line;
         for (std::size_t c = 0; c < all_columns; ++c) {
             std::string cell;
+            const std::vector<const Piece*>* before = nullptr;
             for (const auto& l : cells[c]) {
-                for (const Piece* p : l) join_line(cell, p->text, false);
+                for (std::size_t k = 0; k < l.size(); ++k) {
+                    if (k == 0 && before != nullptr) {
+                        const bool fills = before->size() == 1 &&
+                                           before->front()->x1 - before->front()->x0 >= 0.85f * widest[c];
+                        join_cell_line(cell, l[k]->text, fills);
+                    } else {
+                        join_line(cell, l[k]->text, false);
+                    }
+                }
+                before = &l;
             }
             if (c > 0) line += " | ";
             line += cell;
@@ -922,44 +1037,56 @@ float typical_line_pitch(std::span<const Line> lines) {
 
 namespace {
 
-// The header of a table printed in pieces above its first row (each column
-// heading on one or two lines of its own: "Gross" over "Revenue", "Cost of
-// Sales"), read as the last lines of the paragraph before the table. They
-// are taken as the header when they lie right above the row, close together,
-// and stand in at least three separate blocks side by side, none of them
-// running across another (a caption or a sentence does). Returns the index
-// of the first of them, or `row` when there is no such header.
-std::size_t header_above(std::span<const Line> lines, std::span<const std::size_t> text_lines, std::size_t row,
-                         float line_pitch) {
+// The header of a table printed in pieces (each column heading on one or
+// two lines of its own: "Gross" over "Revenue", "Pin" over "Name"), read as
+// the last lines of the paragraph before the first row of the table. They
+// are the header when they lie close together right above that row - or
+// beside it, on its line and the line below, when the row line is the rest
+// of the header ("ALT0 ALT1 ... ALT7" beside "100"/"LQFP", "Pin"/"Name") -
+// and stand in at least three separate blocks side by side, none running
+// across another (a caption or a sentence does). Returns the lines of the
+// header [first, end), or nothing.
+std::optional<std::pair<std::size_t, std::size_t>> header_above(std::span<const Line> lines,
+                                                                std::span<const std::size_t> text_lines,
+                                                                std::size_t row, float line_pitch) {
     const Line& first_row = lines[row];
     const float size = std::max(first_row.size, 1.0f);
     std::size_t taken = 0;
-    float top = first_row.baseline, bottom = -1e30f;
+    float top = 1e30f, bottom = -1e30f;
     for (std::size_t k = text_lines.size(); k-- > 0;) {
         const Line& line = lines[text_lines[k]];
-        if (line.page != first_row.page || line.baseline >= first_row.baseline - 0.3f * size) break;
-        if (line.baseline < first_row.baseline - 4.0f * line_pitch * size) break;
+        if (line.page != first_row.page) break;
+        if (line.baseline < first_row.baseline - 4.0f * line_pitch * size || line.baseline > first_row.baseline + 2.0f * size) break;
         if (line.size > 1.3f * first_row.size || line.size < 0.7f * first_row.size) break;
         // one band: the pieces of the header lie close together
-        if (std::max(bottom, line.baseline) - std::min(top, line.baseline) > 2.0f * size && bottom > -1e30f) break;
+        if (std::max(bottom, line.baseline) - std::min(top, line.baseline) > 2.0f * size) break;
         top = std::min(top, line.baseline);
         bottom = std::max(bottom, line.baseline);
         ++taken;
     }
-    if (taken < 2) return row;
+    if (taken < 2) return std::nullopt;
+    std::size_t end = row;
+    if (bottom >= first_row.baseline - 0.3f * size) {
+        // beside the row: on its line and the line below, two lines of header
+        const bool on_its_line = top <= first_row.baseline + 0.3f * size;
+        if (!on_its_line || bottom - top < 0.8f * size) return std::nullopt;
+        end = row + 1;
+    }
     const std::size_t first = text_lines[text_lines.size() - taken];
     // nothing else between them and the row
     for (std::size_t i = first; i < row; ++i) {
         if (std::ranges::find(text_lines.subspan(text_lines.size() - taken), i) == text_lines.end() &&
             (lines[i].figure > 0 || !lines[i].text.empty())) {
-            return row;
+            return std::nullopt;
         }
     }
     // blocks side by side; a cell that overlaps two others joins them, which a caption does
     std::vector<Cell> cells;
-    for (std::size_t k = text_lines.size() - taken; k < text_lines.size(); ++k) {
-        const std::vector<Cell> found = cells_of(lines[text_lines[k]]);
-        if (found.empty()) return row;
+    std::vector<std::size_t> head_lines(text_lines.end() - static_cast<std::ptrdiff_t>(taken), text_lines.end());
+    if (end > row) head_lines.push_back(row);
+    for (const std::size_t i : head_lines) {
+        const std::vector<Cell> found = cells_of(lines[i]);
+        if (found.empty()) return std::nullopt;
         cells.insert(cells.end(), found.begin(), found.end());
     }
     std::ranges::stable_sort(cells, {}, &Cell::x0);
@@ -974,9 +1101,10 @@ std::size_t header_above(std::span<const Line> lines, std::span<const std::size_
         for (const Cell& other : cells) {
             if (&other != &cell && other.x0 < cell.x1 && other.x1 > cell.x0) ++overlapped;
         }
-        if (overlapped >= 2) return row;
+        if (overlapped >= 2) return std::nullopt;
     }
-    return blocks >= 3 ? first : row;
+    if (blocks < 3) return std::nullopt;
+    return std::pair{first, end};
 }
 
 }  // namespace
@@ -1056,25 +1184,26 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
         if (kind == ParagraphKind::Rows && table_starts) {
             std::string rebuilt;
             // The header printed in pieces above the first row: it leaves the paragraph before.
-            const std::size_t first = current.kind == ParagraphKind::Text
-                                          ? header_above(lines, text_lines, index, line_pitch) : index;
-            if (first < index) {
-                if (const std::size_t end = rebuild_table(lines, first, index, kinds, line_pitch, rebuilt); end > index) {
+            const auto header = current.kind == ParagraphKind::Text
+                                    ? header_above(lines, text_lines, index, line_pitch)
+                                    : std::nullopt;
+            if (header) {
+                if (const auto end = rebuild_table(lines, header->first, header->second, kinds, line_pitch, rebuilt)) {
                     std::vector<std::size_t> kept(text_lines.begin(), text_lines.end());
-                    std::erase_if(kept, [&](std::size_t i) { return i >= first; });
+                    std::erase_if(kept, [&](std::size_t i) { return i >= header->first; });
                     current.text.clear();
                     for (const std::size_t i : kept) join_line(current.text, lines[i].text, options.dehyphenate);
                     flush();
-                    paragraphs.push_back(Paragraph{lines[first].page, ParagraphKind::Rows, std::move(rebuilt)});
-                    index = end - 1;
+                    paragraphs.push_back(Paragraph{lines[header->first].page, ParagraphKind::Rows, std::move(rebuilt)});
+                    index = *end - 1;
                     previous = nullptr;
                     continue;
                 }
             }
-            if (const std::size_t end = rebuild_table(lines, index, index, kinds, line_pitch, rebuilt); end > index) {
+            if (const auto end = rebuild_table(lines, index, index + 1, kinds, line_pitch, rebuilt)) {
                 flush();
                 paragraphs.push_back(Paragraph{line.page, ParagraphKind::Rows, std::move(rebuilt)});
-                index = end - 1;
+                index = *end - 1;
                 previous = nullptr;
                 continue;
             }

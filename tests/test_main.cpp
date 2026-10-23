@@ -16,6 +16,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -1671,8 +1672,8 @@ TEST(a_table_header_printed_in_pieces_above_the_rows_is_its_header) {
     REQUIRE(paragraphs.size() == 1);
     CHECK(paragraphs[0].kind == ParagraphKind::Rows);
     CHECK_EQ(paragraphs[0].text, std::string("Revenue Channel | Ref | Gross Revenue | Cost | Net\n"
-                                             "Cloud SaaS | IFRS-A | $4,385.00 | ($1,534.00 ) | $2,251.50\n"
-                                             "Licensing | IFRS-B | $3,759.40 | ($1,315.79 ) | $1,930.45"));
+                                             "Cloud SaaS | IFRS-A | $4,385.00 | ($1,534.00) | $2,251.50\n"
+                                             "Licensing | IFRS-B | $3,759.40 | ($1,315.79) | $1,930.45"));
 
     // A caption above the rows runs across the columns: it stays text.
     std::vector<Line> captioned = {make_line(0, "Table 6. Segment income by channel and region of the group", 93),
@@ -1779,6 +1780,54 @@ TEST(a_figure_ends_a_table_and_keeps_its_place) {
     CHECK(paragraphs[0].kind == ParagraphKind::Rows);
     CHECK(paragraphs[1].kind == ParagraphKind::Figure);
     CHECK_EQ(paragraphs[1].text, std::string("1"));
+}
+
+TEST(a_name_broken_in_a_narrow_cell_is_joined_without_a_space) {
+    // Pin tables: a name too wide for its column goes on in the next line.
+    // Only a break that is certainly inside one name loses the space.
+    std::vector<Line> lines;
+    lines.push_back(row_line({{"No", 72}, {"Pin", 110}, {"Default", 170}, {"Alt", 250}, {"Name", 330}, {"Cost", 430}}, 100));
+    // the table is stored cell by cell: each piece is a line of its own
+    for (const auto& [text, x, baseline] : std::initializer_list<std::tuple<const char*, float, float>>{
+             {"2", 72, 113}, {"PTA1", 110, 113}, {"LCD_P2", 170, 113}, {"4", 180, 124}, {"UART2_", 250, 113},
+             {"RX", 255, 124}, {"Register", 330, 113}, {"0", 335, 124}, {"($1,534.00", 430, 113}, {")", 480, 124},
+             {"5", 72, 141}, {"PTA4/", 110, 141}, {"LLWU_P", 110, 152}, {"15", 115, 163}, {"SPI2_MI", 170, 141},
+             {"SO", 180, 152}, {"field", 250, 141},
+             {"_2", 255, 152}, {"Reset", 330, 141}, {"value", 335, 152}, {"$12.00", 430, 141}}) {
+        lines.push_back(row_line({{text, x}}, baseline));
+    }
+    const auto paragraphs = build_paragraphs(lines, 1.2f);
+    REQUIRE(paragraphs.size() == 1);
+    CHECK_EQ(paragraphs[0].text, std::string("No | Pin | Default | Alt | Name | Cost\n"
+                                             "2 | PTA1 | LCD_P24 | UART2_RX | Register 0 | ($1,534.00)\n"
+                                             "5 | PTA4/LLWU_P15 | SPI2_MISO | field_2 | Reset value | $12.00"));
+}
+
+TEST(a_monospace_name_in_a_table_cell_stays_in_the_table) {
+    // A register map: the acronym is set in a monospace font and wraps. Two
+    // monospace lines one above the other are no listing inside a table row.
+    SectionOptions options;
+    options.fonts.resize(2);
+    options.fonts[1].monospace = true;
+    std::vector<Line> lines;
+    lines.push_back(row_line({{"Offset", 58}, {"Register Name", 120}, {"Acronym", 218}, {"Access", 290}, {"Reset", 340}}, 89));
+    Line name = row_line({{"0x0000", 58}, {"Config Register", 120}}, 105.5f);
+    lines.push_back(name);
+    lines.push_back(row_line({{"0", 125}}, 116));
+    Line acronym = row_line({{"CAN_FD_REG_", 218}}, 105.5f);
+    acronym.font = 1;
+    lines.push_back(acronym);
+    Line rest = row_line({{"0", 219}}, 116);
+    rest.font = 1;
+    lines.push_back(rest);
+    lines.push_back(row_line({{"RO", 290}, {"0x00000000", 340}}, 105.5f));
+    lines.push_back(row_line({{"0x0004", 58}, {"Status Register 1", 120}, {"CAN_FD_REG_1", 218}, {"R/W", 290},
+                              {"0x00001A2B", 340}}, 132.5f));
+    const auto paragraphs = build_paragraphs(lines, 1.3f, options);
+    REQUIRE(paragraphs.size() == 1);
+    CHECK_EQ(paragraphs[0].text, std::string("Offset | Register Name | Acronym | Access | Reset\n"
+                                             "0x0000 | Config Register 0 | CAN_FD_REG_0 | RO | 0x00000000\n"
+                                             "0x0004 | Status Register 1 | CAN_FD_REG_1 | R/W | 0x00001A2B"));
 }
 
 TEST(a_justified_line_is_text_not_a_table_row) {

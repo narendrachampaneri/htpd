@@ -295,7 +295,7 @@ as values (`std::expected`); the library does not throw for a bad PDF.
 
 ## What was tested
 
-* **113 automatic tests** (`make test`). Most build their input in memory.
+* **115 automatic tests** (`make test`). Most build their input in memory.
   The others convert small PDFs in `tests/data` through the real PDF
   library: rotated pages, scaled fonts, text spaced only by kerning,
   two columns, code listings, fonts whose names lie about their widths,

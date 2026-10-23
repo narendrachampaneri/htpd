@@ -274,10 +274,20 @@ How the converter decides:
   heading on its own) is the header too, when its pieces stand in three or
   more blocks side by side and none runs across another (a caption does).
   Text that crosses the columns ends the table, and so does a figure or a
-  heading set alone between the rows. A cell set so tight against the next
+  heading set alone between the rows. A line in a monospace font that fits
+  the columns stays in the table (a name in a cell is no listing). A header
+  in pieces may also stand beside the first row line, on its line and the
+  line below ("100" over "LQFP" beside "ALT0 ALT1 ..."): then that line is
+  part of the header. A cell set so tight against the next
   column that no wide gap shows is split where that column starts, when a
   space wider than one between words lies there; a cell set in the middle
-  of its column belongs to it. Pieces of one cell are joined with one space.
+  of its column belongs to it. Pieces of one cell are joined with one space,
+  except where a name is broken inside itself because the column is too
+  narrow - only when that is certain: the first part ends with `_` or `/`
+  (`UART2_` + `RX`), the next part starts with `_` or is a lone `)`
+  (`field` + `_2`), a short number follows a name with digits or `_`
+  (`LCD_P2` + `4` = `LCD_P24`), both parts hold `_`, or a rest of at most
+  three letters follows one word as wide as its column (`DEFAU` + `LT`).
 * **The rows of such a table** are bands across the page: pieces in
   different columns whose baselines lie less than a line apart form one
   row (a cell in the middle of a row whose other cells wrap). A band with
