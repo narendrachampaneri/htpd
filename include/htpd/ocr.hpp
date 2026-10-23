@@ -108,8 +108,10 @@ struct TsvLines {
 };
 // `whole_page`: lines of a scanned page (wide gaps become table columns);
 // otherwise lines of a picture (no columns: a figure is no table).
+// `image`: the picture that was read; with it, lines whose strokes are clearly
+// wider than those of most lines are marked bold (headings of a scan).
 TsvLines lines_from_tsv(std::string_view tsv, int page, const Box& region, float scale, int min_word_confidence,
-                        bool whole_page = true);
+                        bool whole_page = true, const Image* image = nullptr);
 
 // The grey image as a binary PGM file (P5), which Tesseract reads.
 std::string pgm_bytes(const Image& image);

@@ -23,6 +23,7 @@ constexpr bool is_alnum(char c) { return is_alpha(c) || is_digit(c); }
 // no lower-case words.)
 bool is_row(const Line& line) {
     const std::size_t gaps = line.gaps.size();
+    if (line.table && gaps >= 1) return true;   // its columns line up with the rows around it
     if (gaps < 2) return false;
     if (gaps < 3 || line.gap_begin.size() != gaps || line.gap_end.size() != gaps) return true;
     if (static_cast<std::size_t>(std::ranges::count(line.text, ' ')) != gaps) return true;

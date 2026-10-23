@@ -552,9 +552,123 @@ Result<PageText> PdfDocument::read_page(int index) const {
         float em = 0;             // font size along the line, in points
     } previous;
 
+    // Text marked with /ActualText (complex scripts such as Gujarati or Hindi,
+    // ligatures): the PDF says what the glyphs of a span mean. Without it the
+    // glyphs alone give letters twice or in the wrong order. A span is one mark
+    // that the text objects inside it share.
+    struct Span {
+        FPDF_PAGEOBJECTMARK mark = nullptr;
+        std::u32string text;
+    };
+    std::unordered_map<FPDF_PAGEOBJECT, Span> spans;
+    const auto span_of = [&](int ci) -> const Span* {
+        const FPDF_PAGEOBJECT obj = FPDFText_GetTextObject(tp, ci);
+        if (obj == nullptr) return nullptr;
+        auto [it, fresh] = spans.try_emplace(obj);
+        if (fresh) {
+            const int marks = FPDFPageObj_CountMarks(obj);
+            for (int k = 0; k < marks && it->second.mark == nullptr; ++k) {
+                const FPDF_PAGEOBJECTMARK mark = FPDFPageObj_GetMark(obj, static_cast<unsigned long>(k));
+                unsigned long bytes = 0;
+                if (mark == nullptr ||
+                    !FPDFPageObjMark_GetParamBlobValue(mark, "ActualText", nullptr, 0, &bytes) || bytes == 0) {
+                    continue;
+                }
+                std::vector<unsigned char> raw(bytes, 0);
+                if (!FPDFPageObjMark_GetParamBlobValue(mark, "ActualText", raw.data(), bytes, &bytes)) continue;
+                raw.resize(std::min<std::size_t>(raw.size(), bytes));
+                // A PDF text string: UTF-16BE after a byte order mark, else one byte per character.
+                std::u32string text;
+                if (raw.size() >= 2 && raw[0] == 0xFE && raw[1] == 0xFF) {
+                    for (std::size_t u = 2; u + 1 < raw.size(); u += 2) {
+                        char32_t c = static_cast<char32_t>(raw[u] << 8 | raw[u + 1]);
+                        if (c >= 0xD800 && c <= 0xDBFF && u + 3 < raw.size()) {
+                            const char32_t lo = static_cast<char32_t>(raw[u + 2] << 8 | raw[u + 3]);
+                            if (lo >= 0xDC00 && lo <= 0xDFFF) {
+                                c = 0x10000 + ((c - 0xD800) << 10) + (lo - 0xDC00);
+                                u += 2;
+                            }
+                        }
+                        text.push_back(c);
+                    }
+                } else {
+                    for (const unsigned char c : raw) text.push_back(c);
+                }
+                it->second = {mark, std::move(text)};
+            }
+        }
+        return it->second.mark != nullptr ? &it->second : nullptr;
+    };
+    // The characters [i, end) of one span: given out as the span's text,
+    // spread over the place its glyphs take.
+    std::u32string span_text;
+    std::unordered_set<FPDF_PAGEOBJECTMARK> said;   // spans given out
+    std::size_t span_next = 0;
+    int span_end = -1;
+    float span_x0 = 0, span_x1 = 0;
+
     for (int i = 0; i < count; ++i) {
         const int first_index = i;
         char32_t cp = FPDFText_GetUnicode(tp, i);
+        bool from_span = false;
+        if (i >= span_end) {
+            span_text.clear();
+            if (const Span* sp = span_of(i)) {
+                int end = i + 1;
+                while (end < count) {
+                    const Span* next = span_of(end);
+                    if (next != nullptr && next->mark == sp->mark) {
+                        ++end;
+                    } else if (next == nullptr && FPDFText_IsGenerated(tp, end) == 1 && end + 1 < count &&
+                               span_of(end + 1) != nullptr && span_of(end + 1)->mark == sp->mark) {
+                        ++end;   // a space PDFium put between two glyphs of the span
+                    } else {
+                        break;
+                    }
+                }
+                // A span already given out (its glyphs drawn again elsewhere, such
+                // as a mark set apart): its glyphs say nothing new.
+                if (!said.insert(sp->mark).second) {
+                    i = end - 1;
+                    continue;
+                }
+                // Only where the span holds something to say instead of its glyphs.
+                if (!sp->text.empty()) {
+                    span_text = sp->text;
+                    span_next = 0;
+                    span_end = end;
+                    span_x0 = 1e30f;
+                    span_x1 = -1e30f;
+                    for (int k = i; k < end; ++k) {
+                        double l = 0, r = 0, b = 0, t = 0;
+                        if (FPDFText_IsGenerated(tp, k) == 1 || !FPDFText_GetCharBox(tp, k, &l, &r, &b, &t)) continue;
+                        float xa = 0, ya = 0, xb = 0, yb = 0;
+                        to_display.apply(static_cast<float>(l), static_cast<float>(b), xa, ya);
+                        to_display.apply(static_cast<float>(r), static_cast<float>(t), xb, yb);
+                        span_x0 = std::min({span_x0, xa, xb});
+                        span_x1 = std::max({span_x1, xa, xb});
+                    }
+                }
+            }
+        }
+        if (!span_text.empty() && i < span_end) {
+            if (span_next >= span_text.size()) {
+                // the rest of the span's glyphs: already said - but a space of the
+                // text that the span's words leave out stays a space
+                if (is_space_like(cp) && FPDFText_IsGenerated(tp, i) != 1 &&
+                    (span_text.empty() || !is_space_like(span_text.back()))) {
+                    Glyph space;
+                    space.cp = U' ';
+                    space.is_space = true;
+                    out.glyphs.push_back(space);
+                }
+                continue;
+            }
+            // The last character of the span is placed from the last glyph, so
+            // that every character of the span is given out once.
+            from_span = true;
+            cp = span_text[span_next];
+        }
 
         // PDFium may report UTF-16 units; join a surrogate pair into one code point.
         if (cp >= 0xD800 && cp <= 0xDBFF && i + 1 < count) {
@@ -568,6 +682,23 @@ Result<PageText> PdfDocument::read_page(int index) const {
         if (FPDFText_IsHyphen(tp, i) == 1) cp = U'-';
 
         if (is_space_like(cp)) {
+            // A space PDFium adds itself, placed back inside the glyph before it,
+            // where the next glyph follows with almost no gap: no space of the
+            // text, but a split between glyphs that make one word together
+            // (Gujarati, Hindi). A real space leaves a gap of a fifth of the font size.
+            if (FPDFText_IsGenerated(tp, i) == 1 && !out.glyphs.empty() && !out.glyphs.back().is_space && i > 0 &&
+                i + 1 < count) {
+                double l = 0, r = 0, b = 0, t = 0, pl = 0, pr = 0, pb = 0, pt = 0, nl = 0, nr = 0, nb = 0, nt = 0;
+                if (FPDFText_GetCharBox(tp, i, &l, &r, &b, &t) && FPDFText_GetCharBox(tp, i - 1, &pl, &pr, &pb, &pt) &&
+                    FPDFText_GetCharBox(tp, i + 1, &nl, &nr, &nb, &nt)) {
+                    float x = 0, y = 0, px = 0, py = 0, nx = 0, ny = 0;
+                    to_display.apply(static_cast<float>(l), static_cast<float>(b), x, y);
+                    to_display.apply(static_cast<float>(pr), static_cast<float>(pb), px, py);
+                    to_display.apply(static_cast<float>(nl), static_cast<float>(nb), nx, ny);
+                    const float size_here = out.glyphs.back().size;
+                    if (x < px - 0.5f && std::fabs(ny - py) < size_here && nx - px < 0.2f * size_here) continue;
+                }
+            }
             Glyph space;
             space.cp = U' ';
             space.is_space = true;
@@ -623,6 +754,36 @@ Result<PageText> PdfDocument::read_page(int index) const {
         g.y1 = std::max({ys[0], ys[1], ys[2], ys[3]});
         to_display.apply(fl(origin_x), fl(origin_y), g.origin_x, g.baseline);
         g.size = size > 0.01f ? size : std::max(1.0f, (g.y1 - g.y0) * 1.4f);
+        if (from_span) {
+            g.span = true;
+            // The span's characters share its width, one after the other.
+            const float n = static_cast<float>(span_text.size());
+            const float w = span_x1 > span_x0 ? (span_x1 - span_x0) / n : 0.0f;
+            g.x0 = span_x0 + w * static_cast<float>(span_next);
+            g.x1 = g.x0 + w;
+            g.origin_x = g.x0;
+            ++span_next;
+            // The rest of the span's characters follow at once.
+            while (span_next < span_text.size()) {
+                Glyph more = g;
+                more.cp = span_text[span_next];
+                more.x0 = span_x0 + w * static_cast<float>(span_next);
+                more.x1 = more.x0 + w;
+                more.origin_x = more.x0;
+                if (is_space_like(more.cp)) {
+                    Glyph space;
+                    space.cp = U' ';
+                    space.is_space = true;
+                    out.glyphs.push_back(g);
+                    g = space;
+                    ++span_next;
+                    continue;
+                }
+                out.glyphs.push_back(g);
+                g = more;
+                ++span_next;
+            }
+        }
 
         char font_name[160] = {};
         int font_flags = 0;

@@ -61,6 +61,7 @@ set_target_properties(htpd_pdfium PROPERTIES
 # ---- the converter library ------------------------------------------------------
 add_library(htpd_core STATIC
   src/bundle_writer.cpp
+  src/columns.cpp
   src/converter.cpp
   src/furniture.cpp
   src/headings.cpp

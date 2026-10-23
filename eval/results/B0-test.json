@@ -8,7 +8,7 @@
     "aapcs64",
     "riscv-debug"
   ],
-  "when": "2026-10-21",
+  "when": "2026-10-23",
   "machine": "Linux x86_64, Python 3.13.16",
   "metrics": {
     "questions": 133,
@@ -22,9 +22,9 @@
     "not_found_accuracy": 0.0,
     "false_not_found": 0.0,
     "answer_in_text": 1.0,
-    "tokens_mean": 45986.6992481203,
+    "tokens_mean": 46068.917293233084,
     "tokens_vs_whole": 1.0,
-    "ms_per_question": 0.014127458660067689,
+    "ms_per_question": 0.00669365415450372,
     "by_kind": {}
   },
   "misses": [

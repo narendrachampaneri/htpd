@@ -97,8 +97,11 @@ Tesseract processes run at the same time, one per CPU core. Rules:
   dropped.
 * Text read from a picture on a page with text is the content of a figure:
   it is never taken for a heading, and never split into table columns.
-* Text read by OCR never becomes a heading by its size alone; on a scanned
-  page a numbered heading ("3.2 Clock tree") does, checked by its sequence.
+* On a scanned page the size of a line comes from the height of its
+  letters ("Pin" reaches higher than "on", "type" lower), and bold from the
+  width of its strokes. A short line clearly larger or bold is a heading;
+  the rest of a wrapped table cell (starting in lower case) and a row of a
+  table are not. Text read from a picture on a page with text never is.
 * The pages that hold OCR text are listed per section (`ocr_pages`).
 * Without Tesseract such a page is not lost: it is stored as a picture of
   the whole page (a figure "Page N: picture of the whole page"), so an AI
@@ -236,11 +239,12 @@ One PDF goes through seven steps. Each step is one small file.
 
 | Step | File | What happens |
 |---|---|---|
-| 1. Read | `src/pdf_reader_pdfium.cpp` | PDFium gives every character with its position, size and font, and the links of each page. Page rotation is removed here, and a page whose text mainly runs sideways or upside down is turned, so all later steps see upright pages. This is the only file that knows PDFium. |
+| 1. Read | `src/pdf_reader_pdfium.cpp` | PDFium gives every character with its position, size and font, and the links of each page. Where the PDF says what glyphs mean (`/ActualText`, used for Gujarati, Hindi and other scripts whose letters are made of several glyphs), that text is taken, once. Page rotation is removed here, and a page whose text mainly runs sideways or upside down is turned, so all later steps see upright pages. This is the only file that knows PDFium. |
 | 1b. OCR | `src/ocr.cpp` | Pages without a text layer and pictures without text of the PDF on them are drawn (by PDFium, in `pdf_reader_pdfium.cpp`) and read by the Tesseract program, several at a time, when it is installed. See "OCR" above. |
 | 1c. Figures | `src/figures.cpp`, `src/png.cpp` | The pictures and drawings of each page that are figures, with their caption; drawn by PDFium and packed as PNG (several at a time). See "Figures" above. |
 | 2. Lines | `src/layout.cpp` | Characters become lines. Wide gaps are marked (table columns); raised and lowered numbers stay raised (2³¹). |
-| 3. Headers and footers | `src/furniture.cpp` | Lines that repeat at the page edge on many pages are taken out and reported. |
+| 3. Headers and footers | `src/furniture.cpp` | Lines that repeat at the page edge on many pages are taken out and reported (in a document of two or three pages: on every page). |
+| 3b. Columns | `src/columns.cpp` | A table set tight (LaTeX, web pages, slides) has column gaps narrower than two font sizes. Its rows leave the same strips of the page free; the spaces on those strips become column gaps, also in the header row. Running text crosses the strips and is left alone. |
 | 4. Headings | `src/headings.cpp` | From the bookmarks of the PDF; or from a table of contents printed in the document, whose titles are looked for in the text after it, in order (also when the text shows them without their number); or from the text: section numbers, font size, bold, another font. |
 | 4b. Structure | `src/structure.cpp` | For documents with few headings: a running header that changes starts a section with its text as title. Text longer than a few pages is cut into parts of about 2 pages, where a sentence ends (FORMAT.md 3.3). |
 | 5. Sections | `src/sections.cpp` | The text is cut at the headings. Lines become paragraphs, table rows (wrapped cells and tables stored cell by cell are put together) and code blocks. The tree of sections is built. |
@@ -256,7 +260,8 @@ The source tree:
 include/htpd/     the headers (the public one is converter.hpp)
 src/              the converter library
 cli/main.cpp      the command-line tool
-tests/            test_main.cpp, small test PDFs in tests/data, the stress test in tests/stress
+tests/            test_main.cpp, small test PDFs in tests/data, the stress test in tests/stress,
+                  the document zoo in tests/zoo
 scripts/          get_pdfium.sh
 docs/FORMAT.md    the format
 docs/CONVERTER.md this page
@@ -290,10 +295,30 @@ as values (`std::expected`); the library does not throw for a bad PDF.
 
 ## What was tested
 
-* **70 automatic tests** (`make test`). Most build their input in memory.
-  The others convert four small PDFs in `tests/data` through the real PDF
+* **101 automatic tests** (`make test`). Most build their input in memory.
+  The others convert small PDFs in `tests/data` through the real PDF
   library: rotated pages, scaled fonts, text spaced only by kerning,
-  two columns, code listings, fonts whose names lie about their widths.
+  two columns, code listings, fonts whose names lie about their widths,
+  scanned pages, figures, `/ActualText`.
+* **The document zoo** (`tests/zoo`). The same documents - a datasheet, a
+  manual, a report, and short ones in German, Hindi and Gujarati - are made
+  into PDFs by the programs real documents come from: Word export
+  (LibreOffice), LaTeX (with and without bookmarks, two columns), web pages
+  printed by Chromium and wkhtmltopdf, slide decks, scans (straight and
+  turned, with noise) and pages whose letters are drawn as shapes. As the
+  text of every document is known, `run_zoo.py` measures each `.htpd` file:
+  how much of the text it holds in order, how much else, which headings and
+  table rows it found.
+
+  ```sh
+  python3 tests/zoo/make_zoo.py build/zoo
+  PYTHONPATH=reader python3 tests/zoo/run_zoo.py build/zoo [--show manual-scan]
+  ```
+
+  Over the 30 English PDFs: 99 % of the text in order, 96 % of the headings
+  (the scans: 80 %), the table rows mostly exact (on scans OCR misreads
+  some numbers: always check a value from a scan against the page). Hindi
+  and Gujarati from Word: 91 % and 99 % of the text.
 * **The tests were tested.** 99 times one rule of the converter was broken
   on purpose. Every time at least one test failed.
 * **Compiler checks.** No warning with `-Wall -Wextra -Wpedantic -Wshadow
@@ -324,9 +349,11 @@ as values (`std::expected`); the library does not throw for a bad PDF.
 This is version 0.1. It does one job, text with structure, and it is
 honest about the rest.
 
-* **Only tested with English technical documents.** Text in scripts that
-  need shaping (Gujarati, Hindi, Arabic, ...) may come out in a wrong
-  order. This was not tested.
+* **Mostly tested with English technical documents.** German, Hindi and
+  Gujarati were tested (the document zoo). Hindi and Gujarati come out well
+  from Word and LibreOffice; from web pages printed by Chrome and from LaTeX
+  some words are split or run together, because those PDFs do not say where
+  a word ends. Arabic and Hebrew (right to left) were not tested.
 * **OCR needs Tesseract.** Scanned pages and words inside pictures are read
   only when the free Tesseract program is installed (see "OCR" above).
   Without it a scanned page has no text - it is kept as a picture of the
@@ -359,8 +386,8 @@ honest about the rest.
   before it. A document with neither gets one section per page; one with few
   headings still gets parts: where its running header changes, and parts
   of about 2 pages, titled by their pages.
-* **Headers and footers** are only searched in documents with four or more
-  pages. A header that is different on every page and follows no pattern
+* **Headers and footers** in a document of two or three pages are only
+  removed when they stand on every page; a one-page document keeps them. A header that is different on every page and follows no pattern
   stays in the text. Everything that is removed is listed in
   `document.md`.
 * **Footnotes** stay where they stand on the page, so they can sit in the

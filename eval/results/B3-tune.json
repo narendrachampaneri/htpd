@@ -8,7 +8,7 @@
     "aaelf64",
     "riscv-priv"
   ],
-  "when": "2026-10-21",
+  "when": "2026-10-23",
   "machine": "Linux x86_64, Python 3.13.16",
   "metrics": {
     "questions": 121,
@@ -22,9 +22,9 @@
     "not_found_accuracy": 0.0,
     "false_not_found": 0.0,
     "answer_in_text": 0.9072164948453608,
-    "tokens_mean": 2805.5206611570247,
-    "tokens_vs_whole": 0.058085102157558896,
-    "ms_per_question": 0.6654120909519977,
+    "tokens_mean": 2809.5371900826444,
+    "tokens_vs_whole": 0.058014542553280535,
+    "ms_per_question": 0.4745617520561346,
     "by_kind": {
       "1": {
         "n": 72,

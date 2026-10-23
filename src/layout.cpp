@@ -56,6 +56,9 @@ char32_t lowered_form(char32_t c) {
     }
 }
 
+// Letters and signs of the Indian scripts; not the danda (। ॥), which ends a sentence.
+constexpr bool is_indic(char32_t c) { return c >= 0x0900 && c <= 0x0DFF && c != 0x0964 && c != 0x0965; }
+
 // Collects glyphs into one Line.
 class LineBuilder {
 public:
@@ -101,7 +104,13 @@ public:
             const float ref = std::max(main_size_, g.size);
             const float gap = g.x0 - last_x1_;
             const bool column_gap = gap > options_->column_gap * ref;
-            const bool spaced = column_gap || space_before || gap > options_->forced_space_gap * ref;
+            // Indian scripts (Devanagari to Malayalam): letters of a word touch or
+            // overlap, and some PDFs give no space between words: a gap of a
+            // fifth of the font size is a space there.
+            // (Next to a span its place is only roughly known: a wider gap is needed.)
+            const float indic_space = (g.span || last_span_) ? 0.22f : 0.18f;
+            const bool indic_gap = is_indic(g.cp) && is_indic(last_cp_) && gap > indic_space * ref;
+            const bool spaced = column_gap || space_before || indic_gap || gap > options_->forced_space_gap * ref;
             if (spaced || script != pending_kind_) flush_pending();
             if (column_gap) {
                 line_.gaps.push_back(static_cast<std::uint32_t>(line_.text.size()));
@@ -111,6 +120,8 @@ public:
             if (spaced) {
                 line_.text.push_back(' ');
                 line_.space_spans.push_back(std::max(0.0f, g.origin_x - last_origin_x_));
+                line_.space_begin.push_back(last_x1_);
+                line_.space_end.push_back(g.x0);
             }
             line_.x0 = std::min(line_.x0, g.x0);
             line_.y0 = std::min(line_.y0, g.y0);
@@ -131,6 +142,8 @@ public:
         }
         last_x1_ = g.x1;
         last_origin_x_ = g.origin_x;
+        last_cp_ = g.cp;
+        last_span_ = g.span;
         ++glyph_count_;
         if (g.bold) ++bold_count_;
         count(sizes_, static_cast<int>(std::lround(g.size * 4.0f)));   // quarter points
@@ -204,6 +217,8 @@ private:
     float main_size_ = 0;
     float last_x1_ = 0;
     float last_origin_x_ = 0;
+    char32_t last_cp_ = 0;
+    bool last_span_ = false;
     std::size_t glyph_count_ = 0;
     std::size_t bold_count_ = 0;
     Tally sizes_;

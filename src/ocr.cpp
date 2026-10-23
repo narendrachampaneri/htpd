@@ -119,6 +119,63 @@ bool well_formed_word(std::string_view w) {
     return case_changes <= 1;
 }
 
+// The dark runs of a box of a grey picture, row by row: their summed length
+// and their number. Their mean length is the width of the strokes, which is
+// larger for bold letters.
+std::pair<double, double> dark_runs(const Image& image, int left, int top, int width, int height) {
+    if (image.channels != 1) return {0, 0};
+    const int x0 = std::max(left, 0), x1 = std::min(left + width, image.width);
+    const int y0 = std::max(top, 0), y1 = std::min(top + height, image.height);
+    double sum = 0, count = 0;
+    for (int y = y0; y < y1; ++y) {
+        const std::uint8_t* row = image.pixels.data() + static_cast<std::size_t>(y) * static_cast<std::size_t>(image.width);
+        int run = 0;
+        for (int x = x0; x < x1; ++x) {
+            if (row[x] < 128) {
+                ++run;
+            } else if (run > 0) {
+                sum += run;
+                ++count;
+                run = 0;
+            }
+        }
+        if (run > 0) {
+            sum += run;
+            ++count;
+        }
+    }
+    return {sum, count};
+}
+
+// The font size of a line read by OCR, in pixels. The box of a word is as
+// high as its letters: "on" is lower than "Pin", "type" reaches below the
+// line. Each word's height is turned into the size of its font by the
+// letters it has, and the middle value of the line is taken, so a heading
+// set larger stands out and a line of small letters does not look small.
+template <class W>
+float font_size_of(const std::vector<W>& words) {
+    std::vector<float> sizes;
+    for (const W& w : words) {
+        bool tall = false, low = false, letters = false;
+        for (const char c : w.text) {
+            if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || std::string_view("bdfhklt").contains(c)) tall = true;
+            if (std::string_view("gjpqy_,;").contains(c)) low = true;
+            if (std::string_view("()[]{}|/").contains(c)) tall = low = true;
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) letters = true;
+        }
+        if (!letters) continue;
+        const float h = static_cast<float>(w.height);
+        sizes.push_back(tall && low ? h / 0.95f : tall ? h / 0.72f : low ? h / 0.72f : h / 0.52f);
+    }
+    if (sizes.empty()) {
+        int h = 0;
+        for (const W& w : words) h = std::max(h, w.height);
+        return static_cast<float>(h);
+    }
+    std::ranges::nth_element(sizes, sizes.begin() + static_cast<std::ptrdiff_t>(sizes.size() / 2));
+    return sizes[sizes.size() / 2];
+}
+
 // The bullet a small first word of an OCR line stands for, or nullptr. `h` is
 // the usual height of the line's words (pixels).
 const char* bullet_mark(std::string_view text, int width, int height, int gap, int h) {
@@ -136,7 +193,8 @@ const char* bullet_mark(std::string_view text, int width, int height, int gap, i
 }
 
 TsvLines lines_from_tsv(std::string_view tsv, int page, const Box& region, float scale, int min_word_confidence,
-                        bool whole_page) {
+                        bool whole_page, const Image* image) {
+    std::vector<float> strokes;   // per line: width of its strokes / its font size (0 = not known)
     struct Word {
         int left, top, width, height;
         std::string text;
@@ -213,23 +271,34 @@ TsvLines lines_from_tsv(std::string_view tsv, int page, const Box& region, float
         Line line;
         line.page = page;
         line.ocr = whole_page ? Line::Ocr::Page : Line::Ocr::Picture;
-        int top = words.front().top, bottom = 0, height = 0;
+        int top = words.front().top, bottom = 0;
         for (const Word& w : words) {
             top = std::min(top, w.top);
             bottom = std::max(bottom, w.top + w.height);
-            height = std::max(height, w.height);
+        }
+        const float font_px = font_size_of(words);
+        if (image != nullptr) {
+            double run_sum = 0, runs = 0;
+            for (const Word& w : words) {
+                const auto [sum, n] = dark_runs(*image, w.left, w.top, w.width, w.height);
+                run_sum += sum;
+                runs += n;
+            }
+            strokes.push_back(runs > 0 && font_px > 0 ? static_cast<float>(run_sum / runs) / font_px : 0.0f);
         }
         int previous_right = -1;
         for (const Word& w : words) {
             if (previous_right >= 0) {
                 // a wide gap between two words: a gap between table columns
-                if (whole_page && w.left - previous_right > 2 * height) {
+                if (whole_page && static_cast<float>(w.left - previous_right) > 2 * font_px) {
                     line.gaps.push_back(static_cast<std::uint32_t>(line.text.size()));
                     line.gap_begin.push_back(region.x0 + static_cast<float>(previous_right) / scale);
                     line.gap_end.push_back(region.x0 + static_cast<float>(w.left) / scale);
                 }
                 line.text.push_back(' ');
                 line.space_spans.push_back(static_cast<float>(w.left - previous_right) / scale);
+                line.space_begin.push_back(region.x0 + static_cast<float>(previous_right) / scale);
+                line.space_end.push_back(region.x0 + static_cast<float>(w.left) / scale);
             }
             line.text += w.text;
             previous_right = w.left + w.width;
@@ -240,8 +309,20 @@ TsvLines lines_from_tsv(std::string_view tsv, int page, const Box& region, float
         line.y1 = region.y0 + static_cast<float>(bottom) / scale;
         line.baseline = line.y1;
         line.origin_x = line.x0;
-        line.size = static_cast<float>(height) / scale;
+        line.size = font_px / scale;
         result.lines.push_back(std::move(line));
+    }
+    // Bold: strokes clearly wider than those of most lines of the page.
+    if (strokes.size() == result.lines.size() && strokes.size() >= 5) {
+        std::vector<float> known;
+        for (const float x : strokes) {
+            if (x > 0) known.push_back(x);
+        }
+        if (known.size() >= 5) {
+            std::ranges::nth_element(known, known.begin() + static_cast<std::ptrdiff_t>(known.size() / 2));
+            const float usual = known[known.size() / 2];
+            for (std::size_t i = 0; i < strokes.size(); ++i) result.lines[i].bold = strokes[i] > 1.3f * usual;
+        }
     }
     // Reading order: top to bottom (Tesseract numbers blocks in its own order).
     std::ranges::stable_sort(result.lines, [](const Line& a, const Line& b) {
@@ -357,7 +438,7 @@ struct OcrPool::Impl {
             }
             if (ok) {
                 lines = lines_from_tsv(read_whole(fs::path(base.string() + ".tsv")), job.page, job.region, job.scale,
-                                       options.min_word_confidence, job.whole_page);
+                                       options.min_word_confidence, job.whole_page, job.whole_page ? &job.image : nullptr);
             }
             std::error_code ec;
             fs::remove(image, ec);

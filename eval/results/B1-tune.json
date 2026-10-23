@@ -8,31 +8,31 @@
     "aaelf64",
     "riscv-priv"
   ],
-  "when": "2026-10-21",
+  "when": "2026-10-23",
   "machine": "Linux x86_64, Python 3.13.16",
   "metrics": {
     "questions": 121,
     "answerable": 97,
     "not_in_document": 24,
-    "recall@1": 0.3402061855670103,
-    "recall@5": 0.845360824742268,
-    "recall@10": 0.9484536082474226,
-    "mrr": 0.5309047672449734,
+    "recall@1": 0.28865979381443296,
+    "recall@5": 0.865979381443299,
+    "recall@10": 0.9587628865979382,
+    "mrr": 0.5137156371692454,
     "page_accuracy": 0.6907216494845361,
     "not_found_accuracy": 0.0,
     "false_not_found": 0.0,
-    "answer_in_text": 0.9175257731958762,
-    "tokens_mean": 2710.8347107438017,
-    "tokens_vs_whole": 0.0707133326883835,
-    "ms_per_question": 0.5993086115267943,
+    "answer_in_text": 0.9381443298969072,
+    "tokens_mean": 2688.1404958677685,
+    "tokens_vs_whole": 0.07040323636442367,
+    "ms_per_question": 0.34803985953440436,
     "by_kind": {
       "1": {
         "n": 72,
-        "recall@5": 0.875
+        "recall@5": 0.8888888888888888
       },
       "2": {
         "n": 15,
-        "recall@5": 0.6
+        "recall@5": 0.6666666666666666
       },
       "3": {
         "n": 10,
@@ -43,15 +43,6 @@
   "misses": [
     {
       "id": "elf-010",
-      "rank": 6,
-      "top": [
-        "sections/0027-4-1-2-2-overview-of-plt-entry-code-generation",
-        "sections/0028-5-object-files",
-        "sections/0029-5-1-introduction"
-      ]
-    },
-    {
-      "id": "elf-011",
       "rank": 6,
       "top": [
         "sections/0027-4-1-2-2-overview-of-plt-entry-code-generation",
@@ -124,34 +115,25 @@
     },
     {
       "id": "priv-003",
-      "rank": 20,
+      "rank": 22,
       "top": [
         "sections/0190-18-6-4-trap-return",
         "sections/0191-chapter-19-risc-v-privileged-instruction-set-listings",
-        "sections/0125-10-3-1-addressing-and-memory-protection"
-      ]
-    },
-    {
-      "id": "priv-020",
-      "rank": 13,
-      "top": [
-        "sections/0121-10-1-11-supervisor-address-translation-and-protection-satp-r",
-        "sections/0123-10-2-1-supervisor-memory-management-fence-instruction",
-        "sections/0124-10-3-sv32-page-based-32-bit-virtual-memory-systems"
+        "sections/0042-3-1-15-machine-cause-register-mcause"
       ]
     },
     {
       "id": "priv-022",
-      "rank": 27,
+      "rank": 26,
       "top": [
         "sections/0174-18-3-1-hypervisor-virtual-machine-load-and-store-instruction",
         "sections/0175-18-3-2-hypervisor-memory-management-fence-instructions",
-        "sections/0181-18-4-5-machine-trap-instruction-register-mtinst"
+        "sections/0162-18-2-8-hypervisor-trap-value-register-htval"
       ]
     },
     {
       "id": "priv-023",
-      "rank": 9,
+      "rank": 6,
       "top": [
         "sections/0119-10-1-9-supervisor-trap-value-stval-register",
         "sections/0120-10-1-10-supervisor-environment-configuration-register-senvcf",
@@ -159,12 +141,12 @@
       ]
     },
     {
-      "id": "priv-041",
-      "rank": 7,
+      "id": "priv-056",
+      "rank": 6,
       "top": [
-        "sections/0075-4-3-usage",
-        "sections/0076-chapter-5-smcsrind-sscsrind-indirect-csr-access-version-1-0-0",
-        "sections/0077-5-1-introduction"
+        "sections/0007-1-2-privilege-levels",
+        "sections/0008-1-3-debug-mode",
+        "sections/0009-chapter-2-control-and-status-registers-csrs"
       ]
     },
     {

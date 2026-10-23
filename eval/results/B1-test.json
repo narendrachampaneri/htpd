@@ -8,7 +8,7 @@
     "aapcs64",
     "riscv-debug"
   ],
-  "when": "2026-10-21",
+  "when": "2026-10-23",
   "machine": "Linux x86_64, Python 3.13.16",
   "metrics": {
     "questions": 133,
@@ -17,14 +17,14 @@
     "recall@1": 0.32432432432432434,
     "recall@5": 0.7207207207207207,
     "recall@10": 0.8198198198198198,
-    "mrr": 0.4903584637777365,
+    "mrr": 0.49052601855055444,
     "page_accuracy": 0.5045045045045045,
     "not_found_accuracy": 0.0,
     "false_not_found": 0.0,
     "answer_in_text": 0.8288288288288288,
-    "tokens_mean": 2708.03007518797,
-    "tokens_vs_whole": 0.06487626306139734,
-    "ms_per_question": 0.6645682330934889,
+    "tokens_mean": 2714.6691729323306,
+    "tokens_vs_whole": 0.06492365148136559,
+    "ms_per_question": 0.3166255037490886,
     "by_kind": {
       "1": {
         "n": 66,
@@ -151,11 +151,11 @@
     },
     {
       "id": "debug-007",
-      "rank": 19,
+      "rank": 18,
       "top": [
-        "sections/0139-a-3-debug-module-interface-signals",
         "sections/0140-appendix-b-debugger-implementation",
-        "sections/0141-b-1-c-header-file"
+        "sections/0141-b-1-c-header-file",
+        "sections/0142-b-2-external-debugger-implementation"
       ]
     },
     {
@@ -245,7 +245,7 @@
       "top": [
         "sections/0129-6-1-4-dtm-control-and-status-dtmcs-at-0x10",
         "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11",
-        "sections/0022-chapter-3-debug-module-dm-non-isa-extension"
+        "sections/0036-3-8-program-buffer"
       ]
     },
     {
@@ -259,7 +259,7 @@
     },
     {
       "id": "debug-043",
-      "rank": 28,
+      "rank": 30,
       "top": [
         "sections/0129-6-1-4-dtm-control-and-status-dtmcs-at-0x10",
         "sections/0130-6-1-5-debug-module-interface-access-dmi-at-0x11",
@@ -304,20 +304,20 @@
     },
     {
       "id": "debug-059",
-      "rank": 16,
+      "rank": 15,
       "top": [
-        "sections/0139-a-3-debug-module-interface-signals",
         "sections/0140-appendix-b-debugger-implementation",
-        "sections/0141-b-1-c-header-file"
+        "sections/0141-b-1-c-header-file",
+        "sections/0142-b-2-external-debugger-implementation"
       ]
     },
     {
       "id": "debug-061",
-      "rank": 9,
+      "rank": 8,
       "top": [
-        "sections/0139-a-3-debug-module-interface-signals",
         "sections/0140-appendix-b-debugger-implementation",
-        "sections/0141-b-1-c-header-file"
+        "sections/0141-b-1-c-header-file",
+        "sections/0142-b-2-external-debugger-implementation"
       ]
     }
   ]

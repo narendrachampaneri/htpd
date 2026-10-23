@@ -55,8 +55,8 @@ From `eval/report.md`, 133 test questions on two public manuals:
 
 | | R@1 | R@5 | MRR | Page | Answer in the text |
 |---|---|---|---|---|---|
-| without the re-ranker (`htpd-words`) | 0.658 | 0.892 | 0.757 | 0.613 | 0.856 |
-| with the re-ranker (`htpd-rerank`, the default) | 0.766 | 0.946 | 0.837 | 0.631 | 0.856 |
+| without the re-ranker (`htpd-words`) | 0.658 | 0.892 | 0.757 | 0.604 | 0.856 |
+| with the re-ranker (`htpd-rerank`, the default) | 0.784 | 0.946 | 0.851 | 0.640 | 0.856 |
 
 "Not found" is the same with and without it.
 

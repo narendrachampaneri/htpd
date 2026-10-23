@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "htpd/bundle_writer.hpp"
+#include "htpd/columns.hpp"
 #include "htpd/converter.hpp"
 #include "htpd/furniture.hpp"
 #include "htpd/headings.hpp"
@@ -355,6 +356,27 @@ TEST(layout_adds_a_space_where_the_pdf_has_only_a_gap) {
     CHECK(lines[0].gaps.empty());                 // a word gap, not a column gap
 }
 
+TEST(layout_finds_word_spaces_in_indian_scripts) {
+    // Hindi letters of a word touch; between words the PDF has only a small gap.
+    PageText page;
+    const std::u32string word1 = U"के";        // के
+    const std::u32string word2 = U"उप";        // उप
+    float x = 72;
+    for (const char32_t c : word1) {
+        page.glyphs.push_back(Glyph{c, false, false, false, 0, x, 92, x + 5, 102, x, 100, 12});
+        x += 5;
+    }
+    x += 2.9f;                                            // a quarter of the font size
+    for (const char32_t c : word2) {
+        page.glyphs.push_back(Glyph{c, false, false, false, 0, x, 92, x + 5, 102, x, 100, 12});
+        x += 5;
+    }
+    page.glyphs.push_back(Glyph{0x0964, false, false, false, 0, x + 2.5f, 92, x + 5, 102, x + 2.5f, 100, 12});   // danda
+    const auto lines = build_lines(page);
+    REQUIRE(lines.size() == 1);
+    CHECK_EQ(lines[0].text, std::string("के उप।"));   // no space before the danda
+}
+
 TEST(layout_remembers_how_wide_each_space_is) {
     PageText page;
     put_text(page, "ab", 72, 100);          // pen positions 72 and 77.5
@@ -527,8 +549,9 @@ TEST(furniture_needs_a_position_shared_by_many_pages) {
     CHECK_EQ(pages[0].size(), std::size_t{2});
 }
 
-TEST(furniture_leaves_short_documents_alone) {
-    // Up to three pages: too few to tell a running header from a title that repeats.
+TEST(furniture_in_short_documents_must_be_on_every_page) {
+    // Two or three pages: a header must stand on every page (a web page saved
+    // as PDF has its bar on each); on some pages only it stays.
     for (const std::size_t page_count : {std::size_t{2}, std::size_t{3}, std::size_t{4}}) {
         std::vector<std::vector<Line>> pages(page_count);
         const std::vector<float> heights(page_count, 792.0f);
@@ -536,10 +559,88 @@ TEST(furniture_leaves_short_documents_alone) {
             pages[p].push_back(make_line(static_cast<int>(p), "Header", 40));
             pages[p].push_back(make_line(static_cast<int>(p), "Body of page " + std::string(p + 1, 'x'), 300));
         }
-        CHECK_EQ(remove_furniture(pages, heights).removed_lines, page_count == 4 ? std::size_t{4} : std::size_t{0});
+        CHECK_EQ(remove_furniture(pages, heights).removed_lines, page_count);
     }
+    std::vector<std::vector<Line>> pages(3);
+    const std::vector<float> heights(3, 792.0f);
+    for (std::size_t p = 0; p < 3; ++p) {
+        if (p < 2) pages[p].push_back(make_line(static_cast<int>(p), "Overview", 40));
+        pages[p].push_back(make_line(static_cast<int>(p), "Body of page " + std::string(p + 1, 'x'), 300));
+    }
+    CHECK_EQ(remove_furniture(pages, heights).removed_lines, std::size_t{0});
     CHECK_EQ(furniture_key("Page 12 of 340"), std::string("page # of #"));
     CHECK_EQ(furniture_key("xii"), std::string("#"));
+}
+
+// ---- columns of tables set tight -----------------------------------------------
+
+namespace {
+
+// A line of words placed at given x positions: each word 5.5 points per
+// character wide, spaces between them where the next word starts. A gap of
+// two font sizes or more is a sure column gap, as the line builder makes it.
+Line placed_line(float baseline, std::initializer_list<std::pair<float, const char*>> words, float size = 10) {
+    Line line;
+    line.baseline = baseline;
+    line.size = size;
+    line.y0 = baseline - 7;
+    line.y1 = baseline + 2;
+    float right = 0;
+    for (const auto& [x, w] : words) {
+        if (line.text.empty()) {
+            line.x0 = line.origin_x = x;
+        } else {
+            if (x - right > 2 * size) {
+                line.gaps.push_back(static_cast<std::uint32_t>(line.text.size()));
+                line.gap_begin.push_back(right);
+                line.gap_end.push_back(x);
+            }
+            line.text += ' ';
+            line.space_begin.push_back(right);
+            line.space_end.push_back(x);
+            line.space_spans.push_back(x - right);
+        }
+        line.text += w;
+        right = x + 5.5f * static_cast<float>(std::string_view(w).size());
+    }
+    line.x1 = right;
+    return line;
+}
+
+}  // namespace
+
+TEST(columns_of_a_tight_table_are_found_from_its_rows) {
+    // Like LaTeX: "Supply voltage" and "-0.5" only 12 points apart, the header
+    // row has no sure gap at all, its "Parameter" wider than the cells below.
+    std::vector<Line> lines;
+    lines.push_back(placed_line(100, {{72, "Stresses"}, {119, "above"}, {152, "these"}, {185, "values"}, {222, "may"}, {243, "damage."}}));
+    lines.push_back(placed_line(116, {{72, "Symbol"}, {120, "Parameter"}, {245, "Min"}, {275, "Max"}, {305, "Unit"}}));
+    lines.push_back(placed_line(130, {{72, "VIN"}, {120, "Supply"}, {157, "voltage"}, {245, "-0.5"}, {275, "32"}, {305, "V"}}));
+    lines.push_back(placed_line(144, {{72, "VIO"}, {120, "Voltage"}, {162, "on"}, {177, "any"}, {197, "input"}, {245, "-0.5"}, {275, "30"}, {305, "V"}}));
+    lines.push_back(placed_line(158, {{72, "TSTG"}, {120, "Storage"}, {162, "temperature"}, {245, "-40"}, {275, "85"}, {305, "C"}}));
+    const std::size_t added = mark_table_columns(lines, {});
+    CHECK(added > 0);
+    CHECK(!lines[0].table);                         // the sentence above stays text
+    CHECK(lines[0].gaps.empty());
+    CHECK(lines[1].table);                          // the header row joins the table
+    CHECK_EQ(row_text(lines[1]), std::string("Symbol | Parameter | Min | Max | Unit"));
+    CHECK_EQ(row_text(lines[2]), std::string("VIN | Supply voltage | -0.5 | 32 | V"));
+    CHECK_EQ(row_text(lines[4]), std::string("TSTG | Storage temperature | -40 | 85 | C"));
+
+    // Two columns are a table too, but a numbered list is not.
+    std::vector<Line> two;
+    two.push_back(placed_line(100, {{72, "Supply"}, {109, "voltage"}, {200, "12"}, {216, "to"}, {230, "30"}, {246, "V"}}));
+    two.push_back(placed_line(114, {{72, "Weight"}, {200, "160"}, {222, "g"}}));
+    two.push_back(placed_line(128, {{72, "Protection"}, {130, "class"}, {200, "IP20"}}));
+    mark_table_columns(two, {});
+    CHECK(two[0].table && two[1].table && two[2].table);
+    CHECK_EQ(row_text(two[1]), std::string("Weight | 160 g"));
+    std::vector<Line> list;
+    list.push_back(placed_line(100, {{72, "1."}, {100, "Hook"}, {127, "the"}, {148, "edge."}}));
+    list.push_back(placed_line(114, {{72, "2."}, {100, "Press"}, {133, "the"}, {154, "latch."}}));
+    list.push_back(placed_line(128, {{72, "3."}, {100, "Check"}, {133, "it."}}));
+    mark_table_columns(list, {});
+    CHECK(!list[0].table && !list[1].table && !list[2].table);
 }
 
 // ---- headings ---------------------------------------------------------------
@@ -1683,7 +1784,8 @@ TEST(ocr_lines_come_from_the_words_tesseract_is_sure_of) {
     CHECK_EQ(l.page, 4);
     CHECK(std::fabs(l.x0 - (100 + 40 / scale)) < 0.01f);
     CHECK(std::fabs(l.y0 - (200 + 30 / scale)) < 0.01f);
-    CHECK(std::fabs(l.size - 50 / scale) < 0.01f);
+    // the size of the font from the height of the words: "Supply" reaches above and below the line
+    CHECK(std::fabs(l.size - 50 / 0.95f / scale) < 0.01f);
     REQUIRE(l.gaps.size() == 1);
     CHECK_EQ(l.text.substr(l.gaps[0] + 1), std::string("3.3V"));
     CHECK_EQ(page.words_dropped, std::size_t{2});
@@ -1773,13 +1875,29 @@ TEST(text_of_a_figure_is_never_a_heading) {
     Line figure = make_line(0, "0 FFFFFFFD", 130, 20);   // numbered and large, but read from a picture
     figure.ocr = Line::Ocr::Picture;
     lines.push_back(figure);
-    Line scanned_large = make_line(0, "POST", 160, 20);    // large, read by OCR: size says nothing
-    scanned_large.ocr = Line::Ocr::Page;
-    lines.push_back(scanned_large);
+    Line label = make_line(0, "POST", 160, 20);          // large, but read from a picture too
+    label.ocr = Line::Ocr::Picture;
+    lines.push_back(label);
     lines.push_back(make_line(0, "Body text again, long enough to be the body of the page.", 190));
     lines.push_back(make_line(0, "Body text again, long enough to be the body of the page.", 220));
-    const HeadingResult r = detect_headings(lines, {}, {});
-    CHECK(r.headings.empty());
+    CHECK(detect_headings(lines, {}, {}).headings.empty());
+
+    // On a scanned page a short line set clearly larger is a heading - but not
+    // the rest of a wrapped table cell (it starts in lower case).
+    std::vector<Line> scan;
+    const auto add = [&](std::string text, float y, float size) {
+        Line l = make_line(0, std::move(text), y, size);
+        l.ocr = Line::Ocr::Page;
+        scan.push_back(l);
+    };
+    add("Body text of the scanned page that is long enough to be the body.", 100, 10);
+    add("Installation", 130, 13);
+    add("Body text again, long enough to be the body of the scanned page.", 160, 10);
+    add("on, idle", 190, 13);
+    add("Body text again, long enough to be the body of the scanned page.", 220, 10);
+    const HeadingResult r = detect_headings(scan, {}, {});
+    REQUIRE(r.headings.size() == 1);
+    CHECK_EQ(r.headings[0].title, std::string("Installation"));
 }
 
 // ---- structure for documents with few headings ------------------------------
@@ -2559,6 +2677,19 @@ TEST(end_to_end_ocr_reads_pictures_and_scanned_pages) {
     CHECK_EQ(off->ocr.page_pictures, std::size_t{1});
     CHECK(notes.contains("kept as a picture of the whole page"));
     CHECK(all_section_text(options.output_dir).contains("Page 2: picture of the whole page (it has no text layer)"));
+}
+
+TEST(end_to_end_actual_text_says_what_glyphs_mean) {
+    ConvertOptions options;
+    options.input = fs::path(HTPD_TEST_DATA) / "actualtext.pdf";
+    options.output_dir = fresh_temp_dir("e2e_actualtext") / "actualtext.htpd";
+    options.single_file = true;
+    REQUIRE(convert(options).has_value());
+    const std::string text = read_file(options.output_dir);
+    CHECK(text.contains("Before Hello after."));                       // not "XYZ"
+    CHECK(text.contains("ચાર્જર"));      // ચાર્જર, from UTF-16
+    CHECK(!text.contains("XYZ"));
+    CHECK(!text.contains("abcd"));
 }
 
 TEST(end_to_end_links) {

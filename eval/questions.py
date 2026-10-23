@@ -67,7 +67,10 @@ class Question:
 
 
 def norm(text: str) -> str:
-    return _SPACE.sub(" ", text).strip().lower()
+    """Spaces made single, lower case. The cell separator of a table row (" | ")
+    counts as a space: whether an answer stands in a table cell or in a sentence
+    is a matter of layout, not of its words."""
+    return _SPACE.sub(" ", text.replace(" | ", " ")).strip().lower()
 
 
 def load(paths: Iterable[Path]) -> list[Question]:

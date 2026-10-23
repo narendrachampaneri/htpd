@@ -8,23 +8,23 @@
     "aapcs64",
     "riscv-debug"
   ],
-  "when": "2026-10-21",
+  "when": "2026-10-23",
   "machine": "Linux x86_64, Python 3.13.16",
   "metrics": {
     "questions": 133,
     "answerable": 111,
     "not_in_document": 22,
-    "recall@1": 0.7657657657657657,
+    "recall@1": 0.7837837837837838,
     "recall@5": 0.9459459459459459,
     "recall@10": 0.954954954954955,
-    "mrr": 0.8366795366795367,
-    "page_accuracy": 0.6306306306306306,
+    "mrr": 0.850943800943801,
+    "page_accuracy": 0.6396396396396397,
     "not_found_accuracy": 0.9545454545454546,
     "false_not_found": 0.009009009009009009,
     "answer_in_text": 0.8558558558558559,
-    "tokens_mean": 2448.93984962406,
-    "tokens_vs_whole": 0.05999648562092188,
-    "ms_per_question": 27.10331629324563,
+    "tokens_mean": 2450.5488721804513,
+    "tokens_vs_whole": 0.059976632348055996,
+    "ms_per_question": 17.030191067673638,
     "by_kind": {
       "1": {
         "n": 66,
@@ -81,8 +81,8 @@
       "id": "debug-025",
       "rank": null,
       "top": [
-        "sections/0116-5-7-11-match-control-mcontrol-at-0x7a1",
         "sections/0086-4-9-core-debug-registers",
+        "sections/0116-5-7-11-match-control-mcontrol-at-0x7a1",
         "sections/0117-5-7-12-match-control-type-6-mcontrol6-at-0x7a1"
       ]
     },

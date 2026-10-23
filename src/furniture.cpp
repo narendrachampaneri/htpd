@@ -112,7 +112,9 @@ FurnitureReport remove_furniture(std::vector<std::vector<Line>>& pages,
                                  std::span<const float> page_heights,
                                  const FurnitureOptions& options) {
     FurnitureReport report;
-    if (pages.size() < options.min_pages + 1) return report;   // too short to judge
+    // A short document (two or three pages): a line must repeat on every page.
+    if (pages.size() < 2) return report;
+    const std::size_t min_pages = pages.size() > options.min_pages ? options.min_pages : pages.size();
 
     // 1. Candidates: the lines inside the top and bottom band of every page.
     std::vector<BandLine> band;
@@ -184,7 +186,7 @@ FurnitureReport remove_furniture(std::vector<std::vector<Line>>& pages,
         std::size_t repeated_pages = 0, attached_pages = 0;
         std::size_t previous_page = pages.size();
         for (const BandLine* line : by_page) {
-            if (line->page == previous_page || keys.pages(line->key) < options.min_pages) continue;
+            if (line->page == previous_page || keys.pages(line->key) < min_pages) continue;
             previous_page = line->page;
             ++repeated_pages;
         }
@@ -193,13 +195,13 @@ FurnitureReport remove_furniture(std::vector<std::vector<Line>>& pages,
         }
         const auto [best_head, head_pages] = heads.most_common();
         const auto [best_tail, tail_pages] = tails.most_common();
-        const bool same_head = head_pages >= options.min_pages &&
+        const bool same_head = head_pages >= min_pages &&
                                static_cast<double>(head_pages) >= kMinSameAffix * page_count;
-        const bool same_tail = tail_pages >= options.min_pages &&
+        const bool same_tail = tail_pages >= min_pages &&
                                static_cast<double>(tail_pages) >= kMinSameAffix * page_count;
 
         const bool is_furniture =
-            slot_pages.size() >= options.min_pages &&
+            slot_pages.size() >= min_pages &&
             page_count >= kMinCoverage * static_cast<double>(text_pages) &&
             static_cast<double>(attached_pages) >= kMinAttached * page_count &&
             (static_cast<double>(repeated_pages) >= kMinRepeated * page_count || same_head || same_tail);
@@ -218,7 +220,7 @@ FurnitureReport remove_furniture(std::vector<std::vector<Line>>& pages,
         std::vector<std::size_t> removed_pages;
         std::vector<std::string_view> removed_keys;
         for (BandLine& line : slot) {
-            const bool repeats = keys.pages(line.key) >= options.min_pages;
+            const bool repeats = keys.pages(line.key) >= min_pages;
             const bool same_affix = (same_head && line.head == best_head) || (same_tail && line.tail == best_tail);
             // A line that only shares its first or last words with the others
             // is kept when it is the only text of its page: then it is the

@@ -12,6 +12,7 @@
 #include <optional>
 
 #include "htpd/bundle_writer.hpp"
+#include "htpd/columns.hpp"
 #include "htpd/figures.hpp"
 #include "htpd/layout.hpp"
 #include "htpd/links.hpp"
@@ -40,6 +41,7 @@ struct Analysis {
     std::size_t skipped_rotated = 0;
     std::size_t unmapped = 0;
     std::size_t pages_without_text = 0;
+    std::size_t table_gaps = 0;           // column gaps found from the strips rows leave free
     OcrReport ocr;
     std::vector<FigureFile> figures;
 };
@@ -335,6 +337,8 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
                     l.origin_x += dx;
                     for (float& g : l.gap_begin) g += dx;
                     for (float& g : l.gap_end) g += dx;
+                    for (float& g : l.space_begin) g += dx;
+                    for (float& g : l.space_end) g += dx;
                 }
             }
             auto& page = pages[static_cast<std::size_t>(pic.page)];
@@ -366,6 +370,14 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
         FurnitureOptions furniture;
         furniture.band = options.margin_band;
         a.furniture = remove_furniture(pages, heights, furniture);
+    }
+
+    // 2b. Tables set tight: their columns, from the strips every row leaves free.
+    for (auto& page : pages) {
+        std::vector<char> code;
+        code.reserve(page.size());
+        for (const Line& l : page) code.push_back(l.font < a.fonts.size() && a.fonts[l.font].monospace && l.ocr == Line::Ocr::None);
+        a.table_gaps += mark_table_columns(page, code);
     }
 
     // 3. One flat list of lines.

@@ -469,6 +469,21 @@ def figures(path):
     c.save()
 
 
+def actualtext(path):
+    """Text marked with /ActualText: what the glyphs mean (complex scripts, ligatures)."""
+    c = canvas.Canvas(path, pagesize=letter)
+    c.setFont('Helvetica', 12)
+    c.drawString(72, 720, 'Plain words first.')
+    # The glyphs say "XYZ"; the span says they mean "Hello".
+    c._code.append('BT /F1 12 Tf 1 0 0 1 72 690 Tm (Before ) Tj ET '
+                   '/Span <</ActualText (Hello)>> BDC BT /F1 12 Tf 1 0 0 1 116 690 Tm (XYZ) Tj ET EMC '
+                   'BT /F1 12 Tf 1 0 0 1 150 690 Tm ( after.) Tj ET')
+    # UTF-16 with a byte order mark: Gujarati, drawn with any glyphs.
+    c._code.append('/Span <</ActualText <FEFF0A9A0ABE0AB00ACD0A9C0AB0>>> BDC BT /F1 12 Tf 1 0 0 1 72 660 Tm (abcd) Tj ET EMC')
+    c.showPage()
+    c.save()
+
+
 if __name__ == '__main__':
     Manual(os.path.join(OUT, 'sample.pdf'), bookmarks=True).build(manual_story())
     Manual(os.path.join(OUT, 'sample_nobookmarks.pdf'), bookmarks=False).build(manual_story())
@@ -478,4 +493,5 @@ if __name__ == '__main__':
     links(os.path.join(OUT, 'links.pdf'))
     ocr(os.path.join(OUT, 'ocr.pdf'))
     figures(os.path.join(OUT, 'figures.pdf'))
+    actualtext(os.path.join(OUT, 'actualtext.pdf'))
     print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf, sideways.pdf, links.pdf, ocr.pdf, figures.pdf to', OUT)

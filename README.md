@@ -255,11 +255,16 @@ The reader on 133 test questions about two public manuals
 
 | | Right section first | Right section in the first 5 | Right page | Answer in the text for the AI | "Not found" right / wrong |
 |---|---:|---:|---:|---:|---:|
-| HTPD reader | **0.77** | **0.95** | **0.63** | **0.86** | **0.95 / 0.01** |
+| HTPD reader | **0.78** | **0.95** | **0.64** | **0.86** | **0.95 / 0.01** |
 | Plain word search over HTPD sections (B3) | 0.64 | 0.87 | 0.55 | 0.83 | never says it |
 | Plain word search over 500-token chunks (B1) | 0.32 | 0.72 | 0.51 | 0.83 | never says it |
 
 The text handed to the AI is about 6 % of the whole document.
+
+The converter on 39 PDFs of known text, made by Word, LaTeX, Chrome,
+wkhtmltopdf and LibreOffice slides, scanned, and with letters drawn as
+shapes (`tests/zoo`): 99 % of the text of the English ones in order, 96 %
+of their headings; Hindi and Gujarati from Word 91 % and 99 % of the text.
 
 **Robustness.** A stress test makes 34 difficult PDFs locally - two
 columns, sideways tables, rotated pages, 1500 pages, huge tables, CJK and
@@ -281,7 +286,7 @@ HTPD is version 0.1. It works today; these are the known next steps.
 - [x] Figures stored as pictures with caption and page; OCR of scanned pages and text in pictures (Tesseract, optional)
 - [x] Single-file `.htpd` with reading rules for AI models
 - [x] Reader, "not found" rule, `ask`, MCP server, skill for AI apps; figures handed to the AI as images
-- [x] A small trained re-ranker (no GPU, a few kilobytes) - the right section first for 77 % of test questions instead of 66 % without it ([`model/README.md`](model/README.md))
+- [x] A small trained re-ranker (no GPU, a few kilobytes) - the right section first for 78 % of test questions instead of 66 % without it ([`model/README.md`](model/README.md))
 - [ ] Other document types: Word, HTML, plain text, images
 - [ ] "Not found" for questions in the user's own words (a word the document writes differently)
 - [ ] Windows build

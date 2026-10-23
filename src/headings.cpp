@@ -23,6 +23,20 @@ constexpr std::size_t kMaxDepth = 6;
 constexpr std::array<std::string_view, 5> kKeywords = {"chapter", "appendix", "annex", "section",
                                                        "part"};
 
+// The next line of a title that wraps. A word broken at the end of the line
+// ("condi-" / "tions") is joined again: a title is a name, and its words are
+// looked for.
+void append_title_line(std::string& title, std::string_view line) {
+    const std::size_t n = title.size();
+    if (n >= 2 && title[n - 1] == '-' && title[n - 2] >= 'a' && title[n - 2] <= 'z' && !line.empty() &&
+        line[0] >= 'a' && line[0] <= 'z') {
+        title.pop_back();
+    } else if (!title.empty()) {
+        title += ' ';
+    }
+    title += line;
+}
+
 std::string_view skip_blanks(std::string_view s) {
     while (!s.empty() && is_blank(s.front())) s.remove_prefix(1);
     return s;
@@ -361,9 +375,18 @@ HeadingResult detect_from_text(std::span<const Line> lines) {
             if (title_ok) numbered.push_back({i, std::move(number), styled, styled && !emphasised});
             continue;
         }
-        // Size alone says little about text read by OCR (letters of a picture,
-        // a scan): only a numbered heading, checked by its sequence, counts.
-        if (line.ocr == Line::Ocr::None && line.size >= body * 1.15f && plausible_unnumbered_title(line)) {
+        // On a scanned page the size comes from the height of the letters
+        // (ocr.cpp): a heading there must stand out more, and be short.
+        const bool large = line.ocr == Line::Ocr::None
+                               ? line.size >= body * 1.15f
+                               : text::word_count(line.text) <= 8 &&
+                                     (line.size >= body * 1.12f || (line.bold && line.size >= body * 0.95f));
+        // A row of a table (its columns line up with the rows around it) is no
+        // heading; a title read by OCR starts with a capital or a digit
+        // (a lower-case start is the rest of a wrapped table cell).
+        const bool capital_start = !line.text.empty() && ((line.text[0] >= 'A' && line.text[0] <= 'Z') ||
+                                                          (line.text[0] >= '0' && line.text[0] <= '9'));
+        if (large && !line.table && (line.ocr == Line::Ocr::None || capital_start) && plausible_unnumbered_title(line)) {
             unnumbered.push_back({i, std::nullopt, true, false});
         }
     }
@@ -477,8 +500,7 @@ HeadingResult detect_from_text(std::span<const Line> lines) {
         h.line_index = c.line;
         h.line_count = count;
         for (std::size_t k = 0; k < count; ++k) {
-            if (k > 0) h.title += ' ';
-            h.title += text::collapse_spaces(lines[c.line + k].text);
+            append_title_line(h.title, text::collapse_spaces(lines[c.line + k].text));
             consumed[c.line + k] = true;
         }
         if (c.number) {
@@ -617,8 +639,7 @@ HeadingResult detect_from_bookmarks(std::span<const Line> lines,
             h.line_index = match->line;
             h.line_count = match->count;
             for (std::size_t k = 0; k < match->count; ++k) {
-                if (k > 0) h.title += ' ';
-                h.title += text::collapse_spaces(lines[match->line + k].text);
+                append_title_line(h.title, text::collapse_spaces(lines[match->line + k].text));
                 taken[match->line + k] = true;
             }
             cursor = match->line + match->count;

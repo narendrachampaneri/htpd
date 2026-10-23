@@ -45,6 +45,7 @@ struct Glyph {
     char32_t cp = 0;          // Unicode code point; U' ' for any kind of space
     bool is_space = false;    // true: only `cp` is meaningful (no geometry)
     bool bold = false;
+    bool span = false;        // from the /ActualText of a span: its place is only roughly known
     std::uint16_t font = 0;   // same number = same font in this document; 0 = unknown
     float x0 = 0, y0 = 0;     // top-left of the tight glyph box (display space)
     float x1 = 0, y1 = 0;     // bottom-right
@@ -115,6 +116,13 @@ struct Line {
     // For every space in `text`, in order: the distance in points from the pen
     // position of the character before it to that of the character after it.
     std::vector<float> space_spans;
+    // For every space in `text`, in order: where the text before it ends and the
+    // text after it begins (points). Tells the columns of a table whose gaps
+    // are too narrow to be sure of in one line alone (see columns.hpp).
+    std::vector<float> space_begin, space_end;
+    // A row of a table whose columns line up with the rows around it (columns.hpp):
+    // a row even with only two cells.
+    bool table = false;
     // Read by OCR, not from the text of the PDF: from a scanned page (Page) or
     // from a picture on a page that has text (Picture). Picture text is the
     // content of a figure: it is never taken for a heading.
