@@ -68,12 +68,12 @@ Get the files from the [**release page**](https://github.com/narendrachampaneri/
 
 | File | What it is |
 |---|---|
-| `htpd-0.1.1-linux-x64.tar.gz` | The converter, ready to run - Linux x64, Ubuntu 24.04 or newer, also WSL on Windows |
+| `htpd-0.1.2-linux-x64.tar.gz` | The converter, ready to run - Linux x64, Ubuntu 24.04 or newer, also WSL on Windows |
 | `htpd-skill.zip` | The skill for AI apps ([how to add it](#2-apps-with-skills---the-htpd-skill)) |
 
 ```sh
-tar xzf htpd-0.1.1-linux-x64.tar.gz
-cd htpd-0.1.1-linux-x64
+tar xzf htpd-0.1.2-linux-x64.tar.gz
+cd htpd-0.1.2-linux-x64
 ./htpd convert manual.pdf --single           # writes manual.htpd - give it to your AI
 ```
 

@@ -1,7 +1,7 @@
 {
   "name": "htpd",
   "displayName": "HTPD",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Turn PDFs into .htpd files and answer questions from them with page numbers, or say \"Not found in this file.\" Local, free, no GPU.",
   "author": {
     "name": "Narendra Champaneri",

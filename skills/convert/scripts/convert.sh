@@ -12,8 +12,8 @@
 # this computer.
 set -euo pipefail
 
-VERSION="0.1.1"
-SHA256="b56095b08d2933b9e567e32246f56c3e0ff5ed7f754946d5ec77ed9413800e3e"
+VERSION="0.1.2"
+SHA256="fcfc2fadef4343b4be5e16e47381fe1f8016dc16b1343436df92627e90271791"
 NAME="htpd-${VERSION}-linux-x64"
 URL="https://github.com/narendrachampaneri/htpd/releases/download/v${VERSION}/${NAME}.tar.gz"
 

@@ -7,7 +7,7 @@
 #
 # PDFium somewhere else:  cmake -S . -B build-cmake -DPDFIUM_ROOT=/path/to/pdfium
 cmake_minimum_required(VERSION 3.20)
-project(htpd VERSION 0.1.1 DESCRIPTION "PDF to HTPD converter" LANGUAGES CXX)
+project(htpd VERSION 0.1.2 DESCRIPTION "PDF to HTPD converter" LANGUAGES CXX)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)

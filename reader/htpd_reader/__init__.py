@@ -8,7 +8,7 @@
 The format it reads is docs/FORMAT.md.
 """
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 from .bundle import Block, Bundle, BundleError, Node, Problem, open_bundle  # noqa: E402
 from .check import check  # noqa: E402

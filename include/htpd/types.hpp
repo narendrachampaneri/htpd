@@ -15,7 +15,7 @@
 
 namespace htpd {
 
-inline constexpr const char* kVersion = "0.1.1";
+inline constexpr const char* kVersion = "0.1.2";
 inline constexpr const char* kFormatVersion = "0.1";   // HTPD field schema
 inline constexpr const char* kOkfVersion = "0.2";      // OKF spec the bundle follows
 
