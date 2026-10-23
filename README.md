@@ -37,7 +37,7 @@
 | **ChatGPT, Gemini** | Upload the `.htpd` file, or make a custom GPT / Gem with the [ready instructions](https://github.com/narendrachampaneri/htpd/blob/main/docs/AI-APPS.md) |
 | **The converter** (PDF → `.htpd`) | [Download](https://github.com/narendrachampaneri/htpd/releases/latest) `htpd-0.1.2-linux-x64.tar.gz` (Linux, WSL) and run `./htpd convert manual.pdf --single` |
 
-Everything runs on your computer: free, open source, no GPU, no account, the PDF never leaves your machine.
+The converter and the reader run on your computer: free, open source, no GPU, no account. What reaches an AI is only the text you give it.
 
 ---
 
