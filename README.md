@@ -328,27 +328,6 @@ and 155 Python tests run on every change.
 
 ---
 
-## Roadmap
-
-HTPD is version 0.1.2. It works today; these are the known next steps.
-
-- [x] Converter: sections, pages, tables, code, headers/footers, sideways pages, damaged files
-- [x] Headings from bookmarks, a printed table of contents, numbering and font size; parts of a few pages for documents without headings
-- [x] Figures as pictures with caption and page; OCR of scanned pages and text in pictures
-- [x] Reader, answer lines, MCP server, skill; a small trained re-ranker ([`model/README.md`](https://github.com/narendrachampaneri/htpd/blob/main/model/README.md))
-- [x] Claude Code plugin, `pip install htpd-reader`, MCP registry, instructions for ChatGPT and Gemini, [HTPD Studio](https://htpd-studio.ai.studio/)
-- [x] Tested on 45 kinds of PDF of known text
-- [ ] Other document types: Word, HTML, plain text, images
-- [ ] Questions in the user's own words (a word the document writes differently)
-- [ ] Windows build without WSL
-
-**Known limits:** PDF only; what a chart or diagram means is only in its
-picture (an AI must look at it); formulas lose their layout; OCR can misread
-a number on a scan (check it against the page); tested mainly with English
-technical documents. Details: [`docs/CONVERTER.md`](https://github.com/narendrachampaneri/htpd/blob/main/docs/CONVERTER.md#limits-please-read).
-
----
-
 ## Project layout
 
 <details>
