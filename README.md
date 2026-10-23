@@ -261,10 +261,11 @@ The reader on 133 test questions about two public manuals
 
 The text handed to the AI is about 6 % of the whole document.
 
-The converter on 39 PDFs of known text, made by Word, LaTeX, Chrome,
+The converter on 45 PDFs of known text, made by Word, LaTeX, Chrome,
 wkhtmltopdf and LibreOffice slides, scanned, and with letters drawn as
 shapes (`tests/zoo`): 99 % of the text of the English ones in order, 96 %
-of their headings; Hindi and Gujarati from Word 91 % and 99 % of the text.
+of their headings, 89 % of their table rows exact; Hindi and Gujarati from
+Word 91 % and 99 % of the text.
 
 **Robustness.** A stress test makes 34 difficult PDFs locally - two
 columns, sideways tables, rotated pages, 1500 pages, huge tables, CJK and

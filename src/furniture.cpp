@@ -118,9 +118,21 @@ FurnitureReport remove_furniture(std::vector<std::vector<Line>>& pages,
 
     // 1. Candidates: the lines inside the top and bottom band of every page.
     std::vector<BandLine> band;
+    // Pages with text in the body: an empty page that shows only its running
+    // header (the back of a chapter page in a book) does not count against it.
     std::size_t text_pages = 0;
     for (std::size_t p = 0; p < pages.size(); ++p) {
-        if (!pages[p].empty()) ++text_pages;
+        const float height = p < page_heights.size() ? page_heights[p] : 0.0f;
+        if (height <= 0) {
+            text_pages += !pages[p].empty();
+            continue;
+        }
+        text_pages += std::ranges::any_of(pages[p], [&](const Line& l) {
+            const double centre = (l.y0 + l.y1) / 2.0;
+            return l.figure == 0 && centre >= options.band * height && centre <= (1.0 - options.band) * height;
+        });
+    }
+    for (std::size_t p = 0; p < pages.size(); ++p) {
         const float height = p < page_heights.size() ? page_heights[p] : 0.0f;
         if (height <= 0) continue;
         for (std::size_t i = 0; i < pages[p].size(); ++i) {
@@ -200,11 +212,29 @@ FurnitureReport remove_furniture(std::vector<std::vector<Line>>& pages,
         const bool same_tail = tail_pages >= min_pages &&
                                static_cast<double>(tail_pages) >= kMinSameAffix * page_count;
 
+        // A page number at the start or the end of the line on most pages of
+        // the slot: "6 CHAPTER 3. RESULTS", "iv CONTENTS", "Overview 12".
+        const auto numbered = [](std::string_view key) {
+            return key == "#" || key.starts_with("# ") || key.ends_with(" #");
+        };
+        std::size_t numbered_pages = 0;
+        {
+            std::size_t last = pages.size();
+            for (const BandLine* line : by_page) {
+                if (line->page == last || !numbered(line->key)) continue;
+                last = line->page;
+                ++numbered_pages;
+            }
+        }
+        const bool same_number = numbered_pages >= min_pages &&
+                                 static_cast<double>(numbered_pages) >= kMinSameAffix * page_count;
+
         const bool is_furniture =
             slot_pages.size() >= min_pages &&
             page_count >= kMinCoverage * static_cast<double>(text_pages) &&
             static_cast<double>(attached_pages) >= kMinAttached * page_count &&
-            (static_cast<double>(repeated_pages) >= kMinRepeated * page_count || same_head || same_tail);
+            (static_cast<double>(repeated_pages) >= kMinRepeated * page_count || same_head || same_tail ||
+             same_number);
 
         if (!is_furniture) {
             for (const std::size_t page : slot_pages) zone_blocked[page] = true;
@@ -224,8 +254,12 @@ FurnitureReport remove_furniture(std::vector<std::vector<Line>>& pages,
             const bool same_affix = (same_head && line.head == best_head) || (same_tail && line.tail == best_tail);
             // A line that only shares its first or last words with the others
             // is kept when it is the only text of its page: then it is the
-            // content of the page, not a running header.
-            line.remove = repeats || (same_affix && pages[line.page].size() > 1);
+            // content of the page, not a running header - unless it carries a
+            // page number ("6 CHAPTER 3. RESULTS" on the empty back of a
+            // chapter page in a book).
+            const bool with_number = numbered(line.key);
+            line.remove = repeats || (same_number && with_number) ||
+                          (same_affix && (pages[line.page].size() > 1 || with_number));
             if (!line.remove) {
                 zone_blocked[line.page] = true;
                 continue;

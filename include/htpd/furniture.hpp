@@ -9,7 +9,11 @@
 //     of the pages (a "slot"),
 //   - nothing but other furniture lies between the slot and the page edge,
 //   - the lines of the slot repeat: either the same text (digits ignored) on
-//     most pages, or the same first/last two words ("... | Page 12").
+//     most pages, or the same first/last two words ("... | Page 12"), or a
+//     page number at their start or end ("6 CHAPTER 3. RESULTS", "iv CONTENTS").
+// A document of two or three pages needs the line on every page. An empty page
+// that shows only its running header (the back of a chapter page in a book)
+// does not count against the header.
 // Text that merely repeats at the top of some pages - a table header on
 // continuation pages, a sub-heading such as "Synopsis" - fails these tests
 // and stays in the text.

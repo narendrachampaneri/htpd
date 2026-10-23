@@ -11,6 +11,7 @@ PDF the way real documents are made:
     latex       pandoc -> LaTeX: numbered headings, a printed table of contents, bookmarks
     latex-nobm  the same without bookmarks: only the printed contents and the numbers
     latex-2col  two columns
+    latex-book  a book: chapters on new pages, running headers with the chapter
     web         HTML printed by Chromium, with a fixed bar at the top and a contents box (a web page saved as PDF)
     wkhtml      HTML printed by wkhtmltopdf
     slides      pandoc -> .pptx -> LibreOffice (a slide deck)
@@ -103,6 +104,10 @@ def make_latex(md, out, tmp):
 
 def make_latex_nobm(md, out, tmp):
     latex(md, out, "-V", "hyperrefoptions=bookmarks=false")
+
+
+def make_latex_book(md, out, tmp):
+    latex(md, out, "-V", "documentclass=book", "--top-level-division=chapter")
 
 
 def make_latex_2col(md, out, tmp):
@@ -302,6 +307,7 @@ MAKERS = {
     "latex": (make_latex, ("pandoc", "xelatex")),
     "latex-nobm": (make_latex_nobm, ("pandoc", "xelatex")),
     "latex-2col": (make_latex_2col, ("pandoc", "xelatex")),
+    "latex-book": (make_latex_book, ("pandoc", "xelatex")),
     "web": (make_web, ("pandoc", "node")),
     "wkhtml": (make_wkhtml, ("pandoc", "wkhtmltopdf")),
     "slides": (make_slides, ("pandoc", "soffice")),

@@ -572,6 +572,28 @@ TEST(furniture_in_short_documents_must_be_on_every_page) {
     CHECK_EQ(furniture_key("xii"), std::string("#"));
 }
 
+TEST(furniture_running_headers_with_a_page_number_on_empty_pages) {
+    // A book: every chapter starts on a right-hand page; the left-hand page
+    // before it is empty but for its running header with the page number.
+    std::vector<std::vector<Line>> pages(8);
+    const std::vector<float> heights(8, 792.0f);
+    const char* chapters[] = {"SUMMARY", "TEST SETUP", "RESULTS", "CONCLUSIONS"};
+    for (std::size_t p = 0; p < 8; ++p) {
+        const int n = static_cast<int>(p);
+        if (p % 2 == 0) {
+            pages[p].push_back(make_line(n, "Chapter " + std::to_string(p / 2 + 1), 200, 20));
+            pages[p].push_back(make_line(n, "Body text of the chapter " + std::to_string(p), 300));
+        } else {
+            pages[p].push_back(make_line(n, std::to_string(p + 1) + " CHAPTER " + std::to_string(p / 2 + 1) + ". " +
+                                                chapters[p / 2], 40));
+        }
+    }
+    const FurnitureReport r = remove_furniture(pages, heights);
+    CHECK_EQ(r.removed_lines, std::size_t{4});
+    for (std::size_t p = 1; p < 8; p += 2) CHECK(pages[p].empty());
+    CHECK(!pages[0].empty());
+}
+
 // ---- columns of tables set tight -----------------------------------------------
 
 namespace {

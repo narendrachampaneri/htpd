@@ -295,7 +295,7 @@ as values (`std::expected`); the library does not throw for a bad PDF.
 
 ## What was tested
 
-* **101 automatic tests** (`make test`). Most build their input in memory.
+* **102 automatic tests** (`make test`). Most build their input in memory.
   The others convert small PDFs in `tests/data` through the real PDF
   library: rotated pages, scaled fonts, text spaced only by kerning,
   two columns, code listings, fonts whose names lie about their widths,
@@ -303,7 +303,7 @@ as values (`std::expected`); the library does not throw for a bad PDF.
 * **The document zoo** (`tests/zoo`). The same documents - a datasheet, a
   manual, a report, and short ones in German, Hindi and Gujarati - are made
   into PDFs by the programs real documents come from: Word export
-  (LibreOffice), LaTeX (with and without bookmarks, two columns), web pages
+  (LibreOffice), LaTeX (with and without bookmarks, two columns, a book), web pages
   printed by Chromium and wkhtmltopdf, slide decks, scans (straight and
   turned, with noise) and pages whose letters are drawn as shapes. As the
   text of every document is known, `run_zoo.py` measures each `.htpd` file:
@@ -315,10 +315,10 @@ as values (`std::expected`); the library does not throw for a bad PDF.
   PYTHONPATH=reader python3 tests/zoo/run_zoo.py build/zoo [--show manual-scan]
   ```
 
-  Over the 30 English PDFs: 99 % of the text in order, 96 % of the headings
-  (the scans: 80 %), the table rows mostly exact (on scans OCR misreads
-  some numbers: always check a value from a scan against the page). Hindi
-  and Gujarati from Word: 91 % and 99 % of the text.
+  Over the 33 English PDFs: 99 % of the text in order, 96 % of the
+  headings (the scans and shape-letter pages: 86 %), 89 % of the table rows
+  exact (on scans OCR misreads some numbers: always check a value from a scan
+  against the page). Hindi and Gujarati from Word: 91 % and 99 % of the text.
 * **The tests were tested.** 99 times one rule of the converter was broken
   on purpose. Every time at least one test failed.
 * **Compiler checks.** No warning with `-Wall -Wextra -Wpedantic -Wshadow
