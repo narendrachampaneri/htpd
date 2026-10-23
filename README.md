@@ -1,18 +1,18 @@
 <p align="center">
-  <img src="docs/assets/banner.svg" alt="HTPD - Hyper Text Portable Document" width="100%">
+  <img src="https://raw.githubusercontent.com/narendrachampaneri/htpd/main/docs/assets/banner.svg" alt="HTPD - Hyper Text Portable Document" width="100%">
 </p>
 
 <p align="center">
+  <a href="https://github.com/narendrachampaneri/htpd/releases/latest"><img src="https://img.shields.io/github/v/release/narendrachampaneri/htpd?style=for-the-badge&color=1d4ed8&label=release" alt="release"></a>
+  <a href="https://pypi.org/project/htpd-reader/"><img src="https://img.shields.io/pypi/v/htpd-reader?style=for-the-badge&color=0f766e&label=pip%20install%20htpd-reader" alt="PyPI"></a>
+  <a href="https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.narendrachampaneri/htpd"><img src="https://img.shields.io/badge/MCP%20registry-listed-7c3aed?style=for-the-badge" alt="MCP registry"></a>
   <a href="https://github.com/narendrachampaneri/htpd/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/narendrachampaneri/htpd/tests.yml?branch=main&label=tests&style=for-the-badge" alt="tests"></a>
-  <img src="https://img.shields.io/badge/converter-C%2B%2B23-1d4ed8?style=for-the-badge" alt="C++23">
-  <img src="https://img.shields.io/badge/reader-Python%203.10%2B-0f766e?style=for-the-badge" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/license-Apache--2.0-475569?style=for-the-badge" alt="Apache-2.0">
-  <img src="https://img.shields.io/badge/status-0.1%20alpha-b45309?style=for-the-badge" alt="0.1 alpha">
 </p>
 
 <p align="center">
   <a href="#what-is-htpd"><b>What it is</b></a> &nbsp;·&nbsp;
-  <a href="https://github.com/narendrachampaneri/htpd/releases"><b>Download</b></a> &nbsp;·&nbsp;
+  <a href="#install-in-one-minute"><b>Install</b></a> &nbsp;·&nbsp;
   <a href="#quick-start"><b>Quick start</b></a> &nbsp;·&nbsp;
   <a href="#use-it-with-your-ai"><b>Use with your AI</b></a> &nbsp;·&nbsp;
   <a href="#the-format"><b>Format</b></a> &nbsp;·&nbsp;
@@ -21,9 +21,23 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/demo.gif" alt="Converting a data sheet with htpd and asking questions with htpd-read" width="88%">
-  <br><sub>Real commands on the NXP i.MX 93 data sheet (answer output shortened).</sub>
+  <img src="https://raw.githubusercontent.com/narendrachampaneri/htpd/main/docs/assets/demo.gif" alt="Converting a data sheet with htpd and asking questions with htpd-read" width="88%">
+  <br><sub>Real commands and output of htpd 0.1.2 on the NXP i.MX 93 data sheet (shortened).</sub>
 </p>
+
+---
+
+## Install in one minute
+
+| You use | Do this |
+|---|---|
+| **Claude Code** | `/plugin marketplace add narendrachampaneri/htpd` then `/plugin install htpd@htpd` - converts PDFs and answers from them, MCP server included |
+| **Claude app** and other apps with skills | Add [`htpd-skill.zip`](https://github.com/narendrachampaneri/htpd/releases/latest) under *Customize → Skills* |
+| **Any MCP client** (Antigravity, Codex, Cursor, ...) | `pip install htpd-reader`, then the command `htpd-mcp --bundles <folder>` - or find `io.github.narendrachampaneri/htpd` in the MCP registry |
+| **ChatGPT, Gemini** | Upload the `.htpd` file, or make a custom GPT / Gem with the [ready instructions](https://github.com/narendrachampaneri/htpd/blob/main/docs/AI-APPS.md) |
+| **The converter** (PDF → `.htpd`) | [Download](https://github.com/narendrachampaneri/htpd/releases/latest) `htpd-0.1.2-linux-x64.tar.gz` (Linux, WSL) and run `./htpd convert manual.pdf --single` |
+
+Everything runs on your computer: free, open source, no GPU, no account, the PDF never leaves your machine.
 
 ---
 
@@ -51,11 +65,11 @@ flowchart LR
 ```
 
 <p align="center">
-  <img src="docs/assets/features.svg" alt="Exact text - Every fact has a page - Says not found - 100 % local" width="100%">
+  <img src="https://raw.githubusercontent.com/narendrachampaneri/htpd/main/docs/assets/features.svg" alt="Exact text - Every fact has a page - Says not found - 100 % local" width="100%">
 </p>
 
 <p align="center">
-  <img src="docs/assets/before-after.svg" alt="A PDF page becomes a clean HTPD section with its place in the document and page marks" width="100%">
+  <img src="https://raw.githubusercontent.com/narendrachampaneri/htpd/main/docs/assets/before-after.svg" alt="A PDF page becomes a clean HTPD section with its place in the document and page marks" width="100%">
 </p>
 
 ---
@@ -284,20 +298,22 @@ Unicode text, encrypted, truncated and corrupted files, a scanned page,
 LaTeX and Word exports - and checks that the converter never crashes or
 hangs, that every bundle is valid, and that no word is lost.
 
-**Tests.** 96 C++ tests and 150 Python tests run on every change, the
+**Tests.** 102 C++ tests and 155 Python tests run on every change, the
 Python tests also without PyYAML, as the skill does in a chat sandbox.
 
 ---
 
 ## Roadmap
 
-HTPD is version 0.1. It works today; these are the known next steps.
+HTPD is version 0.1.2. It works today; these are the known next steps.
 
 - [x] Converter: sections, pages, tables, code, headers/footers, sideways pages, damaged files
 - [x] Structure for documents without headings (parts of a few pages) and a map of the document
 - [x] Figures stored as pictures with caption and page; OCR of scanned pages and text in pictures (Tesseract, optional)
 - [x] Single-file `.htpd` with reading rules for AI models
 - [x] Reader, "not found" rule, `ask`, MCP server, skill for AI apps; figures handed to the AI as images
+- [x] Claude Code plugin, `pip install htpd-reader`, listed in the MCP registry, ready instructions for ChatGPT and Gemini
+- [x] Tested on 45 kinds of PDF of known text: Word, LaTeX, Chrome, slides, scans, letters drawn as shapes ([`tests/zoo`](https://github.com/narendrachampaneri/htpd/tree/main/tests/zoo))
 - [x] A small trained re-ranker (no GPU, a few kilobytes) - the right section first for 78 % of test questions instead of 66 % without it ([`model/README.md`](https://github.com/narendrachampaneri/htpd/blob/main/model/README.md))
 - [ ] Other document types: Word, HTML, plain text, images
 - [ ] "Not found" for questions in the user's own words (a word the document writes differently)
@@ -324,7 +340,7 @@ skills/convert/         the plugin's skill that converts PDFs
 .claude-plugin/         the Claude Code plugin and its marketplace (this repository is both)
 eval/                   evaluation harness, baselines, report
 model/                  the training of the re-ranker
-tests/                  C++ tests, test PDFs, the stress test
+tests/                  C++ tests, test PDFs, the stress test, the document zoo
 docs/                   FORMAT.md · CONVERTER.md · READER.md · BACKGROUND.md
 examples/               a converted document in both forms
 ```

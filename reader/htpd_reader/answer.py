@@ -33,6 +33,7 @@ class Line:
     kind: str  # "row", "sentence", "code" or "figure"
     header: str | None = None  # the first row of the table, for a row
     score: float = 0.0
+    is_header: bool = False  # the first row of a table: it names the columns
 
     @property
     def ocr(self) -> bool:
@@ -83,7 +84,8 @@ def _pieces_of_block(node: Node, b: Block) -> list[Line]:
     if b.kind == "table":
         rows = b.text.split("\n")
         header = rows[0] if len(rows) > 1 else None
-        return [Line(r, b.page, node, "row", header if i else None) for i, r in enumerate(rows) if r.strip()]
+        return [Line(r, b.page, node, "row", header if i else None, is_header=bool(i == 0 and header))
+                for i, r in enumerate(rows) if r.strip()]
     if b.kind == "code":
         return [Line(r, b.page, node, "code") for r in b.text.split("\n") if r.strip()]
     # Paragraphs: one line in the file may hold several sentences; and a
@@ -94,10 +96,28 @@ def _pieces_of_block(node: Node, b: Block) -> list[Line]:
 
 
 def score_line(line: Line, terms: dict[str, float]) -> float:
-    words = set(technical_tokens(line.text))
-    if line.header:
-        words |= {w for w in technical_tokens(line.header)}
-    got = sum(w for t, w in terms.items() if t in words)
+    """How well a line answers: the weight of the question's words it holds.
+
+    A word of the table's header row counts half - the row itself should hold
+    something asked for, not only stand under the right column. A word that
+    is already in the title of the line's section counts little: the section
+    says it ("Maximum frequency of main modules"); the line that adds the rest
+    ("NPU | 500 MHz | 800 MHz | 1000 MHz") is the answer.
+    """
+    own = set(technical_tokens(line.text))
+    head = set(technical_tokens(line.header)) - own if line.header else set()
+    title = set(technical_tokens(line.section.title))
+    adds = 0.0  # the asked words the line holds that its section's title does not say
+    for t, w in terms.items():
+        if t not in title:
+            adds += w * (1.0 if t in own else 0.5 if t in head else 0.0)
+    said = 0.0  # the asked words the title says: they count for the lines of the section
+    for t, w in terms.items():
+        if t in title:
+            said += w * (0.5 if adds > 0 else 0.3 if t in own else 0.0)
+    got = adds + said
+    if line.is_header:
+        got *= 0.5  # the header row names the columns; a row under it holds the answer
     # a short line that holds the words is a better answer than a long one
     return got / (1.0 + 0.02 * len(line.text.split()))
 
