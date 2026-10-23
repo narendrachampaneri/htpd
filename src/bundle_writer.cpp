@@ -30,6 +30,13 @@ std::string page_range(int first, int last) {   // 0-based in, 1-based out
                          : std::format("pages {}-{}", first + 1, last + 1);
 }
 
+// " - pages 12-13" after a title - nothing when the title already ends with
+// those pages (a part: "2.2 CSR listing - pages 12-13").
+std::string pages_after(std::string_view title, int first, int last) {
+    const std::string pages = " - " + page_range(first, last);
+    return title.ends_with(pages) ? std::string{} : pages;
+}
+
 // First words of the section text, used as its one-line description.
 std::string snippet(const Section& s) {
     if (s.paragraphs.empty()) {
@@ -367,8 +374,8 @@ std::string section_markdown(const std::vector<Section>& sections, const Section
         md += "# Subsections\n\n";
         for (const std::size_t child : s.children) {
             const Section& c = sections[child];
-            md += std::format("* {} - {}\n", link(c.title, file_name_only(c)),
-                              page_range(c.page_start, c.span_page_end));
+            md += std::format("* {}{}\n", link(c.title, file_name_only(c)),
+                              pages_after(c.title, c.page_start, c.span_page_end));
         }
         md += '\n';
     }
@@ -562,7 +569,7 @@ std::string document_markdown(const std::vector<Section>& sections, const Bundle
         if (depth[s.order] > shown) continue;
         ++listed;
         md += std::string(std::min<std::size_t>(depth[s.order], 8) * 2, ' ');
-        md += std::format("* {} - {}{}", link(s.title, s.file), page_range(s.page_start, s.span_page_end),
+        md += std::format("* {}{}{}", link(s.title, s.file), pages_after(s.title, s.page_start, s.span_page_end),
                           contents_hint(s));
         if (depth[s.order] == shown && below[s.order] > 0) {
             md += std::format(" (+{} section{} below)", below[s.order], below[s.order] == 1 ? "" : "s");
@@ -584,8 +591,11 @@ std::string document_markdown(const std::vector<Section>& sections, const Bundle
 }  // namespace
 
 std::string document_title(const BundleInfo& info) {
-    const std::string lowered = text::to_lower_ascii(info.meta.title);
-    if (!info.meta.title.empty() && lowered != "untitled") return info.meta.title;
+    const std::string lowered = text::to_lower_ascii(text::collapse_spaces(info.meta.title));
+    const bool says_nothing = lowered.empty() || lowered == "untitled" || lowered == "(anonymous)" ||
+                              lowered == "anonymous";
+    if (!says_nothing) return info.meta.title;
+    if (!info.printed_title.empty()) return info.printed_title;
     return fs::path(info.source_file).stem().string();
 }
 
@@ -669,8 +679,8 @@ std::string single_file_markdown(const std::vector<Section>& sections, const Bun
     }
     for (const Section& s : sections) {
         md += std::string(std::min<std::size_t>(depth[s.order], 8) * 2, ' ');
-        md += std::format("* [S{}] {} - {}{}\n", s.order + 1, s.title,
-                          page_range(s.page_start, s.span_page_end), contents_hint(s));
+        md += std::format("* [S{}] {}{}{}\n", s.order + 1, s.title,
+                          pages_after(s.title, s.page_start, s.span_page_end), contents_hint(s));
     }
     md += '\n';
     md += conversion_notes(info);
@@ -689,8 +699,7 @@ std::string single_file_markdown(const std::vector<Section>& sections, const Bun
         md += std::format("## [S{}] {}\n\n", s.order + 1, s.title);
         std::string path;
         for (auto p = s.parent; p; p = sections[*p].parent) path = sections[*p].title + " > " + path;
-        md += std::format("Path: {}{} - {}\n\n", path, s.title,
-                          page_range(s.page_start, s.page_end));
+        md += std::format("Path: {}{}{}\n\n", path, s.title, pages_after(s.title, s.page_start, s.page_end));
         md += text_markdown(s, info, true);
         if (!s.links.empty()) {
             md += "<!-- htpd links -->\n";
@@ -791,8 +800,8 @@ Result<WriteReport> write_bundle(const fs::path& out_dir, std::vector<Section>& 
 
     std::string sections_index = "# Sections\n\n";
     for (const Section& s : sections) {
-        sections_index += std::format("* {} - {} - {}\n", link(s.title, file_name_only(s)),
-                                      page_range(s.page_start, s.page_end), snippet(s));
+        sections_index += std::format("* {}{} - {}\n", link(s.title, file_name_only(s)),
+                                      pages_after(s.title, s.page_start, s.page_end), snippet(s));
     }
 
     const std::string root_index = std::format(

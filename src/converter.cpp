@@ -426,6 +426,7 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
 
     BundleInfo info;
     info.meta = a.meta;
+    info.printed_title = printed_title(a.lines, a.headings.body_size);
     info.source_file = text::sanitize_utf8(options.input.filename().string());
     info.source_sha256 = digest->sha256_hex;
     info.source_bytes = digest->bytes;

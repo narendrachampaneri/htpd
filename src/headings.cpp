@@ -355,6 +355,19 @@ HeadingResult detect_from_text(std::span<const Line> lines) {
     // Some documents set headings in another font at the SAME size as the text.
     const std::uint16_t text_font = body_font(lines);
 
+    // Text on the same line to the right of line i: another cell of its row.
+    const auto cell_beside = [&](std::size_t i) {
+        const Line& line = lines[i];
+        const float tolerance = 0.3f * std::max(line.size, 1.0f);
+        const std::size_t from = i > 40 ? i - 40 : 0, to = std::min(lines.size(), i + 41);
+        for (std::size_t k = from; k < to; ++k) {
+            const Line& other = lines[k];
+            if (k == i || other.page != line.page || other.text.empty() || other.figure > 0) continue;
+            if (std::fabs(other.baseline - line.baseline) < tolerance && other.x0 > line.x1) return true;
+        }
+        return false;
+    };
+
     // 1. Collect candidates.
     std::vector<Candidate> numbered, unnumbered;
     for (std::size_t i = 0; i < lines.size(); ++i) {
@@ -369,9 +382,12 @@ HeadingResult detect_from_text(std::span<const Line> lines) {
         if (auto number = parse_section_number(line.text, rest)) {
             // A line that starts like a numbered heading but fails the checks
             // (a contents entry, a table row, a sentence) is no heading at
-            // all, however large it is set.
-            const bool title_ok = rest.empty() ? number->keyword
-                                               : plausible_numbered_title(rest, line, emphasised);
+            // all, however large it is set. A row of a table is one too:
+            // its columns line up with the rows around it, or another cell
+            // stands beside it on its line ("24 notification_payload_f" in
+            // the column "Tag #") - unless it is set larger than the text.
+            const bool title_ok = !line.table && (larger || !cell_beside(i)) &&
+                                  (rest.empty() ? number->keyword : plausible_numbered_title(rest, line, emphasised));
             if (title_ok) numbered.push_back({i, std::move(number), styled, styled && !emphasised});
             continue;
         }
@@ -435,6 +451,21 @@ HeadingResult detect_from_text(std::span<const Line> lines) {
     if (!accepted.empty()) {
         // Only lines in the size of a known heading ("Revision history"),
         // not every large line (cover page titles).
+        // A style smaller than every numbered heading, but still larger than
+        // the text ("Performance Characteristics Table" in 12 pt bold under
+        // "5.2 ..." in 15 pt), used for three titles or more: the level below
+        // the deepest numbered one.
+        const int smallest = level_of_size.begin()->first;
+        int deepest = 1;
+        for (const auto& [key, level] : level_of_size) deepest = std::max(deepest, level);
+        std::map<int, std::size_t> smaller;
+        for (const Candidate& c : unnumbered) {
+            const int key = size_key(lines[c.line]);
+            if (key < smallest) ++smaller[key];
+        }
+        for (const auto& [key, count] : smaller) {
+            if (count >= 3) level_of_size[key] = std::min(deepest + 1, static_cast<int>(kMaxDepth));
+        }
         for (const Candidate& c : unnumbered) {
             if (level_of_size.contains(size_key(lines[c.line]))) accepted_unnumbered.push_back(c);
         }
@@ -1011,6 +1042,23 @@ std::optional<SectionNumber> parse_section_number(std::string_view line, std::st
 
     SectionNumber number;
     std::string_view t = s;
+    // "Register 30.2.43: I2C_2_REG_42 ...": a register heading of a manual
+    // carries the number of its section, one level below it.
+    if (s.starts_with("Register ") && s.size() > 9 && is_digit(s[9])) {
+        std::string_view u = s.substr(9);
+        const int first = read_number(u);
+        std::vector<int> parts = {first};
+        if (first >= 0 && read_dotted_tail(u, parts) && parts.size() >= 2) {
+            number.parts = std::move(parts);
+            number.text = std::string(s.substr(9, s.size() - 9 - u.size()));
+            if (!u.empty() && u[0] == ':') u.remove_prefix(1);
+            if (!u.empty() && is_blank(u[0])) {
+                rest = skip_blanks(u);
+                if (!rest.empty()) return number;
+            }
+        }
+        return std::nullopt;
+    }
     if (s.size() >= 3 && is_upper(s[0]) && s[1] == '.' && is_digit(s[2])) {   // "A.1"
         number.parts.push_back(kLetterBase + (s[0] - 'A'));
         t.remove_prefix(1);
@@ -1025,6 +1073,36 @@ std::optional<SectionNumber> parse_section_number(std::string_view line, std::st
     number.text = std::string(s.substr(0, s.size() - t.size()));
     if (!read_title_after_number(t, rest)) return std::nullopt;
     return number;
+}
+
+// The title printed on the first page with text: its line or lines (at most
+// three, one below the other) in the largest font, clearly larger than the
+// text. "" when there is none.
+std::string printed_title(std::span<const Line> lines, float body_size) {
+    std::size_t first = 0;
+    while (first < lines.size() && lines[first].text.empty()) ++first;
+    if (first == lines.size()) return {};
+    const int page = lines[first].page;
+    std::size_t largest = lines.size();
+    for (std::size_t i = first; i < lines.size() && lines[i].page == page; ++i) {
+        if (lines[i].text.empty() || lines[i].ocr == Line::Ocr::Picture) continue;
+        if (largest == lines.size() || lines[i].size > lines[largest].size) largest = i;
+    }
+    if (largest == lines.size() || lines[largest].size < 1.3f * body_size) return {};
+    std::string title = text::collapse_spaces(lines[largest].text);
+    std::size_t count = 1;
+    for (std::size_t i = largest + 1; i < lines.size() && count < 3; ++i) {
+        const Line& prev = lines[i - 1];
+        const Line& line = lines[i];
+        if (line.page != page || std::fabs(line.size - prev.size) > 0.05f * prev.size || line.bold != prev.bold ||
+            line.baseline <= prev.baseline || line.baseline - prev.baseline > 1.6f * prev.size) {
+            break;
+        }
+        title += ' ';
+        title += text::collapse_spaces(line.text);
+        ++count;
+    }
+    return title.size() <= 200 ? text::sanitize_utf8(title) : std::string{};
 }
 
 bool is_successor(std::span<const int> prev, std::span<const int> next) {

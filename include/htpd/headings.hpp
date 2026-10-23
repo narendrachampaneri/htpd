@@ -57,6 +57,11 @@ HeadingResult detect_headings(std::span<const Line> lines,
                               std::span<const Affine> page_transforms,
                               const HeadingOptions& options = {});
 
+// The title printed on the first page with text: its line or lines (at most
+// three, one below the other) in the largest font, at least 1.3 times the
+// body size. "" when there is none. Used when the PDF names no title.
+std::string printed_title(std::span<const Line> lines, float body_size);
+
 // ---- building blocks, exposed for testing --------------------------------
 
 struct SectionNumber {

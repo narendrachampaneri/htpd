@@ -1,6 +1,7 @@
 #include "htpd/structure.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <format>
 #include <string>
 
@@ -85,8 +86,25 @@ std::size_t add_running_titles(std::vector<Heading>& headings, std::span<const L
 bool clean_cut(std::span<const Line> lines, std::size_t i) {
     const Line& before = lines[i - 1];
     const Line& after = lines[i];
-    // next to a table row: a table stays whole, with its header row
-    if (before.gaps.size() >= 2 || after.gaps.size() >= 2) return false;
+    // next to a table row: a table stays whole, with its header row - also
+    // one whose rows are two cells, or stored cell by cell (another cell on
+    // the same line of the page)
+    if (before.gaps.size() >= 2 || after.gaps.size() >= 2 || before.table || after.table) return false;
+    const auto cell_of_row = [&](std::size_t k) {
+        const Line& line = lines[k];
+        if (!line.gaps.empty()) return true;
+        const float tolerance = 0.3f * std::max(line.size, 1.0f);
+        const std::size_t from = k > 40 ? k - 40 : 0, to = std::min(lines.size(), k + 41);
+        for (std::size_t j = from; j < to; ++j) {
+            const Line& other = lines[j];
+            if (j != k && other.page == line.page && !other.text.empty() &&
+                std::fabs(other.baseline - line.baseline) < tolerance && (other.x0 > line.x1 || other.x1 < line.x0)) {
+                return true;
+            }
+        }
+        return false;
+    };
+    if (cell_of_row(i - 1) || cell_of_row(i)) return false;
     if (text::ends_with_sentence_punct(before.text)) return true;
     // At the top of a page that starts with a larger line (the title of a
     // slide), after a short line that does not run on: no sentence is broken

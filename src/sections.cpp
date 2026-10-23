@@ -1331,7 +1331,9 @@ std::vector<Section> build_sections(std::span<const Line> lines, std::span<const
                              std::make_move_iterator(lead.end()));
     }
 
-    // Parent/child links from the heading levels.
+    // Parent/child links from the heading levels. The front matter is no
+    // parent: a "5.2" heading after it without a "5" above stays at the top.
+    const bool front_matter = first > 0 && !only_figures;
     std::vector<std::size_t> open;   // chain of sections that are still "open"
     for (std::size_t i = 0; i < sections.size(); ++i) {
         while (!open.empty() && sections[open.back()].level >= sections[i].level) open.pop_back();
@@ -1339,7 +1341,7 @@ std::vector<Section> build_sections(std::span<const Line> lines, std::span<const
             sections[i].parent = open.back();
             sections[open.back()].children.push_back(i);
         }
-        open.push_back(i);
+        if (!(front_matter && i == 0)) open.push_back(i);
     }
     // A section spans the pages of all its subsections. Children always come
     // after their parent, so one backwards pass is enough.

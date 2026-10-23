@@ -28,6 +28,7 @@ namespace htpd {
 
 struct BundleInfo {
     DocumentMeta meta;
+    std::string printed_title;          // the title printed on the first page ("" when none is clear)
     std::string source_file;            // file name only, e.g. "manual.pdf"
     std::string source_sha256;
     std::uintmax_t source_bytes = 0;

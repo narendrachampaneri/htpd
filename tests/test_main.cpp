@@ -1021,6 +1021,79 @@ TEST(numbered_sentences_are_not_titles) {
     CHECK(titles(result.headings) == expected);
 }
 
+TEST(a_numbered_cell_of_a_table_row_is_no_heading) {
+    // "3 auth_srv_payload_field" in the column "Tag #", set in a monospace
+    // font, numbered on from the heading "2 Auth": the other cells of its
+    // row stand beside it on its line.
+    std::vector<Line> lines;
+    float y = 100;
+    const auto add = [&](std::string text, float size = 10, bool bold = false, float x0 = 72) {
+        lines.push_back(make_line(0, std::move(text), y, size, bold, x0));
+        lines.back().font = 1;   // the font of the text
+        y += 20;
+    };
+    add("1 Introduction", 16, true);
+    add("The controller supervises the power stage.");
+    add("2 Auth", 16, true);
+    add("Tag # Field Name Wire Type");
+    for (int tag = 3; tag < 8; ++tag) {
+        add(std::to_string(tag) + " auth_payload_field", 10, false, 58);
+        lines.back().font = 3;   // another font than the text
+        lines.push_back(make_line(0, "Varint uint64 OPTIONAL", lines.back().baseline, 10, false, 220));
+        lines.back().font = 1;
+    }
+    add("3 Users", 16, true);
+    add("More body text follows here to set the body size.");
+    add("More body text follows here to set the body size.");
+    const HeadingResult result = detect_headings(lines, {}, {});
+    const std::vector<std::string> expected = {"1 Introduction", "2 Auth", "3 Users"};
+    CHECK(titles(result.headings) == expected);
+}
+
+TEST(register_headings_carry_the_number_of_their_section) {
+    std::vector<Line> lines;
+    float y = 100;
+    const auto add = [&](std::string text, float size = 7.5f, bool bold = false) {
+        lines.push_back(make_line(0, std::move(text), y, size, bold));
+        y += 16;
+    };
+    add("30. I2C Controller", 13, true);
+    add("The controller has registers. Their fields are listed below in tables.");
+    add("30.2 Bitfield Field Specifications", 10.5f, true);
+    add("Register 30.2.1: I2C_REG_0 (Offset: 0x0000)", 10.5f);
+    add("Bits Field Name Access Reset Functional Description");
+    add("Register 30.2.2: I2C_REG_1 (Offset: 0x0004)", 10.5f);
+    add("Bits Field Name Access Reset Functional Description");
+    add("Register 30.2.3: I2C_REG_2 (Offset: 0x0008)", 10.5f);
+    add("Bits Field Name Access Reset Functional Description");
+    const HeadingResult result = detect_headings(lines, {}, {});
+    REQUIRE(result.headings.size() == 5);
+    CHECK_EQ(result.headings[2].title, std::string("Register 30.2.1: I2C_REG_0 (Offset: 0x0000)"));
+    CHECK_EQ(result.headings[2].number, std::string("30.2.1"));
+    CHECK_EQ(result.headings[2].level, 3);
+}
+
+TEST(smaller_headings_under_the_numbered_ones_are_headings_too) {
+    // "Performance Characteristics Table" in 12 pt bold under "5.2 ..." in 15 pt.
+    std::vector<Line> lines;
+    float y = 100;
+    const auto add = [&](std::string text, float size = 10, bool bold = false) {
+        lines.push_back(make_line(0, std::move(text), y, size, bold));
+        y += 20;
+    };
+    for (int n = 1; n <= 3; ++n) {
+        add(std::to_string(n) + ".1 Algorithm number " + std::to_string(n), 15, true);
+        add("The algorithm solves a problem on graphs with weights on the edges.");
+        add("Performance Characteristics Table", 12, true);
+        add("The operations cost little time on the average over many steps.");
+    }
+    const HeadingResult result = detect_headings(lines, {}, {});
+    REQUIRE(result.headings.size() == 6);
+    CHECK_EQ(result.headings[1].title, std::string("Performance Characteristics Table"));
+    CHECK_EQ(result.headings[1].level, 3);
+    CHECK_EQ(result.headings[0].level, 2);
+}
+
 TEST(headings_join_wrapped_titles) {
     std::vector<Line> lines;
     lines.push_back(make_line(0, "4.2 Behaviour of the output stage during", 100, 13, true));
@@ -2329,6 +2402,35 @@ TEST(structure_never_cuts_a_sentence_or_a_table) {
     CHECK_EQ(add_structure(h2, table, {}, 8).page_parts, std::size_t{0});
 }
 
+TEST(structure_never_cuts_a_table_stored_cell_by_cell) {
+    // The rows are stored cell by cell: each cell a line of its own, the
+    // cells of a row on one line of the page. A cell that ends with a full
+    // stop is no place to cut.
+    std::vector<Line> lines;
+    for (int p = 0; p < 8; ++p) {
+        for (int r = 0; r < 3; ++r) {
+            const float y = 100.0f + 30.0f * static_cast<float>(r);
+            lines.push_back(make_line(p, "0x000" + std::to_string(r) + " Register", y));
+            lines.push_back(make_line(p, "Controls the state of the module.", y, 10, false, 300));
+        }
+    }
+    std::vector<Heading> headings = one_title();
+    CHECK_EQ(add_structure(headings, lines, {}, 8).page_parts, std::size_t{0});
+}
+
+TEST(the_front_matter_is_no_parent) {
+    std::vector<Line> lines;
+    lines.push_back(make_line(0, "Cover text", 100));
+    lines.push_back(make_line(0, "5.2 Dijkstra", 140, 15, true));
+    lines.push_back(make_line(0, "Body.", 170));
+    std::vector<Heading> headings;
+    headings.push_back({"5.2 Dijkstra", "5.2", 2, 0, 1, 1, HeadingSource::Numbering});
+    const std::vector<Section> sections = build_sections(lines, headings);
+    REQUIRE(sections.size() == 2);
+    CHECK_EQ(sections[0].title, std::string("Front matter"));
+    CHECK(!sections[1].parent);
+}
+
 TEST(structure_cuts_slides_at_their_titles) {
     std::vector<Line> lines;   // slides: a large title and short points without full stops
     for (int p = 0; p < 8; ++p) {
@@ -2389,12 +2491,30 @@ TEST(contents_show_the_first_words_where_the_title_says_little) {
     REQUIRE(write_bundle(dir, sections, example_info()).has_value());
     const std::string document = read_file(dir / "document.md");
     CHECK(document.contains("- page 1 - starts: `` Cover text of the `report` ``\n"));   // a backtick stays text
-    CHECK(document.contains("- page 3 - starts: `Byte ordering of the core.`\n"));
+    CHECK(document.contains("[1 Intro - page 3](sections/0003-1-intro-page-3.md) - starts: `Byte ordering of the core.`\n"));
     CHECK(document.contains("[1 Intro](sections/0002-1-intro.md) - pages 2-3\n"));       // the author's title: no hint
 
     const fs::path file = fresh_temp_dir("hints_single") / "x.htpd";
     REQUIRE(write_single_file(file, sections, example_info()).has_value());
-    CHECK(read_file(file).contains("* [S3] 1 Intro - page 3 - page 3 - starts: `Byte ordering of the core.`\n"));
+    CHECK(read_file(file).contains("* [S3] 1 Intro - page 3 - starts: `Byte ordering of the core.`\n"));   // the pages once
+}
+
+TEST(the_title_printed_on_the_first_page) {
+    std::vector<Line> lines;
+    lines.push_back(make_line(0, "Category 1: Advanced Algorithms, Data", 84, 24, true));
+    lines.push_back(make_line(0, "Structures & System Architecture", 112, 24, true));
+    lines.push_back(make_line(0, "Version 1.0", 156, 12));
+    lines.push_back(make_line(0, "Body text of the first page.", 260));
+    CHECK_EQ(printed_title(lines, 10), std::string("Category 1: Advanced Algorithms, Data Structures & System Architecture"));
+    std::vector<Line> plain = {make_line(0, "Body text only.", 100)};
+    CHECK_EQ(printed_title(plain, 10), std::string());
+
+    BundleInfo info = example_info();
+    info.meta.title = "(anonymous)";
+    info.printed_title = "Category 1";
+    CHECK_EQ(document_title(info), std::string("Category 1"));
+    info.printed_title.clear();
+    CHECK_EQ(document_title(info), std::filesystem::path(info.source_file).stem().string());
 }
 
 TEST(bundle_is_written_and_links_resolve) {

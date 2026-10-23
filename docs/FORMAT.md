@@ -140,7 +140,9 @@ The same OKF fields (`type: Document`, `tags: [htpd, document]`), and under
 | `children` | IDs of the top-level sections, in order. |
 
 The `title` of the document is the title stored in the PDF. When the PDF
-has none (or only the word "untitled"), it is the file name without `.pdf`.
+has none (or only "untitled" or "(anonymous)"), it is the title printed on
+the first page - its line or lines in the largest font, clearly larger than
+the text - and when there is none, the file name without `.pdf`.
 
 The body of `document.md` has two parts:
 
@@ -165,7 +167,8 @@ The body of `document.md` has two parts:
 ### 3.3 Two special sections
 
 * Text that stands before the first heading (a cover page, for example)
-  goes into a section with the title `Front matter`.
+  goes into a section with the title `Front matter`. It is never the parent
+  of a section: a `5.2` heading after it without a `5` stays at the top.
 * A document in which no heading was found gets one section per page, with
   the titles `Page 1`, `Page 2`, ...
 
@@ -180,8 +183,10 @@ a subsection one level down, with `heading_from: pages` and the title
 topics its running header gives those pages follow
 (`... - pages 3-4: Section 3: Methods; Section 4: Results`). A part starts
 where a sentence ends, or at a page that starts with a larger line (a slide
-title), never next to a table row: no paragraph is broken and a table keeps
-its header row.
+title), never next to a table row (also a row stored cell by cell, whose
+cells stand on one line of the page): no paragraph is broken and a table
+keeps its header row. In the contents the pages of a part are not written
+twice.
 
 ## 4. The body of a section file
 
