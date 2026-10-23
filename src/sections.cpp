@@ -1169,11 +1169,28 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
         return line.x1 <= table_right + 6.0f * size;
     };
 
+    float term_indent = 0;   // the indent of the description, while `current` is a term with its description
+    // The term of a list of terms and their descriptions: a short bold line,
+    // and right below it the description, indented, not bold ("GPIO29" over
+    // "IP Used in ADC mode", "Operating Temp Max" over "85°C"). Each term
+    // starts a paragraph with its description.
+    const auto starts_term = [&](std::size_t i) {
+        const Line& term = lines[i];
+        if (!term.bold || term.ocr != Line::Ocr::None || text::word_count(term.text) > 3 || i + 1 >= lines.size()) {
+            return false;
+        }
+        const Line& next = lines[i + 1];
+        const float size = std::max(term.size, 1.0f);
+        const float step = next.baseline - term.baseline;
+        return next.page == term.page && !next.bold && !next.text.empty() && step > 0 && step <= 2.0f * size &&
+               next.x0 >= term.x0 + 0.8f * size && next.x0 <= term.x0 + 6.0f * size;
+    };
+
     for (std::size_t index = 0; index < lines.size(); ++index) {
         const Line& line = lines[index];
         if (line.figure > 0) {   // a figure: a block of its own between the paragraphs
             flush();
-            paragraphs.push_back(Paragraph{line.page, ParagraphKind::Figure, std::to_string(line.figure)});
+            paragraphs.push_back(Paragraph{line.page, ParagraphKind::Figure, std::to_string(line.figure), {}});
             previous = nullptr;
             continue;
         }
@@ -1192,9 +1209,16 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
                     std::vector<std::size_t> kept(text_lines.begin(), text_lines.end());
                     std::erase_if(kept, [&](std::size_t i) { return i >= header->first; });
                     current.text.clear();
-                    for (const std::size_t i : kept) join_line(current.text, lines[i].text, options.dehyphenate);
+                    current.page_starts.clear();
+                    for (std::size_t k = 0; k < kept.size(); ++k) {
+                        const Line& kept_line = lines[kept[k]];
+                        join_line(current.text, kept_line.text, options.dehyphenate);
+                        if (k > 0 && kept_line.page != lines[kept[k - 1]].page) {
+                            current.page_starts.emplace_back(current.text.size() - kept_line.text.size(), kept_line.page);
+                        }
+                    }
                     flush();
-                    paragraphs.push_back(Paragraph{lines[header->first].page, ParagraphKind::Rows, std::move(rebuilt)});
+                    paragraphs.push_back(Paragraph{lines[header->first].page, ParagraphKind::Rows, std::move(rebuilt), {}});
                     index = *end - 1;
                     previous = nullptr;
                     continue;
@@ -1202,7 +1226,7 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
             }
             if (const auto end = rebuild_table(lines, index, index + 1, kinds, line_pitch, rebuilt)) {
                 flush();
-                paragraphs.push_back(Paragraph{line.page, ParagraphKind::Rows, std::move(rebuilt)});
+                paragraphs.push_back(Paragraph{line.page, ParagraphKind::Rows, std::move(rebuilt), {}});
                 index = *end - 1;
                 previous = nullptr;
                 continue;
@@ -1230,7 +1254,10 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
             // The height of a line read by OCR depends on its letters ("enclave." has no
             // tall ones), so only a clear change of size starts a new paragraph there.
             const float same_size = line.ocr == Line::Ocr::Page && previous->ocr == Line::Ocr::Page ? 0.3f : 0.1f;
-            if (starts_list_item(line.text) || std::fabs(line.size - previous->size) > same_size * size) {
+            // The description of a term ends where a line goes back left of its indent.
+            const bool back_left = term_indent > 0 && line.x0 < term_indent - 0.8f * size;
+            if (starts_list_item(line.text) || std::fabs(line.size - previous->size) > same_size * size ||
+                starts_term(index) || back_left) {
                 start_new = true;
             } else if (moved_to_new_area) {
                 // Next page or next column: the paragraph continues unless the
@@ -1245,6 +1272,7 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
             flush();
             current.page = line.page;
             current.kind = kind;
+            term_indent = kind == ParagraphKind::Text && starts_term(index) ? lines[index + 1].x0 : 0;
         }
         if (kind == ParagraphKind::Code) {
             code.push_back(&line);
@@ -1254,7 +1282,9 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
             table_right = last_row == nullptr ? line.x1 : std::max(table_right, line.x1);
             last_row = &line;
         } else {
+            const bool new_page = previous != nullptr && !current.text.empty() && line.page != previous->page;
             join_line(current.text, line.text, options.dehyphenate);
+            if (new_page) current.page_starts.emplace_back(current.text.size() - line.text.size(), line.page);
             text_lines.push_back(index);
         }
         previous = &line;

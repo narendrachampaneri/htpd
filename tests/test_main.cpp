@@ -1571,6 +1571,22 @@ TEST(a_code_block_ends_at_a_large_gap_a_new_column_or_a_new_page) {
     CHECK_EQ(paragraphs[4].page, 1);
 }
 
+TEST(each_term_of_a_list_of_terms_is_a_paragraph) {
+    // A short bold term, its description right below it, indented.
+    std::vector<Line> lines;
+    lines.push_back(make_line(0, "A few pins are used for internal functions, these are:", 494, 8, false, 71));
+    lines.push_back(make_line(0, "GPIO29", 510, 8, true, 71));
+    lines.push_back(make_line(0, "IP Used in ADC mode to measure VSYS/3", 522, 8, false, 87.6f));
+    lines.push_back(make_line(0, "GPIO25", 534, 8, true, 71));
+    lines.push_back(make_line(0, "OP Connected to user LED", 546, 8, false, 87.3f));
+    lines.push_back(make_line(0, "Note that the pins are fixed.", 560, 8, false, 71));
+    const auto paragraphs = build_paragraphs(lines, 1.5f);
+    REQUIRE(paragraphs.size() == 4);
+    CHECK_EQ(paragraphs[1].text, std::string("GPIO29 IP Used in ADC mode to measure VSYS/3"));
+    CHECK_EQ(paragraphs[2].text, std::string("GPIO25 OP Connected to user LED"));
+    CHECK_EQ(paragraphs[3].text, std::string("Note that the pins are fixed."));
+}
+
 TEST(table_rows_stay_on_their_own_lines) {
     std::vector<Line> lines;
     lines.push_back(make_line(0, "Limits are listed below.", 100));
@@ -2637,6 +2653,26 @@ TEST(the_title_printed_on_the_first_page) {
     CHECK_EQ(document_title(info), std::string("Category 1"));
     info.printed_title.clear();
     CHECK_EQ(document_title(info), std::filesystem::path(info.source_file).stem().string());
+}
+
+TEST(a_paragraph_over_a_page_break_carries_the_page_mark_inside) {
+    // A paragraph that runs on onto the next page: the text of that page is
+    // cited with its own page, so the page mark stands where it begins.
+    std::vector<Line> lines;
+    lines.push_back(make_line(0, "1 Intro", 90, 16, true));
+    lines.push_back(make_line(0, "A few pins are used for internal board functions and the", 700));
+    lines.push_back(make_line(1, "rest of the sentence stands on the next page.", 90));
+    std::vector<Heading> headings;
+    headings.push_back({"1 Intro", "1", 1, 0, 0, 1, HeadingSource::Numbering});
+    std::vector<Section> sections = build_sections(lines, headings);
+    REQUIRE(sections.size() == 1);
+    REQUIRE(sections[0].paragraphs.size() == 1);
+    CHECK_EQ(sections[0].paragraphs[0].text,
+             std::string("A few pins are used for internal board functions and the rest of the sentence stands on the next page."));
+    const fs::path file = fresh_temp_dir("page_inside") / "x.htpd";
+    REQUIRE(write_single_file(file, sections, example_info()).has_value());
+    CHECK(read_file(file).contains("<!-- page 1 -->\n\nA few pins are used for internal board functions and the\n\n"
+                                   "<!-- page 2 -->\n\nrest of the sentence stands on the next page.\n"));
 }
 
 TEST(bundle_is_written_and_links_resolve) {

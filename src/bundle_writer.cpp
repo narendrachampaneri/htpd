@@ -284,7 +284,18 @@ std::string text_markdown(const Section& s, const BundleInfo& info, bool single)
             const std::string_view mark = p.kind == ParagraphKind::Rows ? "text" : "";
             md += std::format("{}{}\n{}\n{}\n\n", fence, mark, p.text, fence);
         } else {
-            md += md_paragraph(p.text) + "\n\n";
+            // Text that runs on over a page break: the page mark where the next page begins.
+            std::size_t from = 0;
+            for (const auto& [at, page] : p.page_starts) {
+                if (at <= from || at >= p.text.size()) continue;
+                std::string_view before = std::string_view(p.text).substr(from, at - from);
+                while (!before.empty() && before.back() == ' ') before.remove_suffix(1);   // the space that joined the lines
+                md += md_paragraph(before) + "\n\n";
+                md += std::format("<!-- page {} -->\n\n", page + 1);
+                current_page = page;
+                from = at;
+            }
+            md += md_paragraph(std::string_view(p.text).substr(from)) + "\n\n";
         }
     }
     return md;

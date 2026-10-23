@@ -245,8 +245,10 @@ Output current | 0 |  | 200 | A
 ### 4.1 Page marks
 
 `<!-- page N -->` stands on a line of its own. Everything below it comes
-from page N, until the next mark. A paragraph that runs from one page to
-the next stands under the page where it starts.
+from page N, until the next mark. A paragraph of text that runs from one
+page to the next is cut where the next page begins, and the mark of that
+page stands between its two parts (a table or a listing stands under the
+page where it starts).
 
 ### 4.2 Three kinds of text
 
@@ -310,6 +312,8 @@ How the converter decides:
 * When the columns are not certain, the lines are written as they stand,
   one per line, inside the block. No text is moved into a cell it does
   not stand in, and none is left out.
+* A **list of terms** - a short bold term and right below it its
+  description, indented - gives one paragraph per term with its description.
 * A **monospace block** needs at least two lines in a monospace font. One
   such line between ordinary lines is a term or a file name inside a
   sentence, and stays part of its paragraph. Whether a font is monospace
