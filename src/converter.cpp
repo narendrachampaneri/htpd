@@ -59,7 +59,9 @@ void insert_figure_mark(std::vector<Line>& page, const Figure& f, int id) {
     mark.figure = id;
     std::size_t at = 0;
     for (std::size_t i = 0; i < page.size(); ++i) {
-        if (page[i].figure == 0 && (page[i].y0 + page[i].y1) / 2 < f.box.y0) at = i + 1;
+        const bool above = page[i].figure == 0 ? (page[i].y0 + page[i].y1) / 2 < f.box.y0
+                                               : page[i].y0 <= f.box.y0;   // figures side by side keep their order
+        if (above) at = i + 1;
     }
     page.insert(page.begin() + static_cast<std::ptrdiff_t>(at), std::move(mark));
 }
@@ -198,67 +200,83 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
             pages[index] = build_lines(*page);
             a.page_links[index] = std::move(page->links);
 
-            if (options.figures && (!page->images.empty() || !page->paths.empty() || !page->forms.empty())) {
+            // A page with (almost) no text that shows something is a scan (or
+            // its text is drawn as shapes): OCR reads all of it. Without OCR its
+            // content is kept as a picture of the whole page.
+            const bool scanned = letters_on(pages[index]) < 20 && page->objects > 0;
+            const bool unread = scanned && !ocr_ready();
+            if (unread) ++a.ocr.pages_unread;
+
+            // Draws a figure, or points at the same picture stored before.
+            const auto store_figure = [&](const Figure& f, float dpi) {
+                // The same picture shown before (a logo, a repeated photo): stored once, not drawn again.
+                const std::size_t key = box_key(f.picture, f.box);
+                if (key != 0) {
+                    const auto seen = figure_seen.find(key);
+                    if (seen != figure_seen.end()) {
+                        FigureFile file;
+                        file.id = static_cast<int>(a.figures.size()) + 1;
+                        file.page = p;
+                        file.kind = f.kind;
+                        file.caption = f.caption;
+                        file.same_as = seen->second;
+                        const FigureFile& first = a.figures[static_cast<std::size_t>(seen->second) - 1];
+                        file.width = first.width;
+                        file.height = first.height;
+                        a.figures.push_back(std::move(file));
+                        insert_figure_mark(pages[index], f, a.figures.back().id);
+                        return;
+                    }
+                }
+                float fig_scale = dpi / 72.0f;
+                const double pixels = static_cast<double>(f.box.width()) * f.box.height() * fig_scale * fig_scale;
+                if (pixels > kMaxFigurePixels) fig_scale *= static_cast<float>(std::sqrt(kMaxFigurePixels / pixels));
+                auto image = doc.render(p, f.box, fig_scale, true);
+                if (!image) return;
+                FigureFile file;
+                file.id = static_cast<int>(a.figures.size()) + 1;
+                file.page = p;
+                file.kind = f.kind;
+                file.caption = f.caption;
+                Image picture = grey_if_possible(std::move(*image));
+                file.width = picture.width;
+                file.height = picture.height;
+                a.figures.push_back(std::move(file));
+                if (key != 0) figure_seen.emplace(key, a.figures.back().id);
+                insert_figure_mark(pages[index], f, a.figures.back().id);
+                if (packing.size() >= max_packing) collect_one();
+                packing.emplace_back(a.figures.size() - 1,
+                                     std::async(std::launch::async,
+                                                [img = std::move(picture)] { return png_bytes(img); }));
+            };
+
+            if (options.figures && unread) {
+                // Nothing of this page can be read as text: the page itself is
+                // stored, so that an AI that sees pictures can still read it.
+                const Figure whole{p, Box{0, 0, page->width, page->height}, Figure::Kind::Picture,
+                                   std::format("Page {}: picture of the whole page (it has no text layer)", p + 1), 0};
+                store_figure(whole, options.figure_dpi);
+                ++a.ocr.page_pictures;
+            } else if (options.figures && (!page->images.empty() || !page->paths.empty() || !page->forms.empty())) {
                 const std::vector<FontFacts> fonts = doc.fonts();
                 std::vector<char> code;
                 code.reserve(pages[index].size());
                 for (const Line& l : pages[index]) code.push_back(l.font < fonts.size() && fonts[l.font].monospace);
+                // On a page without text the shapes are often its letters (text
+                // drawn as outlines): only the pictures on it are figures there.
                 const bool scan = letters_on(pages[index]) < 20;
-                for (const Figure& f : find_figures(p, page->width, page->height, page->images, page->paths,
-                                                    page->forms, pages[index], page->turned != 0, {}, code,
-                                                    page->image_keys)) {
+                const std::span<const Box> paths = scan ? std::span<const Box>{} : std::span<const Box>(page->paths);
+                const std::span<const Box> forms = scan ? std::span<const Box>{} : std::span<const Box>(page->forms);
+                for (const Figure& f : find_figures(p, page->width, page->height, page->images, paths, forms,
+                                                    pages[index], page->turned != 0, {}, code, page->image_keys)) {
                     // A scanned page is one big picture: OCR reads it, it is no figure.
                     if (scan && f.box.width() * f.box.height() > 0.6f * page->width * page->height) continue;
-                    // The same picture shown before (a logo, a repeated photo): stored once, not drawn again.
-                    const std::size_t key = box_key(f.picture, f.box);
-                    if (key != 0) {
-                        const auto seen = figure_seen.find(key);
-                        if (seen != figure_seen.end()) {
-                            FigureFile file;
-                            file.id = static_cast<int>(a.figures.size()) + 1;
-                            file.page = p;
-                            file.kind = f.kind;
-                            file.caption = f.caption;
-                            file.same_as = seen->second;
-                            const FigureFile& first = a.figures[static_cast<std::size_t>(seen->second) - 1];
-                            file.width = first.width;
-                            file.height = first.height;
-                            a.figures.push_back(std::move(file));
-                            insert_figure_mark(pages[index], f, a.figures.back().id);
-                            continue;
-                        }
-                    }
-                    float fig_scale = options.figure_dpi / 72.0f;
-                    const double pixels =
-                        static_cast<double>(f.box.width()) * f.box.height() * fig_scale * fig_scale;
-                    if (pixels > kMaxFigurePixels) {
-                        fig_scale *= static_cast<float>(std::sqrt(kMaxFigurePixels / pixels));
-                    }
-                    auto image = doc.render(p, f.box, fig_scale, true);
-                    if (!image) continue;
-                    FigureFile file;
-                    file.id = static_cast<int>(a.figures.size()) + 1;
-                    file.page = p;
-                    file.kind = f.kind;
-                    file.caption = f.caption;
-                    Image picture = grey_if_possible(std::move(*image));
-                    file.width = picture.width;
-                    file.height = picture.height;
-                    a.figures.push_back(std::move(file));
-                    if (key != 0) figure_seen.emplace(key, a.figures.back().id);
-                    insert_figure_mark(pages[index], f, a.figures.back().id);
-                    if (packing.size() >= max_packing) collect_one();
-                    packing.emplace_back(a.figures.size() - 1,
-                                         std::async(std::launch::async,
-                                                    [img = std::move(picture)] { return png_bytes(img); }));
+                    store_figure(f, options.figure_dpi);
                 }
             }
 
-            // A page with (almost) no text that shows something is a scan:
-            // read all of it. On other pages, read the pictures that are
-            // large enough and have no text of the PDF on them.
-            const bool scanned = letters_on(pages[index]) < 20 && page->objects > 0;
-            if (scanned && !ocr_ready()) ++a.ocr.pages_unread;
+            // OCR: a scanned page is read whole. On other pages, read the
+            // pictures that are large enough and have no text of the PDF on them.
             if (scanned && pool) {
                 const Box whole{0, 0, page->width, page->height};
                 read_picture(p, whole, true, 0, [&]() -> std::optional<Image> {
@@ -338,7 +356,7 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
         a.ocr.pages.erase(std::unique(a.ocr.pages.begin(), a.ocr.pages.end()), a.ocr.pages.end());
     }
     for (const auto& page : pages) {
-        if (page.empty()) ++a.pages_without_text;
+        if (std::ranges::none_of(page, [](const Line& l) { return !l.text.empty(); })) ++a.pages_without_text;   // a figure mark is no text
     }
 
     a.fonts = doc.fonts();   // measured while the pages were read
@@ -404,6 +422,8 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     info.body_size = a.headings.body_size;
     info.bookmarks_total = a.headings.bookmarks_total;
     info.bookmarks_located = a.headings.bookmarks_located;
+    info.contents_entries = a.headings.contents_entries;
+    info.contents_located = a.headings.source == HeadingSource::Contents ? a.headings.headings.size() : 0;
     info.headings_from_text = a.headings.text_added;
     info.running_titles = a.structure.running_titles;
     info.page_parts = a.structure.page_parts;
@@ -438,6 +458,8 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     report.heading_source = a.headings.source;
     report.bookmarks_total = a.headings.bookmarks_total;
     report.bookmarks_located = a.headings.bookmarks_located;
+    report.contents_entries = info.contents_entries;
+    report.contents_located = info.contents_located;
     report.headings_from_text = a.headings.text_added;
     report.running_titles = a.structure.running_titles;
     report.page_parts = a.structure.page_parts;

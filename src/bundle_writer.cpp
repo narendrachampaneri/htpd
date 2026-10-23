@@ -405,6 +405,12 @@ std::string conversion_notes(const BundleInfo& info) {
         case HeadingSource::FontSize:
             md += "* Headings were detected in the text from font size only.\n";
             break;
+        case HeadingSource::Contents:
+            md += std::format("* Headings come from the table of contents printed in the document ({} entries, {} "
+                              "found as titles in the text; `heading_from: contents`). The number of a heading is the "
+                              "one of the contents, also where the text shows the title without it.\n",
+                              info.contents_entries, info.contents_located);
+            break;
         case HeadingSource::None:
             md += "* No headings were found; the text is split by page.\n";
             break;
@@ -446,10 +452,10 @@ std::string conversion_notes(const BundleInfo& info) {
         md += std::format("* {} characters have no Unicode mapping in the PDF; some text may be "
                           "wrong.\n", info.unmapped);
     }
-    if (info.pages_without_text > 0) {
-        md += std::format("* {} of {} pages {} no text layer (scanned pages or pure figures); "
-                          "such pages need OCR, which HTPD {} does not do.\n", info.pages_without_text,
-                          info.meta.page_count, info.pages_without_text == 1 ? "has" : "have", kVersion);
+    if (info.pages_without_text > info.ocr.pages_unread) {
+        const std::size_t n = info.pages_without_text - info.ocr.pages_unread;
+        md += std::format("* {} of {} pages {} no text (empty pages, or pages with pictures only).\n", n,
+                          info.meta.page_count, n == 1 ? "has" : "have");
     }
     md += "* Table rows are kept as lines of text with ` | ` between cells (blocks marked `text`). "
           "A cell with several lines is joined, and a table stored cell by cell is put together by "
@@ -472,9 +478,18 @@ std::string conversion_notes(const BundleInfo& info) {
                           info.ocr.words_dropped == 1 ? "" : "s", info.ocr.words_dropped == 1 ? "was" : "were");
     }
     if (info.ocr.pages_unread > 0) {
-        md += std::format("* {} page{} without a text layer (scanned) could not be read: no OCR program was "
-                          "available. Their content is missing from this file.\n",
-                          info.ocr.pages_unread, info.ocr.pages_unread == 1 ? "" : "s");
+        md += std::format("* {} page{} without a text layer (scanned, or text drawn as shapes) could not be read as "
+                          "text: no OCR program was available.", info.ocr.pages_unread,
+                          info.ocr.pages_unread == 1 ? "" : "s");
+        if (info.ocr.page_pictures == info.ocr.pages_unread) {
+            md += std::format(" {} kept as {} of the whole page (figures \"Page N: picture of the whole page\"): "
+                              "an AI that sees pictures can read {} there; a search of the text cannot.\n",
+                              info.ocr.pages_unread == 1 ? "It is" : "They are",
+                              info.ocr.pages_unread == 1 ? "a picture" : "pictures",
+                              info.ocr.pages_unread == 1 ? "it" : "them");
+        } else {
+            md += " Their content is missing from this file.\n";
+        }
     }
     if (!info.figures.empty()) {
         md += std::format("* {} figure{} (pictures and drawings) {} stored as PNG pictures: in a bundle folder in "

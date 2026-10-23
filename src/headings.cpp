@@ -695,6 +695,291 @@ void refine_with_text_headings(HeadingResult& result, const HeadingResult& from_
     std::ranges::stable_sort(result.headings, {}, &Heading::line_index);
 }
 
+// ---- a printed table of contents --------------------------------------
+//
+// Many PDFs have no bookmarks but print a table of contents, and their
+// headings in the text may have no number at all (a web page printed to PDF:
+// "4.1 iMX93 Processor" in the contents, "iMX93 Processor" above the text).
+// The entries of the contents are read - also several on one line - and each
+// title is looked for later in the text, in order.
+
+struct NumberToken {
+    std::size_t line = 0;
+    std::size_t word = 0;               // index of the word in the line
+    std::vector<int> parts;
+    std::string text;                   // "3.2"
+    std::string glued;                  // "X1-CCS1" of "8.1X1-CCS1", else ""
+};
+
+// "3", "3.2", "3.2.", "A.1", and "8.1X1-CCS1" (a number with the title glued to it).
+std::optional<NumberToken> number_token(std::string_view w) {
+    NumberToken t;
+    std::size_t i = 0;
+    if (w.size() >= 3 && is_upper(w[0]) && w[1] == '.' && is_digit(w[2])) {
+        t.parts.push_back(kLetterBase + (w[0] - 'A'));
+        i = 2;
+    }
+    while (true) {
+        std::size_t digits = 0;
+        int value = 0;
+        while (i < w.size() && is_digit(w[i]) && digits < 3) {
+            value = value * 10 + (w[i] - '0');
+            ++i;
+            ++digits;
+        }
+        if (digits == 0 || (i < w.size() && is_digit(w[i]))) return std::nullopt;
+        t.parts.push_back(value);
+        if (i + 1 < w.size() && w[i] == '.' && is_digit(w[i + 1])) {
+            ++i;
+            continue;
+        }
+        break;
+    }
+    if (t.parts.size() > kMaxDepth || t.parts.front() > 99 || t.parts.front() == 0) return std::nullopt;
+    t.text = std::string(w.substr(0, i));
+    if (i < w.size() && w[i] == '.') ++i;
+    if (i < w.size()) {
+        if (t.parts.size() < 2 || !is_upper(w[i])) return std::nullopt;   // "3D", "5V" are no numbers of a title
+        t.glued = std::string(w.substr(i));
+    }
+    return t;
+}
+
+std::vector<std::string_view> split_words(std::string_view s) {
+    std::vector<std::string_view> out;
+    for (std::size_t i = 0; i < s.size();) {
+        while (i < s.size() && s[i] == ' ') ++i;
+        const std::size_t start = i;
+        while (i < s.size() && s[i] != ' ') ++i;
+        if (i > start) out.push_back(s.substr(start, i - start));
+    }
+    return out;
+}
+
+bool is_leader_or_page(std::string_view w) {
+    if (text::is_all_digits(w) || roman_value(w) > 0) return true;
+    return !w.empty() && std::ranges::all_of(w, [](char c) { return c == '.' || c == '_' || c == '-'; });
+}
+
+// `next` comes after `prev` in contents order with only a few entries left
+// out between them (4.5 -> 6, 6 -> 7.2): entries hidden or lost on the page.
+bool skips_little(std::span<const int> prev, std::span<const int> next) {
+    std::size_t d = 0;
+    while (d < prev.size() && d < next.size() && prev[d] == next[d]) ++d;
+    if (d == next.size()) return false;                         // the same number, or a level up of it
+    if (d < prev.size() && (next[d] <= prev[d] || next[d] - prev[d] > 3)) return false;
+    if (d == prev.size() && next[d] > 3) return false;          // deeper: starts near 1
+    for (std::size_t k = d + 1; k < next.size(); ++k) {
+        if (next[k] > 3) return false;
+    }
+    return true;
+}
+
+struct ContentsEntry {
+    NumberToken number;
+    std::string title;
+    std::string first_line_title;   // the title as far as the entry's own line goes (the rest may be other text)
+    std::size_t last_line = 0;   // the last line of the contents that holds this entry
+};
+
+// The longest run of numbers in contents order (1, 2, 2.1, 2.2, 3 ...), each
+// close to the one before it: a table of contents. Empty when there is none.
+std::vector<ContentsEntry> find_contents(std::span<const Line> lines) {
+    constexpr std::size_t kMaxGapWords = 20;   // words of one title (and its page number)
+    constexpr std::size_t kMaxGapLines = 6;
+    constexpr std::size_t kMinEntries = 6;
+
+    std::vector<std::vector<std::string_view>> words(lines.size());
+    std::vector<NumberToken> tokens;
+    for (std::size_t li = 0; li < lines.size(); ++li) {
+        if (lines[li].figure != 0 || lines[li].ocr == Line::Ocr::Picture) continue;
+        words[li] = split_words(lines[li].text);
+        for (std::size_t wi = 0; wi < words[li].size(); ++wi) {
+            if (auto t = number_token(words[li][wi])) {
+                t->line = li;
+                t->word = wi;
+                tokens.push_back(std::move(*t));
+            }
+        }
+    }
+    // Words from token a to token b (a before b).
+    const auto words_between = [&](const NumberToken& a, const NumberToken& b) {
+        if (a.line == b.line) return b.word - a.word - 1;
+        std::size_t n = words[a.line].size() - a.word - 1;
+        for (std::size_t li = a.line + 1; li < b.line; ++li) n += words[li].size();
+        return n + b.word;
+    };
+
+    std::vector<std::size_t> best;
+    for (std::size_t s = 0; s < tokens.size(); ++s) {
+        if (tokens[s].parts != std::vector<int>{1} && tokens[s].parts != std::vector<int>{1, 1}) continue;
+        std::vector<std::size_t> chain{s};
+        for (std::size_t k = s + 1; k < tokens.size(); ++k) {
+            const NumberToken& last = tokens[chain.back()];
+            if (tokens[k].line > last.line + kMaxGapLines || words_between(last, tokens[k]) > kMaxGapWords) break;
+            if (is_successor(last.parts, tokens[k].parts) || skips_little(last.parts, tokens[k].parts)) chain.push_back(k);
+        }
+        if (chain.size() >= kMinEntries) s = chain.back();   // the next contents can only start after this one
+        if (chain.size() > best.size()) best = std::move(chain);
+    }
+    if (best.size() < kMinEntries) return {};
+
+    std::vector<ContentsEntry> out;
+    for (std::size_t c = 0; c < best.size(); ++c) {
+        const NumberToken& t = tokens[best[c]];
+        ContentsEntry e{t, {}, {}, t.line};
+        std::vector<std::string_view> title;
+        std::size_t own = 0;   // words of the title on the entry's own line
+        if (!t.glued.empty()) {
+            title.push_back(t.glued);
+            ++own;
+        }
+        std::size_t li = t.line, wi = t.word + 1;
+        const NumberToken* next = c + 1 < best.size() ? &tokens[best[c + 1]] : nullptr;
+        while (li < lines.size()) {
+            if (next && li == next->line && wi >= next->word) break;
+            if (wi >= words[li].size()) {
+                if (!next) break;   // the last entry ends with its line
+                ++li;
+                wi = 0;
+                continue;
+            }
+            title.push_back(words[li][wi]);
+            if (li == t.line) ++own;
+            e.last_line = li;
+            ++wi;
+        }
+        const auto join = [&](std::size_t n) {
+            std::vector<std::string_view> w(title.begin(), title.begin() + static_cast<std::ptrdiff_t>(n));
+            while (!w.empty() && is_leader_or_page(w.back())) w.pop_back();   // ". . . . 12"
+            std::string joined;
+            for (const std::string_view x : w) {
+                if (!joined.empty()) joined += ' ';
+                joined += x;
+            }
+            return joined;
+        };
+        e.title = join(title.size());
+        e.first_line_title = join(own);
+        if (text::word_count(e.title) > 14) return {};   // text, not a contents entry
+        out.push_back(std::move(e));
+    }
+    std::size_t words_total = 0;
+    for (const ContentsEntry& e : out) words_total += text::word_count(e.title);
+    if (words_total > 8 * out.size()) return {};
+    return out;
+}
+
+HeadingResult detect_from_contents(std::span<const Line> lines) {
+    HeadingResult result;
+    result.body_size = body_font_size(lines);
+    const std::vector<ContentsEntry> entries = find_contents(lines);
+    if (entries.empty()) return result;
+    const std::size_t after = entries.back().last_line + 1;   // headings come after the contents
+
+    std::vector<std::string> skeletons(lines.size());
+    for (std::size_t i = after; i < lines.size(); ++i) skeletons[i] = text::skeleton(lines[i].text);
+
+    // Every place each title stands alone on a line (or two), after the contents.
+    struct Place {
+        std::size_t line, count;
+        double weight;
+    };
+    std::vector<std::vector<Place>> places(entries.size());
+    for (std::size_t e = 0; e < entries.size(); ++e) {
+        const std::string number_sk = text::skeleton(entries[e].number.text);
+        std::vector<std::string> wanted;   // the title, with and without its number
+        for (const std::string& t : {entries[e].title, entries[e].first_line_title}) {
+            const std::string sk = text::skeleton(t);
+            if (sk.size() < 2) continue;
+            wanted.push_back(sk);
+            wanted.push_back(number_sk + sk);
+        }
+        if (wanted.empty()) continue;
+        const auto equal_any = [&](const std::string& x) { return std::ranges::find(wanted, x) != wanted.end(); };
+        const auto prefix_any = [&](const std::string& x) {
+            return std::ranges::any_of(wanted, [&](const std::string& w) { return w.starts_with(x); });
+        };
+        for (std::size_t i = after; i < lines.size(); ++i) {
+            if (lines[i].figure != 0 || lines[i].ocr == Line::Ocr::Picture || skeletons[i].empty()) continue;
+            std::string joined;
+            for (std::size_t k = 0; k < 2 && i + k < lines.size(); ++k) {
+                joined += skeletons[i + k];
+                if (equal_any(joined)) {
+                    const Line& l = lines[i];
+                    const double style = (l.size >= result.body_size * 1.08f ? 0.2 : 0.0) + (l.bold ? 0.1 : 0.0);
+                    places[e].push_back({i, k + 1, 1.0 + style});
+                    break;
+                }
+                if (!prefix_any(joined)) break;
+            }
+        }
+    }
+
+    // The best choice of places in the order of the contents (weighted
+    // longest increasing sequence of lines).
+    struct Pick {
+        double score = 0;
+        long prev_entry = -1, prev_place = -1;
+    };
+    std::vector<std::vector<Pick>> pick(entries.size());
+    double best_score = 0;
+    long best_e = -1, best_p = -1;
+    for (std::size_t e = 0; e < entries.size(); ++e) {
+        pick[e].resize(places[e].size());
+        for (std::size_t q = 0; q < places[e].size(); ++q) {
+            Pick here{places[e][q].weight, -1, -1};
+            for (std::size_t f = 0; f < e; ++f) {
+                for (std::size_t r = 0; r < places[f].size(); ++r) {
+                    if (places[f][r].line + places[f][r].count <= places[e][q].line &&
+                        pick[f][r].score + places[e][q].weight > here.score) {
+                        here = {pick[f][r].score + places[e][q].weight, static_cast<long>(f), static_cast<long>(r)};
+                    }
+                }
+            }
+            pick[e][q] = here;
+            if (here.score > best_score) {
+                best_score = here.score;
+                best_e = static_cast<long>(e);
+                best_p = static_cast<long>(q);
+            }
+        }
+    }
+    std::vector<std::pair<std::size_t, std::size_t>> chosen;   // entry, place
+    for (long e = best_e, q = best_p; e >= 0;) {
+        chosen.emplace_back(static_cast<std::size_t>(e), static_cast<std::size_t>(q));
+        const Pick& pk = pick[static_cast<std::size_t>(e)][static_cast<std::size_t>(q)];
+        e = pk.prev_entry;
+        q = pk.prev_place;
+    }
+    // Most titles of the contents must be found: otherwise it was a list, not the contents.
+    if (chosen.size() < 4 || 2 * chosen.size() < entries.size()) return result;
+    std::ranges::reverse(chosen);
+
+    for (const auto& [e, q] : chosen) {
+        const ContentsEntry& entry = entries[e];
+        const Place& place = places[e][q];
+        Heading h;
+        h.page = lines[place.line].page;
+        h.line_index = place.line;
+        h.line_count = place.count;
+        std::string text;
+        for (std::size_t k = 0; k < place.count; ++k) {
+            if (k > 0) text += ' ';
+            text += text::collapse_spaces(lines[place.line + k].text);
+        }
+        std::string_view rest;
+        h.title = parse_section_number(text, rest) ? text : entry.number.text + " " + text;
+        h.number = entry.number.text;
+        h.level = static_cast<int>(std::min(entry.number.parts.size(), kMaxDepth));
+        h.source = HeadingSource::Contents;
+        result.headings.push_back(std::move(h));
+    }
+    result.source = HeadingSource::Contents;
+    result.contents_entries = entries.size();
+    return result;
+}
+
 }  // namespace
 
 std::optional<SectionNumber> parse_section_number(std::string_view line, std::string_view& rest) {
@@ -761,7 +1046,18 @@ HeadingResult detect_headings(std::span<const Line> lines, std::span<const Outli
     }));
     const bool use_bookmarks = options.mode == HeadingMode::Bookmarks ||
                                (options.mode == HeadingMode::Auto && usable >= options.min_bookmarks);
-    if (!use_bookmarks || usable == 0) return detect_from_text(lines);
+    if (!use_bookmarks || usable == 0) {
+        HeadingResult from_text = detect_from_text(lines);
+        // A printed table of contents whose titles are found in the text wins
+        // over headings found by their look, unless those are as many and numbered.
+        HeadingResult from_contents = detect_from_contents(lines);
+        const bool numbered = from_text.source == HeadingSource::Numbering;
+        if (!from_contents.headings.empty() &&
+            (!numbered || from_contents.headings.size() > from_text.headings.size())) {
+            return from_contents;
+        }
+        return from_text;
+    }
 
     HeadingResult result = detect_from_bookmarks(lines, outline, page_transforms);
     if (options.mode == HeadingMode::Auto) {

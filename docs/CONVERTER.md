@@ -79,14 +79,20 @@ does not need it.
 
 ### OCR
 
-A page with (almost) no text that shows something is a scan: the converter
+A page with (almost) no text that shows something is a scan - or a page
+whose letters are drawn as shapes (a web page printed to PDF): the converter
 draws it at 300 dpi and Tesseract reads all of it. On a page that has text,
 each picture larger than about 2 x 0.5 cm is read when no text of the PDF
 lies on it (a scan with a hidden text layer is not read twice). Several
 Tesseract processes run at the same time, one per CPU core. Rules:
 
 * A word Tesseract is not sure of (confidence below 60) is left out, not
-  guessed; the notes count them.
+  guessed; the notes count them. In a line it reads well (7 of 10 words
+  sure) a word with confidence 30 or more is kept when it has the form of a
+  real word (`GB`, `eMMC`, `HVSW1_2_OUT`, not `PLMUuy`).
+* The mark of a list item - a small dot, ring or square before the words,
+  which OCR reads as "e", "o" or not at all - becomes `•`, `◦` or `▪`, and
+  each item its own paragraph.
 * Text of the PDF always wins: an OCR line that lies on text of the PDF is
   dropped.
 * Text read from a picture on a page with text is the content of a figure:
@@ -94,6 +100,9 @@ Tesseract processes run at the same time, one per CPU core. Rules:
 * Text read by OCR never becomes a heading by its size alone; on a scanned
   page a numbered heading ("3.2 Clock tree") does, checked by its sequence.
 * The pages that hold OCR text are listed per section (`ocr_pages`).
+* Without Tesseract such a page is not lost: it is stored as a picture of
+  the whole page (a figure "Page N: picture of the whole page"), so an AI
+  that sees pictures can still read it. Only a search of the text cannot.
 
 Speed: about 1-3 s per scanned page per core. Pictures on normal pages
 cost little; the 5600-page i.MX 93 manual, with 41 pictures read, takes
@@ -181,7 +190,7 @@ htpd info manual.pdf                     # show what would be found, write nothi
 | Option | What it does |
 |---|---|
 | `--single` | One `.htpd` file instead of a folder: reading rules for the AI, the contents, every section with its pages ([FORMAT.md](FORMAT.md) section 11). |
-| `--headings auto` | Default. Uses the bookmarks of the PDF, and adds numbered headings found in the text below them. |
+| `--headings auto` | Default. Uses the bookmarks of the PDF, and adds numbered headings found in the text below them. Without bookmarks: a table of contents printed in the document, or the headings found in the text. |
 | `--headings bookmarks` | Only the bookmarks. |
 | `--headings text` | Ignores bookmarks; finds headings in the text. |
 | `--headings none` | No headings: one section per page. |
@@ -232,7 +241,7 @@ One PDF goes through seven steps. Each step is one small file.
 | 1c. Figures | `src/figures.cpp`, `src/png.cpp` | The pictures and drawings of each page that are figures, with their caption; drawn by PDFium and packed as PNG (several at a time). See "Figures" above. |
 | 2. Lines | `src/layout.cpp` | Characters become lines. Wide gaps are marked (table columns); raised and lowered numbers stay raised (2³¹). |
 | 3. Headers and footers | `src/furniture.cpp` | Lines that repeat at the page edge on many pages are taken out and reported. |
-| 4. Headings | `src/headings.cpp` | From the bookmarks of the PDF, and from the text: section numbers, font size, bold, another font. |
+| 4. Headings | `src/headings.cpp` | From the bookmarks of the PDF; or from a table of contents printed in the document, whose titles are looked for in the text after it, in order (also when the text shows them without their number); or from the text: section numbers, font size, bold, another font. |
 | 4b. Structure | `src/structure.cpp` | For documents with few headings: a running header that changes starts a section with its text as title. Text longer than a few pages is cut into parts of about 2 pages, where a sentence ends (FORMAT.md 3.3). |
 | 5. Sections | `src/sections.cpp` | The text is cut at the headings. Lines become paragraphs, table rows (wrapped cells and tables stored cell by cell are put together) and code blocks. The tree of sections is built. |
 | 6. Links | `src/links.cpp` | The links of the pages become links from section to section. |
@@ -320,8 +329,8 @@ honest about the rest.
   order. This was not tested.
 * **OCR needs Tesseract.** Scanned pages and words inside pictures are read
   only when the free Tesseract program is installed (see "OCR" above).
-  Without it a scanned page has no text; the converter counts such pages
-  and tells you. OCR text may hold misread words, and Tesseract reads small
+  Without it a scanned page has no text - it is kept as a picture of the
+  page, which a search of the text cannot find; the converter tells you. OCR text may hold misread words, and Tesseract reads small
   or blurred text and handwriting badly; the bundle marks the pages
   (`ocr_pages`).
 * **Tables are rows of text.** Cells are split by ` | `. A cell that wraps
@@ -343,8 +352,11 @@ honest about the rest.
   right for almost all PDFs, also with two columns. The converter does not
   work out columns by itself.
 * **Headings.** Bookmarks are the best source. Without bookmarks the
-  converter needs numbered headings (`2.1 Supply`) or headings in a larger
-  font. A document with neither gets one section per page; one with few
+  converter uses a table of contents printed in the document (its titles
+  must stand alone on a line in the text), numbered headings (`2.1 Supply`)
+  or headings in a larger font. A title the page hides (under a bar of a
+  web page printed to PDF) cannot be found: its text joins the section
+  before it. A document with neither gets one section per page; one with few
   headings still gets parts: where its running header changes, and parts
   of about 2 pages, titled by their pages.
 * **Headers and footers** are only searched in documents with four or more

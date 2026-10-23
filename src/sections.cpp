@@ -600,7 +600,10 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
             const float size = std::max(previous->size, 1.0f);
             const float step = line.baseline - previous->baseline;
             const bool moved_to_new_area = line.page != previous->page || step < -0.5f * size;
-            if (starts_list_item(line.text) || std::fabs(line.size - previous->size) > 0.1f * size) {
+            // The height of a line read by OCR depends on its letters ("enclave." has no
+            // tall ones), so only a clear change of size starts a new paragraph there.
+            const float same_size = line.ocr == Line::Ocr::Page && previous->ocr == Line::Ocr::Page ? 0.3f : 0.1f;
+            if (starts_list_item(line.text) || std::fabs(line.size - previous->size) > same_size * size) {
                 start_new = true;
             } else if (moved_to_new_area) {
                 // Next page or next column: the paragraph continues unless the

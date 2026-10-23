@@ -611,6 +611,63 @@ TEST(headings_from_text_follow_style_and_sequence) {
     CHECK_EQ(result.headings[2].number, std::string("1.1"));
 }
 
+TEST(headings_from_a_printed_table_of_contents) {
+    // A web page printed to PDF: the contents list several entries on a line
+    // (one hidden under a bar of the page), and the headings in the text have
+    // no numbers.
+    std::vector<Line> lines;
+    float y = 100;
+    const auto add = [&](std::string text, float size = 10) {
+        lines.push_back(make_line(0, std::move(text), y, size));
+        y += 20;
+    };
+    add("Charge Controller Datasheet", 20);
+    add("Table of contents");
+    add("1 Table of contents 2 Revisions 3 Introduction 3.1 Intention 3.2 PCB");
+    add("3.3 Housing 4 Architecture 4.1 iMX93 Processor");
+    add("4.2 Coprocessor 6 Operational");       // 5 is hidden on the page
+    add("Defines");                               // a bar of the page, not part of a title
+    add("7.2 Recommended operating conditions 8 Pinouts 8.1X1-CCS1");
+    add("Revisions", 14);
+    add("Initial release.");
+    add("Introduction", 14);
+    add("Intention", 12);
+    add("The controller is meant for chargers. The PCB is described below.");
+    add("PCB", 12);
+    add("Housing", 12);
+    add("The housing is made of metal.");
+    add("Architecture", 14);
+    add("iMX93 Processor", 12);
+    add("Coprocessor", 12);
+    add("Operational", 14);
+    add("Recommended operating conditions", 12);
+    add("Pinouts", 14);
+    add("X1-CCS1", 12);
+    add("Pin 1 is CP.");
+
+    const HeadingResult result = detect_headings(lines, {}, {});
+    CHECK(result.source == HeadingSource::Contents);
+    CHECK_EQ(result.contents_entries, std::size_t{13});
+    const std::vector<std::string> expected = {
+        "2 Revisions",  "3 Introduction",    "3.1 Intention",       "3.2 PCB",
+        "3.3 Housing",  "4 Architecture",    "4.1 iMX93 Processor", "4.2 Coprocessor",
+        "6 Operational", "7.2 Recommended operating conditions", "8 Pinouts", "8.1 X1-CCS1"};
+    REQUIRE(titles(result.headings) == expected);
+    CHECK_EQ(result.headings[3].number, std::string("3.2"));
+    CHECK_EQ(result.headings[3].level, 2);
+    CHECK_EQ(result.headings[3].line_index, std::size_t{12});   // the line "PCB", not the word in the sentence
+    CHECK(result.headings[9].source == HeadingSource::Contents);
+
+    // A numbered list is no table of contents: its items are not found again as titles.
+    std::vector<Line> list;
+    y = 100;
+    for (const char* t : {"Steps:", "1 Open 2 Plug in 3 Start 4 Wait 5 Stop 6 Unplug 7 Close", "That is all."}) {
+        list.push_back(make_line(0, t, y));
+        y += 20;
+    }
+    CHECK(detect_headings(list, {}, {}).source != HeadingSource::Contents);
+}
+
 TEST(bold_at_text_size_marks_a_heading) {
     std::vector<Line> lines;
     float y = 100;
@@ -1637,6 +1694,42 @@ TEST(ocr_lines_come_from_the_words_tesseract_is_sure_of) {
     CHECK(figure.lines[0].ocr == Line::Ocr::Picture);
 }
 
+TEST(ocr_bullets_and_words_it_is_a_little_unsure_of) {
+    const std::string head =
+        "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n";
+    const std::string tsv = head +
+        // a small dot read as "e", then a gap: a bullet
+        "5\t1\t1\t1\t1\t1\t40\t45\t20\t20\t58\te\n"
+        "5\t1\t1\t1\t1\t2\t90\t30\t200\t50\t95\tMemory:\n"
+        // a small ring OCR is unsure of: a hollow bullet; "GB" and "eMMC" kept in a line read well
+        "5\t1\t1\t1\t2\t1\t80\t130\t20\t20\t20\to\n"
+        "5\t1\t1\t1\t2\t2\t130\t115\t40\t50\t93\tthe\n"
+        "5\t1\t1\t1\t2\t3\t180\t115\t30\t50\t35\t8\n"
+        "5\t1\t1\t1\t2\t4\t220\t115\t60\t50\t35\tGB\n"
+        "5\t1\t1\t1\t2\t5\t290\t115\t110\t50\t35\teMMC\n"
+        "5\t1\t1\t1\t2\t6\t410\t115\t140\t50\t91\tstorage\n"
+        "5\t1\t1\t1\t2\t7\t560\t115\t60\t50\t90\tis\n"
+        "5\t1\t1\t1\t2\t8\t630\t115\t60\t50\t92\tfast.\n"
+        "5\t1\t1\t1\t2\t9\t700\t115\t100\t50\t20\tPLMUuy\n"   // too unsure, and not a word's form
+        "5\t1\t1\t1\t2\t10\t820\t115\t60\t50\t90\tand\n"
+        "5\t1\t1\t1\t2\t11\t890\t115\t60\t50\t90\tkeeps\n"
+        "5\t1\t1\t1\t2\t12\t960\t115\t60\t50\t90\tthe\n"
+        "5\t1\t1\t1\t2\t13\t1030\t115\t60\t50\t90\tlogs\n"
+        "5\t1\t1\t1\t2\t14\t1100\t115\t60\t50\t90\tof\n"
+        "5\t1\t1\t1\t2\t15\t1170\t115\t60\t50\t90\tevery\n"
+        "5\t1\t1\t1\t2\t16\t1240\t115\t60\t50\t90\tsession\n"
+        "5\t1\t1\t1\t2\t17\t1310\t115\t60\t50\t90\there\n"
+        // a real "a" at the start of a line stays a word
+        "5\t1\t1\t1\t3\t1\t40\t220\t25\t28\t90\ta\n"
+        "5\t1\t1\t1\t3\t2\t75\t200\t120\t50\t92\tsignal\n";
+    const TsvLines r = lines_from_tsv(tsv, 0, Box{0, 0, 300, 100}, 300.0f / 72.0f, 60, true);
+    REQUIRE(r.lines.size() == 3);
+    CHECK_EQ(r.lines[0].text, std::string("• Memory:"));
+    CHECK_EQ(r.lines[1].text, std::string("◦ the 8 GB eMMC storage is fast. and keeps the logs of every session here"));
+    CHECK_EQ(r.lines[2].text, std::string("a signal"));
+    CHECK_EQ(r.words_dropped, std::size_t{1});
+}
+
 TEST(ocr_pictures_are_written_as_pgm) {
     Image image;
     image.width = 3;
@@ -2460,7 +2553,12 @@ TEST(end_to_end_ocr_reads_pictures_and_scanned_pages) {
     REQUIRE(off.has_value());
     CHECK_EQ(off->ocr.pages_unread, std::size_t{1});
     CHECK(!all_section_text(options.output_dir).contains("fuse"));
-    CHECK(read_file(options.output_dir / "document.md").contains("could not be read: no OCR program"));
+    const std::string notes = read_file(options.output_dir / "document.md");
+    CHECK(notes.contains("could not be read as text: no OCR program"));
+    // ... but the page is kept as a picture, so nothing of it is lost
+    CHECK_EQ(off->ocr.page_pictures, std::size_t{1});
+    CHECK(notes.contains("kept as a picture of the whole page"));
+    CHECK(all_section_text(options.output_dir).contains("Page 2: picture of the whole page (it has no text layer)"));
 }
 
 TEST(end_to_end_links) {

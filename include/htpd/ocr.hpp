@@ -46,6 +46,7 @@ struct OcrReport {
     std::size_t words_dropped = 0;      // words left out: OCR was not sure of them
     std::size_t failed = 0;             // pictures the program could not read
     std::size_t pages_unread = 0;       // pages without text that were not read (OCR off or missing)
+    std::size_t page_pictures = 0;      // ... of them kept as a picture of the whole page (a figure)
     std::vector<int> pages;             // 0-based pages that hold text read by OCR
 };
 

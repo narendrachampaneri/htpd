@@ -92,11 +92,56 @@ std::string pgm_bytes(const Image& image) {
     return out;
 }
 
+// A word as words are written: all small letters, all capitals, a capital
+// first, digits (with . , - and units glued), or a name of letters, digits and
+// "_" (a signal name). Punctuation may stand around it.
+bool well_formed_word(std::string_view w) {
+    while (!w.empty() && std::string_view("([\"'").contains(w.front())) w.remove_prefix(1);
+    while (!w.empty() && std::string_view(".,;:)]\"'!?").contains(w.back())) w.remove_suffix(1);
+    if (w.empty() || w.size() > 40) return false;
+    std::size_t lower = 0, upper = 0, digit = 0, other = 0, case_changes = 0;
+    int last_case = 0;   // 1 lower, 2 upper
+    for (std::size_t i = 0; i < w.size(); ++i) {
+        const char c = w[i];
+        int this_case = 0;
+        if (c >= 'a' && c <= 'z') { ++lower; this_case = 1; }
+        else if (c >= 'A' && c <= 'Z') { ++upper; this_case = 2; }
+        else if (c >= '0' && c <= '9') ++digit;
+        else if (c == '_' || c == '-' || c == '.' || c == ',' || c == '/' || c == '%') {}
+        else ++other;
+        if (this_case != 0) {
+            if (last_case != 0 && this_case != last_case && i > 1) ++case_changes;
+            last_case = this_case;
+        }
+    }
+    if (other > 0 || lower + upper + digit == 0) return false;
+    // "eMMC", "iMX93", "GPIOs": one change of case is how names are written; more is OCR noise
+    return case_changes <= 1;
+}
+
+// The bullet a small first word of an OCR line stands for, or nullptr. `h` is
+// the usual height of the line's words (pixels).
+const char* bullet_mark(std::string_view text, int width, int height, int gap, int h) {
+    if (h <= 0 || 10 * width > 7 * h || 10 * height > 7 * h || 4 * gap < h) return nullptr;
+    // Words that are words: a real "a" or "I" at the start of a line stays.
+    static constexpr std::string_view kHollow[] = {"o", "O", "0", "\xC2\xB0", "\xE2\x97\xA6"};   // ° ◦
+    static constexpr std::string_view kSquare[] = {"=", "\xE2\x96\xA0", "\xE2\x96\xAA", "\xE2\x96\xA1", "a"};
+    static constexpr std::string_view kFilled[] = {"e", "*", "\xC2\xAB", "\xC2\xBB", "\xC2\xA9", "\xC2\xAE", "@",
+                                                   "\xE2\x80\xA2", "\xC2\xB7", "-", "~", "\xC2\xA2", "+"};
+    if (std::ranges::find(kHollow, text) != std::end(kHollow)) return "\xE2\x97\xA6";   // ◦
+    if (text != "a" && std::ranges::find(kSquare, text) != std::end(kSquare)) return "\xE2\x96\xAA";   // ▪
+    if (std::ranges::find(kFilled, text) != std::end(kFilled)) return "\xE2\x80\xA2";   // •
+    if (text.size() <= 2 && !has_letter_or_digit(text)) return "\xE2\x80\xA2";
+    return nullptr;
+}
+
 TsvLines lines_from_tsv(std::string_view tsv, int page, const Box& region, float scale, int min_word_confidence,
                         bool whole_page) {
     struct Word {
         int left, top, width, height;
         std::string text;
+        bool unsure = false;   // below the confidence: left out, unless it is a bullet mark
+        int confidence = 0;
     };
     TsvLines result;
     std::map<std::tuple<int, int, int, int>, std::vector<Word>> by_line;   // page, block, paragraph, line
@@ -131,15 +176,40 @@ TsvLines lines_from_tsv(std::string_view tsv, int page, const Box& region, float
         // with decimals: its whole part is enough)
         const std::string word = text::collapse_spaces(text::sanitize_utf8(f[11]));
         if (word.empty()) continue;
-        if (v[9] < min_word_confidence || !has_letter_or_digit(word)) {
-            ++result.words_dropped;
-            continue;
-        }
-        by_line[{v[0], v[1], v[2], v[3]}].push_back({v[5], v[6], v[7], v[8], word});
+        const bool unsure = v[9] < min_word_confidence || !has_letter_or_digit(word);
+        by_line[{v[0], v[1], v[2], v[3]}].push_back({v[5], v[6], v[7], v[8], word, unsure, v[9]});
     }
 
     for (auto& [key, words] : by_line) {
         std::ranges::sort(words, {}, &Word::left);
+        // The mark of a list item: a small first "word" with a gap after it,
+        // which OCR reads as "e", "o", "«" or not at all. It becomes the bullet.
+        if (words.size() >= 2) {
+            std::vector<int> heights;
+            for (std::size_t k = 1; k < words.size(); ++k) heights.push_back(words[k].height);
+            std::ranges::nth_element(heights, heights.begin() + static_cast<std::ptrdiff_t>(heights.size() / 2));
+            const int h = heights[heights.size() / 2];
+            Word& first = words.front();
+            const int gap = words[1].left - (first.left + first.width);
+            if (const char* bullet = bullet_mark(first.text, first.width, first.height, gap, h)) {
+                first.text = bullet;
+                first.unsure = false;
+            }
+        }
+        // A word OCR is a little unsure of is kept in a line it reads well
+        // (most words sure) when it has the form of a real word: "GB", "eMMC",
+        // "HVSW1_2_OUT" - not "PLMUuy" (a line half covered on the page).
+        {
+            const auto sure = std::ranges::count_if(words, [](const Word& w) { return !w.unsure; });
+            if (sure >= 3 && 10 * sure >= 7 * static_cast<long>(words.size())) {
+                for (Word& w : words) {
+                    if (w.unsure && w.confidence >= min_word_confidence / 2 && well_formed_word(w.text)) w.unsure = false;
+                }
+            }
+        }
+        result.words_dropped += static_cast<std::size_t>(std::ranges::count_if(words, &Word::unsure));
+        std::erase_if(words, [](const Word& w) { return w.unsure; });
+        if (words.empty()) continue;
         Line line;
         line.page = page;
         line.ocr = whole_page ? Line::Ocr::Page : Line::Ocr::Picture;

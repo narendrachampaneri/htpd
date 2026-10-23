@@ -134,6 +134,10 @@ int run_convert(Args& args) {
                               r.headings_from_text));
         }
     }
+    if (r.heading_source == htpd::HeadingSource::Contents) {
+        print(std::format("  contents        {} entries of the printed table of contents, {} found in the text\n",
+                          r.contents_entries, r.contents_located));
+    }
     if (r.running_titles > 0) {
         print(std::format("  + running titles {} sections where the page header changes\n", r.running_titles));
     }
@@ -168,8 +172,11 @@ int run_convert(Args& args) {
     }
     if (r.ocr.pages_unread > 0) {
         print(std::format("Warning: {} of {} pages {} no text layer (scans). Install the free Tesseract OCR "
-                          "program to read them (Ubuntu: sudo apt install tesseract-ocr).\n",
-                          r.ocr.pages_unread, r.pages, r.ocr.pages_unread == 1 ? "has" : "have"));
+                          "program to read them (Ubuntu: sudo apt install tesseract-ocr).{}\n",
+                          r.ocr.pages_unread, r.pages, r.ocr.pages_unread == 1 ? "has" : "have",
+                          r.ocr.page_pictures > 0 ? std::format(" Until then {} kept as pictures of the pages.",
+                                                                r.ocr.page_pictures == 1 ? "it is" : "they are")
+                                                  : std::string()));
     } else if (r.pages_without_text > 0) {
         print(std::format("Note: {} of {} pages {} no text at all (empty pages or pictures without text).\n",
                           r.pages_without_text, r.pages, r.pages_without_text == 1 ? "has" : "have"));

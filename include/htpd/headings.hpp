@@ -4,7 +4,10 @@
 //   1. PDF bookmarks  - written by the author, so they are the most reliable.
 //      Each bookmark is located in the page text so the heading line itself
 //      can be taken out of the body.
-//   2. The text       - numbered lines ("5.2.1 Clock tree") that are set in a
+//   2. A printed table of contents - its entries ("4.1 iMX93 Processor", also
+//      several on one line) located in the text after it, in order; the
+//      heading in the text may lack the number.
+//   3. The text       - numbered lines ("5.2.1 Clock tree") that are set in a
 //      larger, bolder or different font than the body text, checked against
 //      the numbering sequence.
 //
@@ -44,6 +47,7 @@ struct HeadingResult {
     std::size_t bookmarks_total = 0;      // when bookmarks were used
     std::size_t bookmarks_located = 0;    // ... of which were found in the text
     std::size_t text_added = 0;           // headings added below the bookmark level
+    std::size_t contents_entries = 0;     // entries of a printed table of contents (source Contents)
 };
 
 // `lines` are all lines of the document in reading order (page by page).
