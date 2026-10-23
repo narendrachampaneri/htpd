@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "htpd-reader"
-version = "0.1.2"
+version = "0.1.2.post1"
 description = "The HTPD reader: read HTPD files and find the exact text, with pages, that answers a question."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -35,6 +35,8 @@ Issues = "https://github.com/narendrachampaneri/htpd/issues"
 [project.scripts]
 htpd-read = "htpd_reader.cli:main"
 htpd-mcp = "htpd_reader.mcp:main"
+# `uvx htpd-reader` (how MCP clients start a server from PyPI) runs the MCP server
+htpd-reader = "htpd_reader.mcp:main"
 
 [tool.setuptools.packages.find]
 where = ["reader"]

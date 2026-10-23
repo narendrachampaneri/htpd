@@ -131,5 +131,18 @@ class Plugin(unittest.TestCase):
     def test_convert_script_names_the_release(self) -> None:
         script = (ROOT / "skills" / "convert" / "scripts" / "convert.sh").read_text(encoding="utf-8")
         from htpd_reader import __version__
-        self.assertIn(f'VERSION="{__version__}"', script)
+        # the release of the converter: the version without a ".postN" of the Python package
+        self.assertIn(f'VERSION="{__version__.split(".post")[0]}"', script)
         self.assertRegex(script, r'SHA256="[0-9a-f]{64}"')
+
+    def test_mcp_registry_entry(self) -> None:
+        """server.json lists the PyPI package; its README carries the name the registry checks."""
+        from htpd_reader import __version__
+        server = json.loads((ROOT / "server.json").read_text(encoding="utf-8"))
+        self.assertEqual(server["version"], __version__)
+        self.assertEqual(server["packages"][0]["identifier"], "htpd-reader")
+        self.assertEqual(server["packages"][0]["version"], __version__)
+        self.assertLessEqual(len(server["description"]), 100)
+        self.assertIn(f"<!-- mcp-name: {server['name']} -->", (ROOT / "README.md").read_text(encoding="utf-8"))
+        self.assertIn('htpd-reader = "htpd_reader.mcp:main"', (ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+

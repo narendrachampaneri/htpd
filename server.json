@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.narendrachampaneri/htpd",
+  "title": "HTPD",
+  "description": "Answer questions from PDFs converted to .htpd: exact text with pages, or 'Not found in this file.'",
+  "repository": {
+    "url": "https://github.com/narendrachampaneri/htpd",
+    "source": "github"
+  },
+  "version": "0.1.2.post1",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "htpd-reader",
+      "version": "0.1.2.post1",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

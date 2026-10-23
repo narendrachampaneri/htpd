@@ -175,6 +175,9 @@ chat.
 pip install htpd-reader        # the reader: htpd-read and htpd-mcp, nothing else needed
 ```
 
+The server is also listed in the official MCP registry as
+`io.github.narendrachampaneri/htpd` (MCP clients start it with `uvx htpd-reader`).
+
 ```sh
 claude mcp add htpd -- htpd-mcp --bundles ~/manuals        # Claude Code
 ```
@@ -369,3 +372,5 @@ with `libpdfium.so`, give them those files too.
 Made by **Narendra Champaneri**
 
 </div>
+
+<!-- mcp-name: io.github.narendrachampaneri/htpd -->

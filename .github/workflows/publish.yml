@@ -1,6 +1,7 @@
 name: publish
 
-# Puts the reader on PyPI (pip install htpd-reader) when a release is published.
+# Puts the reader on PyPI (pip install htpd-reader) when a release is published,
+# then lists its MCP server in the official MCP registry (server.json).
 # It uses PyPI's trusted publishing: no password or token is stored in GitHub.
 # One-time setup on pypi.org: Publishing > add a pending publisher with
 # owner narendrachampaneri, repository htpd, workflow publish.yml, environment pypi.
@@ -52,3 +53,21 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  mcp-registry:
+    name: List the MCP server in the MCP registry
+    needs: pypi
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write   # the registry knows the repository by GitHub's token: no secret
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install mcp-publisher
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+      - name: Publish server.json (PyPI may need a minute to show the new version)
+        run: |
+          ./mcp-publisher login github-oidc
+          for i in 1 2 3 4 5; do ./mcp-publisher publish && exit 0; sleep 60; done
+          exit 1
