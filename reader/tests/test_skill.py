@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -80,3 +81,55 @@ class SkillPackage(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SkillMcp(unittest.TestCase):
+    """`htpd.py mcp` runs the MCP server: how the Claude Code plugin starts it."""
+
+    def test_mcp_server_from_the_skill(self) -> None:
+        msgs = [
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+             "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "t", "version": "1"}}},
+            {"jsonrpc": "2.0", "method": "notifications/initialized"},
+            {"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+             "params": {"name": "ask", "arguments": {"bundle": str(SINGLE), "question": "What is the maximum bus voltage?"}}},
+        ]
+        env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HTPD_NO_YAML": "1"}
+        r = subprocess.run([sys.executable, "-I", str(ROOT / "skills" / "htpd" / "scripts" / "htpd.py"), "mcp"],
+                           input="".join(json.dumps(m) + "\n" for m in msgs), capture_output=True, text=True,
+                           env=env, cwd=ROOT, timeout=60)
+        replies = {d["id"]: d for d in map(json.loads, r.stdout.splitlines())}
+        self.assertEqual(replies[1]["result"]["serverInfo"]["name"], "htpd")
+        text = replies[2]["result"]["content"][0]["text"]
+        self.assertIn("page", text)
+
+
+class Plugin(unittest.TestCase):
+    """The Claude Code plugin: the repository is the marketplace and the plugin."""
+
+    def test_manifests(self) -> None:
+        plugin = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        market = json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+        self.assertEqual(plugin["name"], "htpd")
+        self.assertEqual([p["name"] for p in market["plugins"]], ["htpd"])
+        self.assertEqual(market["plugins"][0]["source"], "./")
+        args = plugin["mcpServers"]["htpd"]["args"]
+        self.assertTrue((ROOT / args[0].replace("${CLAUDE_PLUGIN_ROOT}/", "")).is_file())
+        # the version of the plugin, the pip package and the reader agree
+        from htpd_reader import __version__
+        self.assertEqual(plugin["version"], __version__)
+        self.assertIn(f'version = "{__version__}"', (ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        # no .mcp.json at the root: it would also load as a project server in this repository
+        self.assertFalse((ROOT / ".mcp.json").exists())
+
+    def test_skills(self) -> None:
+        for name in ("htpd", "convert"):
+            f = build_skill.front_matter((ROOT / "skills" / name / "SKILL.md").read_text(encoding="utf-8"))
+            self.assertEqual(f["name"], name)
+            self.assertLessEqual(len(f["description"]), 200)
+
+    def test_convert_script_names_the_release(self) -> None:
+        script = (ROOT / "skills" / "convert" / "scripts" / "convert.sh").read_text(encoding="utf-8")
+        from htpd_reader import __version__
+        self.assertIn(f'VERSION="{__version__}"', script)
+        self.assertRegex(script, r'SHA256="[0-9a-f]{64}"')

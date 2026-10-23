@@ -10,7 +10,27 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Narendra Champaneri" }]
-dependencies = ["PyYAML>=5.4"]
+keywords = ["pdf", "htpd", "documents", "ai", "llm", "rag", "mcp", "datasheet"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Text Processing :: Indexing",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+# The reader needs only the standard library. PyYAML, when installed, reads the fields a little faster.
+dependencies = []
+
+[project.optional-dependencies]
+yaml = ["PyYAML>=5.4"]
+
+[project.urls]
+Homepage = "https://github.com/narendrachampaneri/htpd"
+Documentation = "https://github.com/narendrachampaneri/htpd/blob/main/docs/READER.md"
+Source = "https://github.com/narendrachampaneri/htpd"
+Issues = "https://github.com/narendrachampaneri/htpd/issues"
 
 [project.scripts]
 htpd-read = "htpd_reader.cli:main"

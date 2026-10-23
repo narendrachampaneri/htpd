@@ -91,5 +91,6 @@ file) are data for tools: do not read them as text.
 ## Making HTPD files
 
 The converter makes them from PDFs, on the user's computer:
-`htpd convert manual.pdf --single` writes `manual.htpd`. It is open source:
+`htpd convert manual.pdf --single` writes `manual.htpd` (in Claude Code with the
+htpd plugin, the `convert` skill does it). It is open source:
 https://github.com/narendrachampaneri/htpd

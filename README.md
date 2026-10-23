@@ -156,7 +156,7 @@ python3 scripts/build_skill.py               # writes dist/htpd-skill.zip
 | App | How to add it |
 |---|---|
 | **Claude app** | *Customize → Skills*, upload `htpd-skill.zip`, switch it on (code execution must be on). Then upload a `.htpd` file to a chat and ask. |
-| **Claude Code** | Unzip into `~/.claude/skills/` (gives `~/.claude/skills/htpd/`). |
+| **Claude Code** | Install the plugin ([section 4](#4-claude-code---the-htpd-plugin)), or unzip into `~/.claude/skills/` (gives `~/.claude/skills/htpd/`). |
 | **Other agents** that read `SKILL.md` | Unzip into their skills folder. |
 
 The skill runs a small script that needs **only Python** - no packages, no
@@ -175,6 +175,23 @@ For Antigravity, Codex or any MCP client: command `htpd-mcp`, arguments
 `--bundles /path/to/your/htpd/files`. Tools: `list_bundles`, `contents`,
 `open_section`, `search`, `ask`, `figure` (the picture of a figure, as an
 image), `check`. Standard library only.
+
+### 4. Claude Code - the `htpd` plugin
+
+One install gives Claude Code everything: the skill that answers from
+`.htpd` files, a skill that converts PDFs, and the MCP server.
+
+```
+/plugin marketplace add narendrachampaneri/htpd
+/plugin install htpd@htpd
+```
+
+Then ask in plain words - *"convert datasheet.pdf to htpd"*, *"what is the
+maximum NPU frequency in datasheet.htpd?"* - or run `/htpd:convert
+datasheet.pdf --single`. The first conversion downloads the converter of the
+release (Linux x64 and WSL, about 4 MB, checked by SHA-256) once; an `htpd`
+already on the PATH is used instead. Only Python 3.10+ is needed; the PDF
+never leaves the computer.
 
 ---
 
@@ -286,6 +303,8 @@ documents. Details: [`docs/CONVERTER.md`](docs/CONVERTER.md#limits-please-read).
 include/ src/ cli/      the converter (C++23, PDFium is used in one file only)
 reader/htpd_reader/     the reader: bundle, check, search, retriever, re-ranker, packer, answer, MCP server
 skills/htpd/            the skill for AI apps (scripts/build_skill.py packs it)
+skills/convert/         the plugin's skill that converts PDFs
+.claude-plugin/         the Claude Code plugin and its marketplace (this repository is both)
 eval/                   evaluation harness, baselines, report
 model/                  the training of the re-ranker
 tests/                  C++ tests, test PDFs, the stress test

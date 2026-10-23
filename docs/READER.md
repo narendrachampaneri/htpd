@@ -79,9 +79,11 @@ Figures stand in the text as `![F12: caption]` lines; `htpd-read figure`
 writes the picture of one to a PNG file, and the MCP tool `figure` returns
 it as an image, so an AI that can see pictures can look at a diagram.
 
-The reader is used in four ways: as a Python library, as the command
-`htpd-read`, as the MCP server `htpd-mcp` for AI agents, and as the skill
-`skills/htpd` for AI apps (the reader packed with a `SKILL.md`). A single
+The reader is used in five ways: as a Python library, as the command
+`htpd-read`, as the MCP server `htpd-mcp` for AI agents, as the skill
+`skills/htpd` for AI apps (the reader packed with a `SKILL.md`), and as the
+Claude Code plugin `htpd` (`.claude-plugin/`: both skills and the MCP
+server, started with `skills/htpd/scripts/htpd.py mcp`). A single
 `.htpd` file also works without any of them: its reading rules tell any AI
 how to use it.
 
@@ -112,6 +114,8 @@ how to use it.
 reader/htpd_reader/   the reader, the MCP server, the re-ranker's weights
 reader/tests/         its tests
 skills/htpd/          the skill for AI apps (scripts/build_skill.py packs it)
+skills/convert/       the plugin's skill that converts PDFs
+.claude-plugin/       the Claude Code plugin and its marketplace
 eval/                 questions, harness, baselines, report
 model/                the re-ranker's training
 ```

@@ -1,0 +1,15 @@
+{
+  "name": "htpd",
+  "description": "HTPD: PDFs made for AI - exact text, pages, figures, and an honest \"Not found in this file.\"",
+  "owner": {
+    "name": "Narendra Champaneri",
+    "url": "https://github.com/narendrachampaneri"
+  },
+  "plugins": [
+    {
+      "name": "htpd",
+      "source": "./",
+      "description": "Convert PDFs to .htpd and answer questions from them with page numbers (skill, MCP server, converter)."
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "name": "htpd",
+  "displayName": "HTPD",
+  "version": "0.1.1",
+  "description": "Turn PDFs into .htpd files and answer questions from them with page numbers, or say \"Not found in this file.\" Local, free, no GPU.",
+  "author": {
+    "name": "Narendra Champaneri",
+    "url": "https://github.com/narendrachampaneri"
+  },
+  "homepage": "https://github.com/narendrachampaneri/htpd",
+  "repository": "https://github.com/narendrachampaneri/htpd",
+  "license": "Apache-2.0",
+  "keywords": [
+    "pdf",
+    "htpd",
+    "documents",
+    "datasheet",
+    "manual",
+    "rag",
+    "mcp"
+  ],
+  "mcpServers": {
+    "htpd": {
+      "command": "python3",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/skills/htpd/scripts/htpd.py",
+        "mcp"
+      ]
+    }
+  }
+}

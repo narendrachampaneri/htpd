@@ -7,6 +7,7 @@
     python3 htpd.py search   FILE words...
     python3 htpd.py figure   FILE F12 [-o F12.png]
     python3 htpd.py check    FILE
+    python3 htpd.py mcp      [--bundles DIR ...]   # the MCP server (stdio)
 
 Needs only Python 3.10 or newer. The package `htpd_reader` lies next to this
 file in the skill (scripts/htpd_reader); in the HTPD repository it is found in
@@ -26,7 +27,16 @@ for candidate in (HERE, REPO_READER):
 if sys.version_info < (3, 10):
     sys.exit("htpd needs Python 3.10 or newer")
 
-from htpd_reader.cli import main  # noqa: E402
+
+def run(argv: list[str]) -> int:
+    if argv[:1] == ["mcp"]:
+        from htpd_reader.mcp import main as mcp_main
+
+        return mcp_main(argv[1:])
+    from htpd_reader.cli import main
+
+    return main(argv)
+
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run(sys.argv[1:]))

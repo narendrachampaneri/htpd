@@ -12,6 +12,9 @@ python3 -m pip install pytest      # only to run the tests
 python3 -m pytest                  # all Python tests
 ```
 
+It needs nothing but Python; `pip install -e ".[yaml]"` adds PyYAML, which
+reads the fields a little faster.
+
 Without installing: `PYTHONPATH=reader python3 -m htpd_reader ...`.
 Without pytest: `PYTHONPATH=reader:. python3 -m unittest discover -s reader/tests -t .`
 
