@@ -11,6 +11,7 @@ PDF the way real documents are made:
     word-tagged pandoc -> .docx -> LibreOffice as a tagged PDF without bookmarks: only the tags say what a heading is
     word-flat   headings set like body text (same font, size and weight), no bookmarks: only the tags say what a heading is
     word-hf     the same with bookmarks, a running header and a footer with the page number (artifacts in the tags)
+    word-2col   pandoc -> .docx with two columns -> LibreOffice (a Word report in two columns: the reading order of columns the PDF stores in order)
     latex       pandoc -> LaTeX: numbered headings, a printed table of contents, bookmarks
     latex-nobm  the same without bookmarks: only the printed contents and the numbers
     latex-2col  two columns
@@ -163,6 +164,32 @@ def make_word_hf(md: Path, out: Path, tmp: Path) -> None:
     run(["pandoc", str(md), "-o", str(docx)])
     add_header_footer(docx, "ACME Reference Document Rev 1.2")
     soffice_tagged_pdf(docx, out, TAGGED)
+
+
+def two_columns(docx: Path) -> None:
+    """Sets the section of a .docx in two columns (zip and XML only)."""
+    import zipfile
+    with zipfile.ZipFile(docx) as z:
+        files = {n: z.read(n) for n in z.namelist()}
+    document = files["word/document.xml"].decode()
+    cols = '<w:cols w:num="2" w:space="567"/>'
+    if re.search(r"<w:sectPr\s*/>", document):
+        document = re.sub(r"<w:sectPr\s*/>", "<w:sectPr>" + cols + "</w:sectPr>", document, count=1)
+    elif "<w:cols" in document:
+        document = re.sub(r"<w:cols[^>]*/>", cols, document, count=1)
+    else:
+        document = re.sub(r"(</w:sectPr>)", cols + r"\1", document, count=1)
+    files["word/document.xml"] = document.encode()
+    with zipfile.ZipFile(docx, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, data in files.items():
+            z.writestr(name, data)
+
+
+def make_word_2col(md: Path, out: Path, tmp: Path) -> None:
+    docx = tmp / (md.stem + ".docx")
+    run(["pandoc", str(md), "-o", str(docx)])
+    two_columns(docx)
+    soffice_pdf(docx, out)
 
 
 def make_word(md: Path, out: Path, tmp: Path) -> None:
@@ -403,6 +430,7 @@ MAKERS = {
     "word-tagged": (make_word_tagged, ("pandoc", "soffice")),
     "word-flat": (make_word_flat, ("pandoc", "soffice")),
     "word-hf": (make_word_hf, ("pandoc", "soffice")),
+    "word-2col": (make_word_2col, ("pandoc", "soffice")),
     "latex": (make_latex, ("pandoc", "xelatex")),
     "latex-nobm": (make_latex_nobm, ("pandoc", "xelatex")),
     "latex-2col": (make_latex_2col, ("pandoc", "xelatex")),
