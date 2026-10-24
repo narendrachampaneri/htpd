@@ -282,7 +282,18 @@ std::string text_markdown(const Section& s, const BundleInfo& info, bool single)
             // Table rows are marked "text"; a code listing has no mark.
             const std::string fence = fence_for(p.text);
             const std::string_view mark = p.kind == ParagraphKind::Rows ? "text" : "";
-            md += std::format("{}{}\n{}\n{}\n\n", fence, mark, p.text, fence);
+            // A table over a page break: the mark of the new page is a line of its own between two rows.
+            std::string body;
+            std::size_t from = 0;
+            for (const auto& [at, page] : p.page_starts) {
+                if (p.kind != ParagraphKind::Rows || at <= from || at >= p.text.size()) continue;
+                body += p.text.substr(from, at - from);
+                body += std::format("<!-- page {} -->\n", page + 1);
+                current_page = page;
+                from = at;
+            }
+            body += p.text.substr(from);
+            md += std::format("{}{}\n{}\n{}\n\n", fence, mark, body, fence);
         } else {
             // Text that runs on over a page break: the page mark where the next page begins.
             std::size_t from = 0;
@@ -494,6 +505,12 @@ std::string conversion_notes(const BundleInfo& info) {
                               info.lattice.spans == 1 ? "s" : "");
         }
         md += "\n";
+    }
+    if (info.joined_tables > 0) {
+        md += std::format("* {} table{} that go{} on over a page break {} written as one block, with a page mark (`<!-- page N -->`) "
+                          "as a line of its own between two rows where the page changes (`--table-pages join`).\n",
+                          info.joined_tables, info.joined_tables == 1 ? "" : "s", info.joined_tables == 1 ? "es" : "",
+                          info.joined_tables == 1 ? "is" : "are");
     }
     if (!info.furniture_removed) {
         md += "* Running headers and footers were kept.\n";
@@ -718,7 +735,12 @@ std::string reading_rules(const BundleInfo& info, std::string_view doc_title) {
                             ? ""
                             : "13. In a table, `[>]` at the end of a cell means that it spans one more column to its right "
                               "(`[>>]`: two more), and `[=]` one more row below it (a cell can have both); the cells "
-                              "it covers are empty.\n"));
+                              "it covers are empty.\n") +
+            std::string(info.joined_tables == 0
+                            ? ""
+                            : "14. A table that goes on over a page break is one block. A line `<!-- page N -->` between two "
+                              "rows of the block is not a row: the rows after it are on page N (the header of the table "
+                              "may be printed again there, and is kept as a row).\n"));
 }
 
 std::string single_file_markdown(const std::vector<Section>& sections, const BundleInfo& info,

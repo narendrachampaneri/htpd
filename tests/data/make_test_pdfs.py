@@ -880,6 +880,25 @@ def ruled_tables(path):
                Paragraph('Temperature over a day.', body), chart])
 
 
+def multipage_table(path):
+    """One table over three pages with its header printed again on each, a second table of the same
+    columns on the last page that is no continuation (it starts under a heading and a paragraph), and a
+    table of four columns on page 1 (the table engine joins the parts of a table over a page break)."""
+    rows = [['Part', 'Name', 'Qty', 'Price']] + [['P%04d' % i, 'Washer %d' % (i % 37 + 2), str(i * 7 % 900 + 1),
+                                                   '%d.%02d' % (i * 3 % 99 + 1, i * 11 % 100)] for i in range(1, 121)]
+    t = Table(rows, colWidths=[60, 120, 50, 60], repeatRows=1)
+    t.setStyle(TableStyle([('LINEABOVE', (0, 0), (-1, 0), 1, colors.black), ('LINEBELOW', (0, 0), (-1, 0), 0.6, colors.black),
+                           ('LINEBELOW', (0, -1), (-1, -1), 1, colors.black), ('FONTSIZE', (0, 0), (-1, -1), 9),
+                           ('TOPPADDING', (0, 0), (-1, -1), 2), ('BOTTOMPADDING', (0, 0), (-1, -1), 2)]))
+    other = Table([['Part', 'Name', 'Qty', 'Price'], ['X1', 'Gasket', '4', '1.10'], ['X2', 'Seal', '9', '0.35']],
+                  colWidths=[60, 120, 50, 60])
+    other.setStyle(TableStyle([('FONTSIZE', (0, 0), (-1, -1), 9)]))
+    doc = SimpleDocTemplate(path, pagesize=letter, leftMargin=72, rightMargin=72, topMargin=72, bottomMargin=72,
+                            title='Parts list', author='HTPD tests')
+    doc.build([Paragraph('Parts list', h1), Paragraph('All parts of the charger.', body), t, Spacer(1, 18),
+               Paragraph('Spare parts', h2), Paragraph('The spare parts kit holds:', body), other])
+
+
 if __name__ == '__main__':
     Manual(os.path.join(OUT, 'sample.pdf'), bookmarks=True).build(manual_story())
     Manual(os.path.join(OUT, 'sample_nobookmarks.pdf'), bookmarks=False).build(manual_story())
@@ -898,4 +917,5 @@ if __name__ == '__main__':
     chrome_template(os.path.join(OUT, 'chrome_template.pdf'))
     tagged_styled(os.path.join(OUT, 'tagged_styled.pdf'))
     ruled_tables(os.path.join(OUT, 'ruled_tables.pdf'))
-    print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf, sideways.pdf, links.pdf, ocr.pdf, figures.pdf, actualtext.pdf, tagged.pdf, tagged_bookmarks.pdf, tagged_disagree.pdf, styles_weight.pdf, latex_chapters.pdf, chrome_template.pdf, tagged_styled.pdf, ruled_tables.pdf to', OUT)
+    multipage_table(os.path.join(OUT, 'multipage_table.pdf'))
+    print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf, sideways.pdf, links.pdf, ocr.pdf, figures.pdf, actualtext.pdf, tagged.pdf, tagged_bookmarks.pdf, tagged_disagree.pdf, styles_weight.pdf, latex_chapters.pdf, chrome_template.pdf, tagged_styled.pdf, ruled_tables.pdf, multipage_table.pdf to', OUT)

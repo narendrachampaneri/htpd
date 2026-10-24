@@ -16,6 +16,8 @@ struct SectionOptions {
     // Default (false): a word split as "inter-" / "rupt" becomes "inter-rupt",
     // so no character of the source is lost. True: it becomes "interrupt".
     bool dehyphenate = false;
+    // A table over a page break in one block, with a mark where the page changes (tables.hpp).
+    bool join_table_pages = false;
     // Facts about the fonts of the document, indexed by Line::font. Two or
     // more lines in a monospace font are kept as code: line by line, with the
     // spacing they have on the page.

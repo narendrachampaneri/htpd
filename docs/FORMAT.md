@@ -334,6 +334,15 @@ How the converter decides:
 * When the columns are not certain, the lines are written as they stand,
   one per line, inside the block. No text is moved into a cell it does
   not stand in, and none is left out.
+* **A table over a page break.** By default a table that goes on over a page break is one block per page,
+  each under the mark of its page. With `--table-pages join` the parts are one block, and the page changes
+  where a line `<!-- page N -->` stands between two rows (a line of its own inside the block; it is not a
+  row: the rows after it are on page N, and the page of the block is the page of its first row). The parts
+  are joined only when they stand on consecutive pages, have the same number of columns at the same left
+  edge, and either the next part begins with the same first row (a header printed again - it is kept as a
+  row, so no text is lost) or the table ends at the bottom of its page and goes on at the top of the next
+  (not more than three lines above it). A table under another heading is not joined. The conversion notes
+  say how many tables were joined, and the rules for reading the file get an item 14.
 * A **list of terms** - a short bold term and right below it its
   description, indented - gives one paragraph per term with its description.
 * **Monospace text in a table is table text**, not code: four lines or more one under the other, each with

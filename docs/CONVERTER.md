@@ -247,6 +247,13 @@ near its row as the lines of a cell do, and under the header row it keeps to the
 cell is not joined this way; the older rule of `sections.cpp` (a line right under a row that starts in a column
 after the first) still applies. `sections.cpp` puts the pieces into the cells of the row.
 
+**Tables over pages** are written one block per page, each under its page mark. `--table-pages join` writes one block
+with a row-level page mark between two rows (FORMAT.md 4.2); the parts must be on consecutive pages with the same number
+of columns at the same left edge, and the next part begins with the header again (compared with the first row of the
+table; the header is kept as a row) or the table ends at the bottom of a page and goes on at the top of the next. It is
+off by default because a reader that does not know the mark takes the page of the whole block from the mark above its
+first row.
+
 **Monospace** text is table text when it is a table: four lines or more one under the other with two or more sure
 gaps whose places the lines share (`monospace_table_rows`); a listing is code.
 
@@ -406,6 +413,7 @@ htpd info manual.pdf                     # show what would be found, write nothi
 | `--dehyphenate` | `inter-` + `rupt` becomes `interrupt` instead of `inter-rupt`. |
 | `--tags auto\|on\|off` | The structure tags of a tagged PDF (headings, tables, lists, figures, page furniture), used where they agree with the page text. `auto` (default): when the PDF is tagged and the headings found without the tags are poor (see "Tagged PDFs"). `on`: whenever the PDF has tags. `off`: read every PDF as if it had no tags. Reading the tags costs time, see "Tagged PDFs". |
 | `--tables auto\|text` | How the cells of a table are found. `auto` (default): from the PDF's tags, from the lines drawn on the page (lattice) and from the text. `text`: not from the lines drawn on the page. See "Tables". |
+| `--table-pages split\|join` | A table that goes on over a page break. `split` (default): one block per page. `join`: one block, with a row-level page mark (`<!-- page N -->` between two rows) where the page changes - when the columns match and the header is printed again or the table ends at the bottom and goes on at the top of the next page. Off by default: a reader that takes the page of a block from the mark above it (the reader of this project) then gives the first page for all the rows (page accuracy of the evaluation 0.640 -> 0.505), see "Tables". |
 | `--ocr auto\|on\|off` | Read text from pictures and scanned pages with Tesseract. `auto` (default): when it is installed. `on`: stop with an error when it is not. `off`: never. |
 | `--ocr-lang <langs>` | Tesseract languages, e.g. `eng+deu` (default `eng`). Each must be installed (`tesseract --list-langs`). |
 | `--figures on\|off` | Store figures (pictures and drawings) as PNG pictures in the bundle (default `on`). |

@@ -3511,6 +3511,45 @@ TEST(end_to_end_a_ruled_table_is_read_from_its_lines) {
     CHECK(!all_section_text(options.output_dir).contains("[=]"));
 }
 
+TEST(end_to_end_a_table_over_a_page_break_is_one_block_with_a_page_mark_when_asked) {
+    const auto count = [](const std::string& text, const std::string& what) {
+        std::size_t n = 0;
+        for (std::size_t at = text.find(what); at != std::string::npos; at = text.find(what, at + what.size())) ++n;
+        return n;
+    };
+    ConvertOptions options;
+    options.input = fs::path(HTPD_TEST_DATA) / "multipage_table.pdf";
+    options.output_dir = fresh_temp_dir("e2e_pages_split");
+    REQUIRE(convert(options).has_value());
+    const std::string split = all_section_text(options.output_dir);
+    // One block per page, each under the mark of its page.
+    CHECK_EQ(count(split, "```text\nPart | Name | Qty | Price\n"), std::size_t{5});
+    CHECK(split.contains("```\n\n<!-- page 2 -->\n\n```text\nPart | Name | Qty | Price\n"));
+
+    options.output_dir = fresh_temp_dir("e2e_pages_join");
+    options.table_pages = TablePages::Join;
+    REQUIRE(convert(options).has_value());
+    const std::string joined = all_section_text(options.output_dir);
+    // The table of the parts list is one block, with the page mark between two rows; the header printed
+    // again is kept. The table under "Spare parts" is another one: a heading and a paragraph stand before it.
+    CHECK_EQ(count(joined, "```text\nPart | Name | Qty | Price\n"), std::size_t{2});
+    CHECK(joined.contains("\n<!-- page 2 -->\nPart | Name | Qty | Price\nP00"));
+    CHECK(joined.contains("\n<!-- page 4 -->\nPart | Name | Qty | Price\nP01"));
+    CHECK(joined.contains("```text\nPart | Name | Qty | Price\nX1 | Gasket | 4 | 1.10"));
+    CHECK(read_file(options.output_dir / "document.md").contains("1 table that goes on over a page break is written as one block"));
+
+    // The rows are the same, in the same order, with or without the marks.
+    const auto rows_of = [](const std::string& text) {
+        std::string out;
+        std::istringstream in(text);
+        for (std::string line; std::getline(in, line);) {
+            if (line.contains(" | ") && !line.starts_with("*") && !line.starts_with("#")) out += line + "\n";
+        }
+        return out;
+    };
+    CHECK_EQ(rows_of(joined), rows_of(split));
+}
+
 TEST(end_to_end_ocr_reads_pictures_and_scanned_pages) {
     OcrOptions probe;
     if (!find_ocr(probe).available) {

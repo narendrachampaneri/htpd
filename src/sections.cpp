@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <format>
+#include <map>
 #include <optional>
 
 #include "htpd/tables.hpp"
@@ -1087,8 +1088,83 @@ void append_wrapped_line(std::string& paragraph, std::string_view line, bool deh
     join_line(paragraph, line, dehyphenate);
 }
 
-std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_pitch,
-                                        const SectionOptions& options) {
+namespace {
+
+// Where a table stands: its first and last line, the left edge of its lines, and its text.
+Paragraph::Table table_geometry(const Line& first, const Line& last, float left, const std::string& text) {
+    Paragraph::Table t;
+    t.first_baseline = first.baseline;
+    t.last_baseline = last.baseline;
+    t.size = first.size;
+    t.left = left;
+    for (std::size_t start = 0; start <= text.size();) {
+        const std::size_t end = std::min(text.find('\n', start), text.size());
+        std::size_t cells = 1;
+        for (std::size_t at = text.find(" | ", start); at != std::string::npos && at < end; at = text.find(" | ", at + 3)) ++cells;
+        t.columns = std::max(t.columns, cells);
+        start = end + 1;
+    }
+    return t;
+}
+
+Paragraph::Table table_geometry(std::span<const Line> rows, const std::string& text) {
+    float left = rows.front().x0;
+    for (const Line& l : rows) left = std::min(left, l.x0);
+    return table_geometry(rows.front(), rows.back(), left, text);
+}
+
+std::vector<Paragraph> build_paragraphs_impl(std::span<const Line> lines, float line_pitch, const SectionOptions& options);
+
+}  // namespace
+
+std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_pitch, const SectionOptions& options) {
+    std::vector<Paragraph> paragraphs = build_paragraphs_impl(lines, line_pitch, options);
+    if (!options.join_table_pages) return paragraphs;
+    // The parts of a table over a page break. The top and the bottom of every page: its text lines.
+    std::map<int, std::pair<float, float>> extent;
+    for (const Line& l : lines) {
+        if (l.text.empty()) continue;
+        const auto [it, fresh] = extent.try_emplace(l.page, l.baseline, l.baseline);
+        if (!fresh) it->second = {std::min(it->second.first, l.baseline), std::max(it->second.second, l.baseline)};
+    }
+    const auto first_row = [](const Paragraph& p) {
+        std::string row = p.text.substr(0, p.text.find('\n'));
+        std::string out;
+        for (const char c : row) {
+            if (c == ' ' && (out.empty() || out.back() == ' ')) continue;
+            out.push_back(c);
+        }
+        return out;
+    };
+    std::vector<Paragraph> out;
+    for (Paragraph& p : paragraphs) {
+        if (!out.empty() && p.kind == ParagraphKind::Rows && p.table && out.back().kind == ParagraphKind::Rows && out.back().table) {
+            Paragraph& a = out.back();
+            const int a_last = a.page_starts.empty() ? a.page : a.page_starts.back().second;
+            const auto a_extent = extent.find(a_last), b_extent = extent.find(p.page);
+            const float size = std::max(a.table->size, 1.0f);
+            const bool columns = a.table->columns == p.table->columns && std::fabs(a.table->left - p.table->left) <= 3.0f;
+            const std::string head = first_row(p);
+            const bool header_again = head.find(" | ") != std::string::npos && head == first_row(a);
+            const bool bottom = a_extent != extent.end() && a.table->last_baseline >= a_extent->second.second - 2.5f * line_pitch * size;
+            const bool top = b_extent != extent.end() && p.table->first_baseline <= b_extent->second.first + 3.5f * line_pitch * size;
+            if (p.page == a_last + 1 && columns && (header_again || (bottom && top))) {
+                a.page_starts.emplace_back(a.text.size() + 1, p.page);
+                a.text += '\n';
+                a.text += p.text;
+                a.table->last_baseline = p.table->last_baseline;
+                continue;
+            }
+        }
+        out.push_back(std::move(p));
+    }
+    return out;
+}
+
+namespace {
+
+std::vector<Paragraph> build_paragraphs_impl(std::span<const Line> lines, float line_pitch,
+                                             const SectionOptions& options) {
     // Rows of a table that the PDF's tags describe cell by cell are complete:
     // each table is one block of rows, and the lines around it are read as usual.
     if (std::ranges::any_of(lines, [](const Line& l) { return !l.cells.empty(); })) {
@@ -1107,10 +1183,11 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
                     }
                     ++end;
                 }
+                table.table = table_geometry(lines.subspan(begin, end - begin), table.text);
                 all.push_back(std::move(table));
             } else {
                 while (end < lines.size() && lines[end].cells.empty()) ++end;
-                for (Paragraph& p : build_paragraphs(lines.subspan(begin, end - begin), line_pitch, options)) {
+                for (Paragraph& p : build_paragraphs_impl(lines.subspan(begin, end - begin), line_pitch, options)) {
                     all.push_back(std::move(p));
                 }
             }
@@ -1154,7 +1231,12 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
             current.text = code_text(code, options.fonts);
         }
         code.clear();
-        if (!rows.empty()) current.text = rows_text(rows, rest);
+        if (!rows.empty()) {
+            current.text = rows_text(rows, rest);
+            float left = rows.front()->x0;
+            for (const Line* l : rows) left = std::min(left, l->x0);
+            current.table = table_geometry(*rows.front(), *rows.back(), left, current.text);
+        }
         rows.clear();
         text_lines.clear();
         rest.clear();
@@ -1227,7 +1309,9 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
                         }
                     }
                     flush();
-                    paragraphs.push_back(Paragraph{lines[header->first].page, ParagraphKind::Rows, std::move(rebuilt), {}});
+                    Paragraph rebuilt_table{lines[header->first].page, ParagraphKind::Rows, std::move(rebuilt), {}};
+                    rebuilt_table.table = table_geometry(lines.subspan(header->first, *end - header->first), rebuilt_table.text);
+                    paragraphs.push_back(std::move(rebuilt_table));
                     index = *end - 1;
                     previous = nullptr;
                     continue;
@@ -1235,7 +1319,9 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
             }
             if (const auto end = rebuild_table(lines, index, index + 1, kinds, line_pitch, rebuilt)) {
                 flush();
-                paragraphs.push_back(Paragraph{line.page, ParagraphKind::Rows, std::move(rebuilt), {}});
+                Paragraph rebuilt_table{line.page, ParagraphKind::Rows, std::move(rebuilt), {}};
+                rebuilt_table.table = table_geometry(lines.subspan(index, *end - index), rebuilt_table.text);
+                paragraphs.push_back(std::move(rebuilt_table));
                 index = *end - 1;
                 previous = nullptr;
                 continue;
@@ -1312,6 +1398,8 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
     flush();
     return paragraphs;
 }
+
+}  // namespace
 
 std::vector<Section> build_sections(std::span<const Line> lines, std::span<const Heading> headings,
                                     const SectionOptions& options) {

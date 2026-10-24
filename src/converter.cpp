@@ -514,6 +514,7 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
 
     SectionOptions section_options;
     section_options.dehyphenate = options.dehyphenate;
+    section_options.join_table_pages = options.table_pages == TablePages::Join;
     section_options.fonts = std::move(a.fonts);
     std::vector<Section> sections = build_sections(a.lines, a.headings.headings, section_options);
     attach_links(sections, a.lines, a.page_links, a.page_transforms);
@@ -539,6 +540,9 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     info.furniture = a.furniture;
     info.tags = a.tags;
     info.lattice = a.lattice;
+    for (const Section& s : sections) {
+        for (const Paragraph& p : s.paragraphs) info.joined_tables += p.kind == ParagraphKind::Rows && !p.page_starts.empty();
+    }
     info.tag_title = a.tag_title;
     info.producer = a.producer;
     info.producer_text = a.producer_text;

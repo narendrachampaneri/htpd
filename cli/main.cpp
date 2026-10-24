@@ -47,6 +47,10 @@ Options for convert:
                               auto  from the PDF's tags, from the lines drawn
                                     on the page, and from the text (default)
                               text  not from the lines drawn on the page
+      --table-pages <mode>  A table that goes on over a page break:
+                              split one block per page (default)
+                              join  one block, with a page mark between
+                                    two rows where the page changes
       --ocr <mode>          Text in pictures and scanned pages, read with the
                             free Tesseract program:
                               auto  when Tesseract is installed (default)
@@ -284,6 +288,9 @@ int main(int argc, char** argv) {
             if (!value(v) || !parse_fraction(v, args.convert.margin_band)) {
                 return usage_error("--margin-band must be a number from 0 to 0.3");
             }
+        } else if (arg == "--table-pages") {
+            if (!value(v) || (v != "split" && v != "join")) return usage_error("--table-pages must be split or join");
+            args.convert.table_pages = v == "join" ? htpd::TablePages::Join : htpd::TablePages::Split;
         } else if (arg == "--tables") {
             if (!value(v) || (v != "auto" && v != "text")) return usage_error("--tables must be auto or text");
             args.convert.tables = v == "text" ? htpd::TableMode::Text : htpd::TableMode::Auto;

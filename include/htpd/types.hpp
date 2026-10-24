@@ -274,6 +274,14 @@ struct Paragraph {
     // Text that runs on over a page break: where in `text` (byte offset) each
     // later page begins, and that page. The page mark is written there.
     std::vector<std::pair<std::size_t, int>> page_starts = {};
+    // Rows only: where the table stands (used to join the parts of a table over a page break).
+    struct Table {
+        float first_baseline = 0, last_baseline = 0;   // of the first and the last line
+        float left = 0;                                // left edge of the table
+        float size = 0;                                // font size of its first row
+        std::size_t columns = 0;                       // cells in its widest row
+    };
+    std::optional<Table> table = {};
 };
 
 // A link from the text of a section to another section.

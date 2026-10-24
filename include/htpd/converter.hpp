@@ -40,6 +40,7 @@ struct ConvertOptions {
     OcrOptions ocr_options;
     TagMode tags = TagMode::Auto;        // use the structure tags of a tagged PDF where they can be trusted
     TableMode tables = TableMode::Auto;  // read the cells of a table from the lines drawn on the page, too
+    TablePages table_pages = TablePages::Split;   // a table over a page break: one block per page, or one block with a row-level page mark
     std::function<void(int done, int total)> on_progress;   // called once per page
 };
 

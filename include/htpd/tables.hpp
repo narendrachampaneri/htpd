@@ -32,6 +32,13 @@ namespace htpd {
 // method).
 enum class TableMode { Auto, Text };
 
+// What becomes of a table that goes on over a page break. Split: one block per page, each under the
+// mark of its page. Join: one block, with a row-level page mark (`<!-- page N -->` as a line of its
+// own between two rows) where the page changes - when the columns match and the part on the next page
+// begins with the header again, or the table ends at the bottom of its page and goes on at the top of
+// the next one (FORMAT.md 4.2).
+enum class TablePages { Split, Join };
+
 // ---- the text of a cell --------------------------------------------------------------------
 
 // Whether the next line of a table cell continues the last word of the cell without a space: a
