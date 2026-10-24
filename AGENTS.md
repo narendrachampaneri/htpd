@@ -11,6 +11,9 @@ Read these before you change anything:
 * `docs/BACKGROUND.md` - why the project is the way it is: the idea and the
   decisions.
 
+Working on the converter series? `docs/ROADMAP.md` holds the plan, the
+rules for each part, the check to run and the log: do the first open part.
+
 What is true: these five files and this one. If anything else (notes kept
 by a tool, a generated summary, your own notes) says something different,
 these files win - fix the other thing, or ask.
