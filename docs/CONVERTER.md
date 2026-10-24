@@ -263,7 +263,7 @@ include/htpd/     the headers (the public one is converter.hpp)
 src/              the converter library
 cli/main.cpp      the command-line tool
 tests/            test_main.cpp, small test PDFs in tests/data, the stress test in tests/stress,
-                  the document zoo in tests/zoo
+                  the document zoo in tests/zoo, the benchmark in tests/bench
 scripts/          get_pdfium.sh
 docs/FORMAT.md    the format
 docs/CONVERTER.md this page
@@ -321,6 +321,13 @@ as values (`std::expected`); the library does not throw for a bad PDF.
   headings (the scans and shape-letter pages: 86 %), 89 % of the table rows
   exact (on scans OCR misreads some numbers: always check a value from a scan
   against the page). Hindi and Gujarati from Word: 91 % and 99 % of the text.
+* **The benchmark** (`tests/bench`). `run_bench.py` converts every PDF of a folder
+  (your own in `private/bench/`, the five public manuals of the evaluation, the zoo, the
+  small test PDFs) and compares each `.htpd` file with its PDF page by page: time, size, text
+  in order and on the right page, lost and invented words, headings, table rows, figures.
+  `--compare before.json after.json` shows what a change did and whether it stays within
+  the limits (accuracy never worse, time at most +10 %, size at most +5 %). How to use it and
+  what each number means: [`tests/bench/README.md`](../tests/bench/README.md).
 * **The tests were tested.** 99 times one rule of the converter was broken
   on purpose. Every time at least one test failed.
 * **Compiler checks.** No warning with `-Wall -Wextra -Wpedantic -Wshadow
