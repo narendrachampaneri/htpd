@@ -513,7 +513,7 @@ as values (`std::expected`); the library does not throw for a bad PDF.
 
 ## What was tested
 
-* **156 automatic tests** (`make test`). Most build their input in memory.
+* **170 automatic tests** (`make test`). Most build their input in memory.
   The others convert small PDFs in `tests/data` through the real PDF
   library: rotated pages, scaled fonts, text spaced only by kerning,
   two columns, code listings, fonts whose names lie about their widths,
@@ -552,6 +552,12 @@ as values (`std::expected`); the library does not throw for a bad PDF.
   `--compare before.json after.json` shows what a change did and whether it stays within
   the limits (accuracy never worse, time at most +10 %, size at most +5 %). How to use it and
   what each number means: [`tests/bench/README.md`](../tests/bench/README.md).
+* **Tables with known cells** (`tests/bench/make_tables.py`). 29 small PDFs whose tables have known cells: ruled
+  grids, rules only above and below the header, no rules at all, cells over columns and rows, a header of two
+  levels, cells that wrap, values stacked in a cell, names and amounts broken inside themselves, empty cells,
+  tables over three pages (with the header printed again or not), register maps, ledgers, datasheet tables,
+  monospace tables, and a chart with grid lines that is no table. `run_bench.py --set tables` scores each
+  cell, row and value in its right row and column (see `tests/bench/README.md`).
 * **The tests were tested.** 99 times one rule of the converter was broken
   on purpose. Every time at least one test failed.
 * **Compiler checks.** No warning with `-Wall -Wextra -Wpedantic -Wshadow
