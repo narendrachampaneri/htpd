@@ -438,6 +438,9 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
         std::vector<char> code;
         code.reserve(page.size());
         for (const Line& l : page) code.push_back(l.font < a.fonts.size() && a.fonts[l.font].monospace && l.ocr == Line::Ocr::None);
+        // Monospace lines that are the rows of a table (a name in a cell, a whole table set in a monospace font) are no listing.
+        const std::vector<char> rows = monospace_table_rows(page, code);
+        for (std::size_t i = 0; i < code.size(); ++i) code[i] = code[i] && !rows[i];
         a.table_gaps += mark_table_columns(page, code);
     }
 

@@ -70,6 +70,12 @@ inline constexpr std::int32_t kLatticeTableId = 1 << 20;
 LatticeReport find_lattice_tables(std::vector<Line>& lines, std::span<const Rule> rules, std::int32_t& next_id,
                                   const LatticeOptions& options = {});
 
+// Lines in a monospace font that are the rows of a table and not a listing: at least four lines
+// one under the other, each with two or more sure column gaps, and the first two gaps of all of
+// them have a stretch of the page in common. `mono[i]` tells the monospace lines. Returns a mask
+// of the lines that are table rows (the others are left to the listing rules).
+std::vector<char> monospace_table_rows(const std::vector<Line>& lines, std::span<const char> mono);
+
 // ---- stream ---------------------------------------------------------------------------------
 
 // The lines [begin, end) are the rows of a table set by its text, whose columns are separated at

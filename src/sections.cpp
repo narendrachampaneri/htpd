@@ -1139,7 +1139,7 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
     };
     std::vector<ParagraphKind> kinds(lines.size(), ParagraphKind::Text);
     for (std::size_t i = 0; i < lines.size(); ++i) {
-        const bool listing = is_monospace(i) &&
+        const bool listing = is_monospace(i) && !(lines[i].table && lines[i].gaps.size() >= 2) &&
                              ((i > 0 && listing_neighbour(i, i - 1)) || listing_neighbour(i, i + 1));
         kinds[i] = listing ? ParagraphKind::Code
                    : (is_row(lines[i]) || (lines[i].continues != 0 && lines[i].table)) ? ParagraphKind::Rows

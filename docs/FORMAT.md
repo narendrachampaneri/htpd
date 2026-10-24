@@ -336,6 +336,10 @@ How the converter decides:
   not stand in, and none is left out.
 * A **list of terms** - a short bold term and right below it its
   description, indented - gives one paragraph per term with its description.
+* **Monospace text in a table is table text**, not code: four lines or more one under the other, each with
+  two or more sure column gaps (more than two font sizes), whose first two gaps lie on stretches of the page
+  they have in common, are the rows of a table (a name in a cell, or a whole table set in a monospace
+  font). A listing, with at most one gap in its lines, stays a monospace block.
 * A **monospace block** needs at least two lines in a monospace font. One
   such line between ordinary lines is a term or a file name inside a
   sentence, and stays part of its paragraph. Whether a font is monospace

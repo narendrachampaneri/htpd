@@ -247,6 +247,9 @@ near its row as the lines of a cell do, and under the header row it keeps to the
 cell is not joined this way; the older rule of `sections.cpp` (a line right under a row that starts in a column
 after the first) still applies. `sections.cpp` puts the pieces into the cells of the row.
 
+**Monospace** text is table text when it is a table: four lines or more one under the other with two or more sure
+gaps whose places the lines share (`monospace_table_rows`); a listing is code.
+
 **Joining the lines of a cell** (all methods): a space, except where the next line certainly continues the
 last word: the first part ends with `_` or `/`; the next starts with `_` or is a lone `)`; a short number
 follows a name that has letters and digits or `_` ("LCD_P2" + "4"; two numbers one under the other are not a

@@ -33,6 +33,8 @@ The cases:
     datasheet          electrical characteristics (no rules)
     registers_narrow   the register map in columns so narrow that a header cell breaks inside itself
     registers_stream   the register map without rules
+    mono_names         names and numbers in a monospace font, the description in the text font
+    mono_table         a table all in a monospace font (no rules)
     wrapped_middle     cells set in the middle of tall rows (ruled)
     wrapped_middle_stream   the same without rules
     rowrules           a hairline under every row
@@ -354,6 +356,35 @@ def case_wrapped_first():
     return [table(data, [130, 30, 40, 100], BOOK)], {"rows": data, "header_rows": 1}
 
 
+def case_mono_names():
+    data = [["Register", "Offset", "Reset", "Description"],
+            ["CAN_FD_CTRL", "0x000", "0x0000", "Enables the controller and selects the clock source."],
+            ["CAN_FD_STATUS", "0x004", "0x0001", "Shows the busy flag and the error flags."],
+            ["CAN_FD_TIMING_A", "0x008", "0x00FF", "Bit timing of the arbitration phase."],
+            ["CAN_FD_TIMING_B", "0x00C", "0x00FF", "Bit timing of the data phase."],
+            ["CAN_FD_TX_FIFO", "0x010", "0x0000", "A write puts one frame into the transmit FIFO."]]
+    rows = [[P(c, CELLB) for c in data[0]]]
+    for r in data[1:]:
+        rows.append([P(r[0], MONO), P(r[1], MONO), P(r[2], MONO), P(r[3])])
+    t = Table(rows, colWidths=[90, 44, 44, 200])
+    t.setStyle(TableStyle(PLAIN))
+    return [t], {"rows": data, "header_rows": 1}
+
+
+def case_mono_table():
+    data = [["Signal", "Pin", "Mode"],
+            ["TXD", "A1", "output"],
+            ["RXD", "A2", "input"],
+            ["RTS", "B1", "output"],
+            ["CTS", "B2", "input"]]
+    rows = [[P(c, ParagraphStyle("mb", parent=MONO, fontName="Courier-Bold")) for c in data[0]]]
+    for r in data[1:]:
+        rows.append([P(c, MONO) for c in r])
+    t = Table(rows, colWidths=[70, 50, 70])
+    t.setStyle(TableStyle(PLAIN))
+    return [t], {"rows": data, "header_rows": 1}
+
+
 def case_ledger():
     data = [["Date", "Account", "Reference", "Debit", "Credit"],
             ["2024-01-03", "Cash", "INV-1001", "$12,400.00", ""],
@@ -407,7 +438,7 @@ CASES = {
     "empty": case_empty, "multipage": case_multipage, "multipage_stream": case_multipage_stream,
     "multipage_plain": case_multipage_plain, "registers": case_registers, "ledger": case_ledger,
     "datasheet": case_datasheet, "chart": case_chart, "registers_stream": case_registers_stream,
-    "registers_narrow": case_registers_narrow, "wrapped_middle": case_wrapped_middle, "wrapped_middle_stream": case_wrapped_middle_stream,
+    "registers_narrow": case_registers_narrow, "mono_names": case_mono_names, "mono_table": case_mono_table, "wrapped_middle": case_wrapped_middle, "wrapped_middle_stream": case_wrapped_middle_stream,
     "rowrules": case_rowrules, "tight": case_tight, "wrapped_first": case_wrapped_first,
 }
 

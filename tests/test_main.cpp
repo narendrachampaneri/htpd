@@ -971,6 +971,33 @@ TEST(stream_the_second_line_of_a_header_over_two_levels_is_not_the_rest_of_the_f
     CHECK_EQ(int(lines[1].continues), 0);
 }
 
+TEST(stream_a_table_set_in_a_monospace_font_is_a_table_and_a_listing_is_not) {
+    std::vector<Line> lines;
+    lines.push_back(placed_line(100, {{72, "Signal"}, {172, "Pin"}, {252, "Mode"}}));
+    lines.push_back(placed_line(112, {{72, "TXD"}, {172, "A1"}, {252, "output"}}));
+    lines.push_back(placed_line(124, {{72, "RXD"}, {172, "A2"}, {252, "input"}}));
+    lines.push_back(placed_line(136, {{72, "RTS"}, {172, "B1"}, {252, "output"}}));
+    for (Line& l : lines) l.font = 1;
+    SectionOptions options;
+    options.fonts = {FontFacts{}, FontFacts{true, 0.6f}};
+    const std::vector<char> mono(lines.size(), 1);
+    const std::vector<char> rows = monospace_table_rows(lines, mono);
+    CHECK(std::ranges::all_of(rows, [](char c) { return c != 0; }));
+    mark_table_columns(lines, std::vector<char>(lines.size(), 0));   // as the converter does, with the rows taken out of the listing mask
+    const auto paragraphs = build_paragraphs(lines, 1.2f, options);
+    REQUIRE(paragraphs.size() == 1);
+    CHECK(paragraphs[0].kind == ParagraphKind::Rows);
+    CHECK(paragraphs[0].text.starts_with("Signal | Pin | Mode\nTXD | A1 | output"));
+
+    // A listing: indented lines with at most one gap are code, with the spacing of the page.
+    std::vector<Line> code;
+    code.push_back(placed_line(100, {{72, "int"}, {95, "main()"}, {135, "{"}}));
+    code.push_back(placed_line(112, {{90, "return"}, {125, "0;"}}));
+    code.push_back(placed_line(124, {{72, "}"}}));
+    for (Line& l : code) l.font = 1;
+    CHECK(std::ranges::none_of(monospace_table_rows(code, std::vector<char>(code.size(), 1)), [](char c) { return c != 0; }));
+}
+
 // ---- headings ---------------------------------------------------------------
 
 TEST(section_numbers_are_parsed) {

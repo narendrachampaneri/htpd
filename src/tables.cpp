@@ -745,6 +745,44 @@ LatticeReport find_lattice_tables(std::vector<Line>& lines, std::span<const Rule
 
 // ---- stream --------------------------------------------------------------------------------
 
+std::vector<char> monospace_table_rows(const std::vector<Line>& lines, std::span<const char> mono) {
+    std::vector<char> out(lines.size(), 0);
+    const auto candidate = [&](std::size_t i) {
+        const Line& l = lines[i];
+        return i < mono.size() && mono[i] && l.figure == 0 && l.gaps.size() >= 2 && l.gap_begin.size() == l.gaps.size() &&
+               l.gap_end.size() == l.gaps.size();
+    };
+    for (std::size_t i = 0; i < lines.size();) {
+        if (!candidate(i)) {
+            ++i;
+            continue;
+        }
+        std::size_t j = i + 1;
+        while (j < lines.size() && candidate(j) && lines[j].page == lines[i].page) {
+            const float size = std::max(lines[j].size, 1.0f);
+            const float step = lines[j].baseline - lines[j - 1].baseline;
+            if (step <= 0.3f * size || step > 2.6f * size) break;
+            ++j;
+        }
+        if (j - i >= 4) {
+            // The first two gaps of every line have a stretch in common.
+            bool aligned = true;
+            for (std::size_t k = 0; k < 2 && aligned; ++k) {
+                float lo = -1e30f, hi = 1e30f;
+                for (std::size_t r = i; r < j; ++r) {
+                    lo = std::max(lo, lines[r].gap_begin[k]);
+                    hi = std::min(hi, lines[r].gap_end[k]);
+                }
+                aligned = lo < hi;
+            }
+            if (aligned) std::fill(out.begin() + static_cast<std::ptrdiff_t>(i), out.begin() + static_cast<std::ptrdiff_t>(j), char{1});
+        }
+        i = j;
+    }
+    return out;
+}
+
+
 std::size_t mark_row_continuations(std::vector<Line>& lines, std::size_t begin, std::size_t end,
                                    std::span<const float> cuts) {
     if (end > lines.size() || end < begin + 4 || cuts.empty() || cuts.size() > 30) return 0;
