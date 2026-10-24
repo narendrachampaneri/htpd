@@ -79,6 +79,43 @@ class Align(unittest.TestCase):
             self.assertEqual(len(ma), best)
 
 
+class Joins(unittest.TestCase):
+    def test_a_name_joined_in_the_file_is_the_two_pieces_of_the_pdf(self):
+        P = ["ref", "aael", "source", "f64", "title"]
+        H = ["ref", "aaelf64", "source", "title"]
+        got, n = rb.credit_joins(P, H)
+        self.assertEqual((got, n), (["ref", "aaelf64", "source", "title"], 1))
+
+    def test_nothing_is_joined_when_the_pieces_are_found_by_themselves(self):
+        P = ["aael", "f64", "x"]
+        H = ["aael", "f64", "aaelf64", "x"]
+        self.assertEqual(rb.credit_joins(P, H), (P, 0))
+
+    def test_a_word_that_is_not_two_missing_words_is_invented(self):
+        P = ["aael", "x"]
+        H = ["aaelf64", "x"]
+        self.assertEqual(rb.credit_joins(P, H), (P, 0))
+
+
+class RowsMatch(unittest.TestCase):
+    def test_a_name_the_pdf_text_cuts_short_matches_the_whole_name(self):
+        pdf = [["vector", "16b", "index", "vlxei16", "vsxei1"]]
+        file = [["vector", "16b", "index", "vlxei16", "vsxei16"]]
+        self.assertEqual(rb.match_rows(pdf, file), (1, 0))
+
+    def test_a_short_word_must_match_whole(self):
+        self.assertEqual(rb.match_rows([["a", "b", "ab"]], [["a", "b", "abc"]]), (0, 1))
+
+    def test_the_order_of_the_words_still_counts(self):
+        self.assertEqual(rb.match_rows([["alpha", "betaxx"]], [["betaxxyy", "alpha"]]), (0, 1))
+
+
+    def test_a_row_with_only_two_cells_of_text_is_never_stray(self):
+        file = [["lui", "rd", "x0"], ["a", "b", "c"]]
+        self.assertEqual(rb.match_rows([], file, [rb.rich_row("LUI | rd=x0 |  | "), rb.rich_row("a | b | c")]), (0, 1))
+        self.assertEqual(rb.match_rows([], file), (0, 2))
+
+
 class Furniture(unittest.TestCase):
     NOTES = ["  * header, 4 pages: `ACME Manual Rev 1.2`",
              "  * footer, 9 pages, 3 different texts, for example: `Intro | Page 1`"]

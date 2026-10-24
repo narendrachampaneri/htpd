@@ -53,7 +53,8 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.pdfgen.canvas import Canvas
-from reportlab.platypus import Flowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.graphics.shapes import Drawing, Line, Rect, String
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 rl_config.invariant = 1
 
@@ -367,39 +368,26 @@ def case_datasheet():
     return [table(data, [40, 100, 70, 36, 36, 36, 36], PLAIN)], {"rows": data, "header_rows": 1}
 
 
-class Chart(Flowable):
+def chart_drawing() -> Drawing:
     """Bars on a grid with axis labels: lines and numbers, no table."""
-    width, height = 380, 200
-
-    def wrap(self, aw, ah):
-        return self.width, self.height
-
-    def draw(self):
-        c = self.canv
-        x0, y0, w, h = 40, 20, 320, 160
-        c.setStrokeColor(colors.grey)
-        c.setLineWidth(0.4)
-        for i in range(6):
-            y = y0 + i * h / 5
-            c.line(x0, y, x0 + w, y)
-            c.setFont("Helvetica", 8)
-            c.setFillColor(colors.black)
-            c.drawRightString(x0 - 4, y - 3, str(i * 20))
-        for i in range(7):
-            x = x0 + i * w / 6
-            c.line(x, y0, x, y0 + h)
-        months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
-        vals = [35, 52, 61, 48, 77, 90]
-        for i, (m, v) in enumerate(zip(months, vals)):
-            x = x0 + i * w / 6
-            c.setFillColor(colors.HexColor("#3465a4"))
-            c.rect(x + 8, y0, w / 6 - 16, v * h / 100, fill=1, stroke=0)
-            c.setFillColor(colors.black)
-            c.drawCentredString(x + w / 12, y0 - 10, m)
+    d = Drawing(380, 200)
+    x0, y0, w, h = 40, 20, 320, 160
+    for i in range(6):
+        y = y0 + i * h / 5
+        d.add(Line(x0, y, x0 + w, y, strokeColor=colors.grey, strokeWidth=0.4))
+        d.add(String(x0 - 4, y - 3, str(i * 20), fontName="Helvetica", fontSize=8, textAnchor="end"))
+    for i in range(7):
+        x = x0 + i * w / 6
+        d.add(Line(x, y0, x, y0 + h, strokeColor=colors.grey, strokeWidth=0.4))
+    for i, (m, v) in enumerate(zip(["Jan", "Feb", "Mar", "Apr", "May", "Jun"], [35, 52, 61, 48, 77, 90])):
+        x = x0 + i * w / 6
+        d.add(Rect(x + 8, y0, w / 6 - 16, v * h / 100, fillColor=colors.HexColor("#3465a4"), strokeColor=None))
+        d.add(String(x + w / 12, y0 - 10, m, fontName="Helvetica", fontSize=8, textAnchor="middle"))
+    return d
 
 
 def case_chart():
-    return [Chart()], {"rows": [], "header_rows": 0, "kind": "chart"}
+    return [chart_drawing()], {"rows": [], "header_rows": 0, "kind": "chart"}
 
 
 CASES = {

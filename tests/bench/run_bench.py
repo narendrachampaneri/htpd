@@ -91,6 +91,50 @@ def tokens(text: str) -> list[str]:
     return out
 
 
+def credit_joins(P: list[str], H: list[str], pairs: list | None = None) -> tuple[list[str], int]:
+    """A name the PDF breaks over two lines of a cell ("AAEL" / "F64") is two words for pdftotext and
+    one name in the file ("AAELF64"). Where a word of the file is missing from the PDF's page but is the
+    two words of the PDF that the file lacks, put together, the PDF's two words become that one word
+    (at the place of the first) - so a name joined right counts as found, not as one lost and one
+    invented word. Returns the new PDF words and how many names were joined; `pairs` collects
+    (first piece, second piece, name)."""
+    cp, ch = Counter(P), Counter(H)
+    miss, extra = cp - ch, ch - cp
+    if not miss or not extra:
+        return P, 0
+    P = list(P)
+    joined = 0
+    for e in sorted(extra, key=lambda w: -len(w)):
+        for _ in range(extra[e]):
+            done = False
+            for k in range(1, len(e)):
+                a, b = e[:k], e[k:]
+                need = Counter([a, b])
+                if any(miss[w] < n for w, n in need.items()):
+                    continue
+                # The nearest pair: a piece and the same name's next piece after it.
+                pos_a = [i for i, w in enumerate(P) if w == a]
+                best = None
+                for i in pos_a:
+                    j = next((x for x in range(i + 1, len(P)) if P[x] == b), None)
+                    if j is not None and (best is None or j - i < best[1] - best[0]):
+                        best = (i, j)
+                if best is None:
+                    continue
+                ia, ib = best
+                P[ia] = e
+                del P[ib]
+                if pairs is not None:
+                    pairs.append((a, b, e))
+                miss.subtract(need)
+                joined += 1
+                done = True
+                break
+            if not done:
+                break
+    return P, joined
+
+
 def digits_to_hash(words: list[str]) -> list[str]:
     return [re.sub(r"\d+", "#", w) for w in words]
 
@@ -696,25 +740,56 @@ def subsequence(small: list[str], big: list[str]) -> bool:
     return all(w in it for w in small)
 
 
-def match_rows(pdf_rows: list[list[str]], h_rows: list[list[str]]) -> tuple[int, int]:
-    """(PDF rows found inside a row of the file, rows of the file that hold no PDF row)."""
+def match_rows(pdf_rows: list[list[str]], h_rows: list[list[str]],
+               rich: list[bool] | None = None) -> tuple[int, int]:
+    """(PDF rows found inside a row of the file, rows of the file that hold no PDF row).
+    `rich[k]`: the row k of the file has three cells with text; a row with fewer is never stray (the PDF
+    side counts cells with text, an empty cell is not one).
+    A word of the PDF row also matches a longer word of the file that starts with it (at least five
+    letters): the file has the whole name where pdftotext cut it off at the cell or joined only its
+    first piece ("R_AARCH64_AUTH_GOT_ADR_P" / "REL_LO21" is one name in the file)."""
     index: dict[str, set[int]] = defaultdict(set)
     for k, r in enumerate(h_rows):
         for w in set(r):
             index[w].add(k)
+    vocab = sorted(index)
+
+    def rows_with(w: str) -> set[int]:
+        found = set(index.get(w, ()))
+        if len(w) >= 5:
+            for i in range(bisect_left(vocab, w), len(vocab)):
+                if not vocab[i].startswith(w):
+                    break
+                found |= index[vocab[i]]
+        return found
+
+    def same(w: str, v: str) -> bool:
+        return w == v or (len(w) >= 5 and v.startswith(w))
+
+    def in_row(p: list[str], row: list[str]) -> bool:
+        it = iter(row)
+        return all(any(same(w, v) for v in it) for w in p)
+
     found = 0
     used: set[int] = set()
     for p in pdf_rows:
         cand: set[int] | None = None
         for w in set(p):
-            cand = index.get(w, set()) if cand is None else cand & index.get(w, set())
+            cand = rows_with(w) if cand is None else cand & rows_with(w)
             if not cand:
                 break
-        hit = [k for k in sorted(cand or ()) if subsequence(p, h_rows[k])]
+        hit = [k for k in sorted(cand or ()) if in_row(p, h_rows[k])]
         if hit:
             found += 1
             used.update(hit)
-    return found, len(h_rows) - len(used)
+    if rich is None:
+        return found, len(h_rows) - len(used)
+    return found, sum(1 for k in range(len(h_rows)) if rich[k] and k not in used)
+
+
+def rich_row(line: str) -> bool:
+    """A row of the file with at least three cells that hold text."""
+    return sum(1 for c in line.split(" | ") if c.strip(" |")) >= 3
 
 
 def analyse(job: dict) -> dict:
@@ -767,10 +842,13 @@ def analyse(job: dict) -> dict:
             H = [w for x in hl for w in x]
             for c in pdf_captions(plines):
                 fig_pdf.add((pno, c))
+            P, joins = credit_joins(P, H)
+            t["joined_names"] += joins
             prow = table_lines(plines)
-            hrow = [tokens(r) for r in h.page_rows.get(pno, []) if r.count(" | ") >= 2]
+            hlist = [r for r in h.page_rows.get(pno, []) if r.count(" | ") >= 2]
+            hrow = [tokens(r) for r in hlist]
             pdf_rows_all += len(prow)
-            f, s = match_rows(prow, hrow)
+            f, s = match_rows(prow, hrow, [rich_row(r) for r in hlist])
             row_found += f
             row_stray += s
             t["rows_htpd"] += len(h.page_rows.get(pno, []))
@@ -797,6 +875,8 @@ def analyse(job: dict) -> dict:
             t["extra_pieces"] += len(ep)
             if mp or ep:
                 worst.append({"page": pno, "missing": len(P) - order_hit, "extra": len(H) - hit,
+                              "missing_words": sorted(miss.items(), key=lambda kv: -kv[1])[:12],
+                              "extra_words": sorted(extra.items(), key=lambda kv: -kv[1])[:12],
                               "missing_pieces": [" ".join(x[:14]) for x in mp[:5]],
                               "extra_pieces": [" ".join(x[:14]) for x in ep[:5]]})
         moved = sum(min(c, extra_all[w]) for w, c in miss_all.items())
@@ -812,9 +892,10 @@ def analyse(job: dict) -> dict:
             "pages_text": t["pages_text"], "pages_ok": t["pages_ok"],
             "missing_pieces": t["missing_pieces"], "extra_pieces": t["extra_pieces"],
             "furniture_removed": t["furniture_removed"], "furniture_kept": t["furniture_kept"],
+            "joined_names": t["joined_names"],
             "unpaged_words": h.unpaged_words, "title_labels": labels,
         })
-        d["worst_pages"] = sorted(worst, key=lambda x: -(x["missing"] + x["extra"]))[:12]
+        d["worst_pages"] = sorted(worst, key=lambda x: -(x["missing"] + x["extra"]))[:60]
         m.update({"rows_pdf": pdf_rows_all, "rows_htpd": t["rows_htpd"], "rows_found": row_found,
                   "rows_stray": row_stray})
         m["figs_pdf"] = len(fig_pdf)
@@ -825,7 +906,7 @@ def analyse(job: dict) -> dict:
         for k in ("pdf_words", "htpd_words", "hit_words", "order_words", "coverage_words", "coverage_order",
                   "missing_words", "extra_words", "moved_words", "lost_words", "invented_words", "extra_share",
                   "pages_text", "pages_ok", "missing_pieces", "extra_pieces", "furniture_removed",
-                  "furniture_kept", "title_labels", "rows_pdf", "rows_found", "rows_stray", "figs_pdf", "figs_found"):
+                  "furniture_kept", "joined_names", "title_labels", "rows_pdf", "rows_found", "rows_stray", "figs_pdf", "figs_found"):
             m[k] = None
         m["rows_htpd"] = sum(len(v) for v in h.page_rows.values())
         m["unpaged_words"] = h.unpaged_words
@@ -943,6 +1024,7 @@ METRICS = [
     ("missing_pieces", "missing pieces", "down", "{:,}"),
     ("extra_pieces", "extra pieces", "down", "{:,}"),
     ("furniture_kept", "headers kept", "down", "{:,}"),
+    ("joined_names", "names joined", "info", "{:,}"),
     ("toc_found", "headings found", "up", "{:,}"),
     ("toc_missing", "headings missing", "down", "{:,}"),
     ("toc_extra", "headings extra", "info", "{:,}"),

@@ -120,7 +120,7 @@ The file side: lines with ` | ` in a `text` block.
 |---|---|---|
 | `rows found` of `rows in PDF` | PDF rows whose words (in order) are inside one row of the file on the same page; a row with a joined wrapped cell still counts | higher |
 | `rows in file` | lines with ` | ` | no verdict |
-| `stray rows` | rows of the file (three or more cells) that hold no PDF row | lower |
+| `stray rows` | rows of the file with three or more cells that hold text and no PDF row (a row with empty cells is counted by its cells with text) | lower |
 
 **Figures.** The PDF side: lines that start with `Figure N.`, `Figure N:`, `Fig. N -` or are only `Figure N`
 (not a line of a list of figures that ends in a page number); each (page, label) once.
@@ -158,7 +158,11 @@ The reference is `pdftotext`, not the truth. Be aware of what it gets wrong, so 
   the PDF stores (FORMAT.md 4.2). On two-column pages and in tables, words are "in order" for one and not for
   the other, so `words in order` is below `words on page`. This difference is the same before and after; compare.
 * **Wrapped names.** A long name broken over two lines (`_TLSGD_ADR_` / `PREL21`) is two words for
-  `pdftotext` and one for the converter: one missing and one extra piece.
+  `pdftotext` and one for the converter. Where a word of the file is missing from the PDF's page but is two
+  words of the PDF that the file lacks, put together, the bench counts the name as found (`names joined`).
+  A PDF word that is the first five letters or more of a longer word of the file also matches in the rows
+  (pdftotext cuts a name where the file has it whole). The bench cannot tell a right join from a wrong
+  one - the cells of `make_tables.py` can.
 * **Rotated text, scans, other scripts.** `pdftotext` drops or garbles sideways pages and some Indic
   scripts. A PDF without a text layer (a scan) has no reference: its text, table and figure numbers are `-`
   (it still counts for time, size and headings from bookmarks).
