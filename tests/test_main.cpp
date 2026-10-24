@@ -888,6 +888,22 @@ TEST(lattice_leaves_a_grid_that_is_not_a_table_to_the_other_methods) {
     CHECK_EQ(find_lattice_tables(block, blocks, id3).tables, std::size_t{0});
 }
 
+TEST(lattice_does_not_read_a_page_drawn_with_thousands_of_lines) {
+    std::vector<Rule> rules;
+    for (int i = 0; i < 1000; ++i) {
+        rules.push_back(h_rule(100 + 2.5f * static_cast<float>(i), 50, 350));
+        rules.push_back(v_rule(50 + 3.0f * static_cast<float>(i), 100, 2600));
+    }
+    std::vector<Line> lines;
+    lines.push_back(placed_line(114, {{56, "Name"}, {156, "Value"}}));
+    lines.push_back(placed_line(134, {{56, "Reset"}, {156, "5"}}));
+    std::int32_t id = kLatticeTableId;
+    const LatticeReport report = find_lattice_tables(lines, rules, id);
+    CHECK_EQ(report.tables, std::size_t{0});
+    CHECK_EQ(report.left, std::size_t{0});   // not even tried: the page is a drawing
+    CHECK(lines[0].cells.empty());
+}
+
 TEST(lattice_leaves_a_table_alone_when_a_word_crosses_a_line_of_the_grid) {
     const std::vector<Rule> rules = grid_rules({50, 100, 150}, {100, 120, 140});
     std::vector<Line> lines;

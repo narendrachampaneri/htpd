@@ -59,6 +59,7 @@ struct LatticeOptions {
     float reach = 2.0f;            // a rule this near a crossing rule touches it
     float min_filled = 0.4f;       // at least this share of the cells must hold text
     std::size_t max_cells = 4000;  // a bigger grid is not read
+    std::size_t max_rules = 1500;  // a page with more lines (after merging those on one line) is a drawing, not read
 };
 
 struct LatticeReport {

@@ -558,6 +558,7 @@ LatticeReport find_lattice_tables(std::vector<Line>& lines, std::span<const Rule
     if (hs.size() < 2 || vs.size() < 2) return report;   // a grid needs both
     hs = merge_segments(std::move(hs), o);
     vs = merge_segments(std::move(vs), o);
+    if (hs.size() + vs.size() > o.max_rules) return report;   // a drawing (a map, hatching), not a table: too many lines to be read
 
     // 2. Connected sets of rules: a horizontal and a vertical rule that touch are one set.
     const std::size_t nh = hs.size(), n = hs.size() + vs.size();
