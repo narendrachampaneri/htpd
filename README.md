@@ -204,7 +204,7 @@ flowchart LR
 
 | Part | What it does |
 |---|---|
-| **Converter** `htpd` (C++23, PDFium) | Reads every character with its position and font, removes headers and footers, finds the headings (bookmarks, the PDF's own tags, a printed table of contents, numbering, font size), cuts the text into sections, keeps tables as rows and code as code, stores figures as PNG with their caption, reads scans with OCR. |
+| **Converter** `htpd` (C++23, PDFium) | Reads every character with its position and font, removes headers and footers, finds the headings (bookmarks, the PDF's own tags, a printed table of contents, numbering, font size), cuts the text into sections, reads tables as rows (from the lines the page draws, the PDF's tags or the text; cells over columns or rows are marked) and keeps code as code, stores figures as PNG with their caption, reads scans with OCR. |
 | **Reader** `htpd-read` (Python, standard library only) | Finds the sections that answer a question (word search, the tree of titles, a small trained re-ranker), packs only that text with its pages, picks the exact answer lines, and says when the file cannot answer. Also as a skill, a plugin and an MCP server. |
 
 <p align="center">
@@ -279,7 +279,7 @@ NPU | 500 MHz | 800 MHz | 1000 MHz
 
 - **Sections** follow the document's own headings and form a tree: parent, children, previous, next.
 - **Page marks** `<!-- page N -->` stand above the text of every page.
-- **Tables** are rows with ` | ` between cells; **code and listings** keep their spacing.
+- **Tables** are rows with ` | ` between cells (a cell over columns or rows is marked `[>]` / `[=]` where the page draws the lines of the table); **code and listings** keep their spacing.
 - **Figures** are PNG pictures with caption and page, stored inside the file.
 - **Two forms, same content:** a single `.htpd` file (for chats) and a folder with one file per section (for tools), which is also a valid [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) bundle.
 
