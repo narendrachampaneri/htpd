@@ -4,7 +4,7 @@ title: "A.1 Status register"
 description: "Bit | Name | Access | Reset | Description; 0 | READY | R | 0 | Controller is ready to charge; 1 | FAULT | R | 0 | A fault is latched; 2 | ..."
 resource: "sample.pdf#page=5"
 tags: [htpd, section]
-generated: { by: htpd/0.1.2, at: 2026-10-24T05:39:17Z }
+generated: { by: htpd/0.1.2, at: 2026-10-24T07:25:00Z }
 sources:
   - id: source-pdf
     resource: "sample.pdf#page=5"

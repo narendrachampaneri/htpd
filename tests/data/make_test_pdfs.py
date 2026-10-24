@@ -15,7 +15,7 @@ from reportlab.lib.pagesizes import landscape, letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfgen import canvas
-from reportlab.platypus import (BaseDocTemplate, Frame, NextPageTemplate, PageBreak,
+from reportlab.platypus import (SimpleDocTemplate, BaseDocTemplate, Frame, NextPageTemplate, PageBreak,
                                 PageTemplate, Paragraph, Spacer, Table, TableStyle)
 
 rl_config.invariant = 1   # same bytes on every run (no timestamps)
@@ -850,6 +850,36 @@ def chrome_template(path, pages=1):
     c.save()
 
 
+def ruled_tables(path):
+    """Tables drawn with lines: one with cells over rows and columns, one of two columns, and a chart
+    with grid lines that is no table (the lattice method of the table engine)."""
+    from reportlab.graphics.shapes import Drawing, Line, String
+    cell = ParagraphStyle('cell', fontName='Helvetica', fontSize=9, leading=11)
+    grid = [('GRID', (0, 0), (-1, -1), 0.5, colors.black), ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 3), ('BOTTOMPADDING', (0, 0), (-1, -1), 3)]
+    merged = Table([['Region', 'Area', 'Sales', '', ''], ['', '', 'Q1', 'Q2', 'Q3'],
+                    ['North', 'Urban', '10', '11', '12'], ['', 'Rural', '5', '6', '7'],
+                    ['South', 'Urban', '20', '22', '21'], ['', 'Rural', '8', '9', '9']],
+                   colWidths=[60, 60, 50, 50, 50])
+    merged.setStyle(TableStyle(grid + [('SPAN', (0, 0), (0, 1)), ('SPAN', (1, 0), (1, 1)), ('SPAN', (2, 0), (4, 0)),
+                                       ('SPAN', (0, 2), (0, 3)), ('SPAN', (0, 4), (0, 5))]))
+    pairs = Table([[Paragraph('Operating voltage', cell), Paragraph('The controller works from 3.0 V to 3.6 V and '
+                                                                   'switches itself off below 2.7 V.', cell)],
+                   [Paragraph('Protection class', cell), Paragraph('IP20', cell)]], colWidths=[110, 230])
+    pairs.setStyle(TableStyle(grid))
+    chart = Drawing(300, 140)
+    for i in range(5):
+        chart.add(Line(30, 20 + i * 25, 290, 20 + i * 25, strokeColor=colors.grey, strokeWidth=0.4))
+        chart.add(String(10, 17 + i * 25, str(i * 10), fontName='Helvetica', fontSize=8))
+    for i in range(6):
+        chart.add(Line(30 + i * 52, 20, 30 + i * 52, 120, strokeColor=colors.grey, strokeWidth=0.4))
+    doc = SimpleDocTemplate(path, pagesize=letter, leftMargin=72, rightMargin=72, topMargin=72, bottomMargin=72,
+                            title='Ruled tables', author='HTPD tests')
+    doc.build([Paragraph('Ruled tables', h1), Paragraph('Sales by region and quarter.', body), merged, Spacer(1, 14),
+               Paragraph('Operating data.', body), pairs, Spacer(1, 14),
+               Paragraph('Temperature over a day.', body), chart])
+
+
 if __name__ == '__main__':
     Manual(os.path.join(OUT, 'sample.pdf'), bookmarks=True).build(manual_story())
     Manual(os.path.join(OUT, 'sample_nobookmarks.pdf'), bookmarks=False).build(manual_story())
@@ -867,4 +897,5 @@ if __name__ == '__main__':
     latex_chapters(os.path.join(OUT, 'latex_chapters.pdf'))
     chrome_template(os.path.join(OUT, 'chrome_template.pdf'))
     tagged_styled(os.path.join(OUT, 'tagged_styled.pdf'))
-    print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf, sideways.pdf, links.pdf, ocr.pdf, figures.pdf, actualtext.pdf, tagged.pdf, tagged_bookmarks.pdf, tagged_disagree.pdf, styles_weight.pdf, latex_chapters.pdf, chrome_template.pdf, tagged_styled.pdf to', OUT)
+    ruled_tables(os.path.join(OUT, 'ruled_tables.pdf'))
+    print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf, sideways.pdf, links.pdf, ocr.pdf, figures.pdf, actualtext.pdf, tagged.pdf, tagged_bookmarks.pdf, tagged_disagree.pdf, styles_weight.pdf, latex_chapters.pdf, chrome_template.pdf, tagged_styled.pdf, ruled_tables.pdf to', OUT)

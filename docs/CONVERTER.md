@@ -209,6 +209,40 @@ Cost and gain (`tests/bench`, `tests/zoo`):
   one-page document are taken out (the noise in the text of such a document
   falls from 0.12 to 0.03).
 
+### Tables
+
+Three ways to know where the cells of a table are, tried in this order (`src/tables.cpp`, with
+`src/columns.cpp` and `src/sections.cpp`). Where none is certain, the lines stay as they stand: no text is
+moved into a cell it does not stand in, none is left out.
+
+| Method | Evidence | What it gives |
+|---|---|---|
+| Tags | the structure tree of a tagged PDF (see "Tagged PDFs") | every cell exactly, spans |
+| Lattice | the lines drawn on the page: horizontal and vertical rules, and thin filled bars (how Word and LibreOffice draw borders) | the cells are the boxes the lines make, also cells over several columns or rows (`[>]`, `[=]`, as for tags) |
+| Stream | the positions of the text: columns from the strips the rows leave free, rows from bands across the page | rows and cells of a table without lines |
+
+**Lattice** takes the rules of a page, joins those that lie on one line, finds the grid they make and the
+cells (a box without the line between two atoms is one cell, so a cell can span). The words go into the cell
+their middle lies in. The grid is used only when it is consistent, otherwise the page is left to the
+stream method: every cell is a rectangle, no word crosses a line of the grid, at least 40 % of the cells hold
+text and two rows have two cells with text (a chart with grid lines, a frame round a paragraph and a page
+border are no tables); no cell of four lines or more shares its row with another such cell (rows whose
+rules the page does not draw: the lines are read by the text); and every line lies in the table as a whole
+or outside it. In a cell, the lines are joined with a space - except where a name is broken inside itself
+because the column is too narrow ("LCD_P2" over "4", "US-GAAP" over "-1010", "($1,433,600." over "00)"):
+there the geometry decides, since the line before is one word that reaches the right limit of the cell.
+Values stacked in a cell - two cells of a row with a number on each of their lines, the other tall cells
+with as many lines at the same heights ("Level 1..4 falling | 2.62 | 2.70 | 2.78") - become one row per line.
+`--tables text` switches the lattice method off.
+
+**Joining the lines of a cell** (all methods): a space, except where the next line certainly continues the
+last word: the first part ends with `_` or `/`; the next starts with `_` or is a lone `)`; a short number
+follows a name that has letters and digits or `_` ("LCD_P2" + "4"; two numbers one under the other are not a
+name); a code in capitals breaks at its hyphen ("US-GAAP" + "-1010"); an amount is completed ("($1,433,600."
++ "00)", "$1,433," + "600.00"); two halves of a name with `_` in lower case or in capitals ("CAN_FD_CONT" +
+"ROL_STATUS" - but not "SPI_CLK" + "SPI_MISO", two names that start alike); a rest of at most three letters
+under a word as wide as its column ("DEFAU" + "LT"). Never a character is invented or dropped.
+
 ### Styles and producers
 
 **The style sheet** (`src/styles.cpp`). Before headers, footers and headings
@@ -356,6 +390,7 @@ htpd info manual.pdf                     # show what would be found, write nothi
 | `--keep-headers` | Keeps the running headers and footers in the text. |
 | `--dehyphenate` | `inter-` + `rupt` becomes `interrupt` instead of `inter-rupt`. |
 | `--tags auto\|on\|off` | The structure tags of a tagged PDF (headings, tables, lists, figures, page furniture), used where they agree with the page text. `auto` (default): when the PDF is tagged and the headings found without the tags are poor (see "Tagged PDFs"). `on`: whenever the PDF has tags. `off`: read every PDF as if it had no tags. Reading the tags costs time, see "Tagged PDFs". |
+| `--tables auto\|text` | How the cells of a table are found. `auto` (default): from the PDF's tags, from the lines drawn on the page (lattice) and from the text. `text`: not from the lines drawn on the page. See "Tables". |
 | `--ocr auto\|on\|off` | Read text from pictures and scanned pages with Tesseract. `auto` (default): when it is installed. `on`: stop with an error when it is not. `off`: never. |
 | `--ocr-lang <langs>` | Tesseract languages, e.g. `eng+deu` (default `eng`). Each must be installed (`tesseract --list-langs`). |
 | `--figures on\|off` | Store figures (pictures and drawings) as PNG pictures in the bundle (default `on`). |
@@ -403,6 +438,7 @@ One PDF goes through seven steps. Each step is one small file.
 | 2. Lines | `src/layout.cpp` | Characters become lines. Wide gaps are marked (table columns); raised and lowered numbers stay raised (2³¹). |
 | 2b. Styles | `src/styles.cpp` | The style sheet: every line into a style, the styles into roles (body, headings, captions, table text, code, header/footer, footnote), and the producer of the PDF. See "Styles and producers" above. |
 | 3. Headers and footers | `src/furniture.cpp` | Lines that repeat at the page edge on many pages are taken out and reported (in a document of two or three pages: on every page). A running header is set apart from the text: a line that stands right on top of the text below it (closer than 2.5 of its font sizes) stays in the text - a heading or the header row of a table at the top of the page - unless it holds the number of its page or stands on almost every page. |
+| 3a. Ruled tables | `src/tables.cpp` | Tables drawn with lines: the cells the rules make, spans, stacked values, names broken in a cell. See "Tables". The rules of a page come from `src/pdf_reader_pdfium.cpp`. |
 | 3b. Columns | `src/columns.cpp` | A table set tight (LaTeX, web pages, slides) has column gaps narrower than two font sizes. Its rows leave the same strips of the page free; the spaces on those strips become column gaps, also in the header row. Running text crosses the strips and is left alone. |
 | 4. Headings | `src/headings.cpp` | From the bookmarks of the PDF (each found as its heading line on its page - the line in the largest font, so not a running header with the same words - or at the top of the next page); or from a table of contents printed in the document, whose titles are looked for in the text after it, in order (also when the text shows them without their number); or from the text: section numbers (also `Register 30.2.43: ...`, one level below its section), font size, bold, another font, and a heading style of the style sheet (a colour or a weight of its own). A numbered cell of a table row (another cell beside it on its line) is no heading. Large titles in a smaller style than the numbered headings, used three times or more, are headings one level below them. |
 | 4b. Structure | `src/structure.cpp` | For documents with few headings: a running header that changes starts a section with its text as title. Text longer than a few pages is cut into parts of about 2 pages, where a sentence ends (FORMAT.md 3.3). |

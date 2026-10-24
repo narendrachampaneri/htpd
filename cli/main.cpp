@@ -43,6 +43,10 @@ Options for convert:
                                     pages, or all on one level (default)
                               on    whenever the PDF has tags
                               off   never
+      --tables <mode>       How the cells of a table are found:
+                              auto  from the PDF's tags, from the lines drawn
+                                    on the page, and from the text (default)
+                              text  not from the lines drawn on the page
       --ocr <mode>          Text in pictures and scanned pages, read with the
                             free Tesseract program:
                               auto  when Tesseract is installed (default)
@@ -158,6 +162,10 @@ int run_convert(Args& args) {
                           "{} artifact lines\n",
                           r.headings_from_tags, r.tags.tables, r.tags.table_rows, r.tags.lists, r.tags.list_items,
                           r.tags.figures, r.tags.artifact_lines));
+    }
+    if (r.lattice.tables > 0) {
+        print(std::format("  ruled tables    {} tables ({} rows) from the lines drawn on the pages\n", r.lattice.tables,
+                          r.lattice.rows));
     }
     if (r.figures > 0) {
         print(std::format("  figures         {} stored as pictures ({})\n", r.figures, megabytes(r.figure_bytes)));
@@ -276,6 +284,9 @@ int main(int argc, char** argv) {
             if (!value(v) || !parse_fraction(v, args.convert.margin_band)) {
                 return usage_error("--margin-band must be a number from 0 to 0.3");
             }
+        } else if (arg == "--tables") {
+            if (!value(v) || (v != "auto" && v != "text")) return usage_error("--tables must be auto or text");
+            args.convert.tables = v == "text" ? htpd::TableMode::Text : htpd::TableMode::Auto;
         } else if (arg == "--tags") {
             if (!value(v) || (v != "auto" && v != "on" && v != "off")) return usage_error("--tags must be auto, on or off");
             args.convert.tags = v == "on" ? htpd::TagMode::On : v == "off" ? htpd::TagMode::Off : htpd::TagMode::Auto;

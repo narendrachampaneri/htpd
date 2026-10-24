@@ -4,7 +4,7 @@ title: "1 Introduction"
 description: "The controller supervises the power stage and the vehicle interface. It samples the bus voltage, the output current and three temperature ..."
 resource: "sample.pdf#page=2"
 tags: [htpd, section]
-generated: { by: htpd/0.1.2, at: 2026-10-24T05:39:17Z }
+generated: { by: htpd/0.1.2, at: 2026-10-24T07:25:00Z }
 sources:
   - id: source-pdf
     resource: "sample.pdf#page=2"

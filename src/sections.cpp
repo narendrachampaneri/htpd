@@ -5,6 +5,7 @@
 #include <format>
 #include <optional>
 
+#include "htpd/tables.hpp"
 #include "htpd/text.hpp"
 
 namespace htpd {
@@ -97,47 +98,6 @@ void join_line(std::string& paragraph, std::string_view line, bool dehyphenate) 
         paragraph.push_back(' ');
     }
     paragraph += line;
-}
-
-// Whether the next line of a table cell continues the last word of the cell
-// without a space: a name broken inside itself because the column is too
-// narrow for it ("UART2_" / "RX", "LCD_P2" / "4", "field" / "_2",
-// "($1,433,600.00" / ")"). Only when that is certain; otherwise the line
-// break is a space, as everywhere. `fills` tells that the line before is one
-// word as wide as its column: then a very short rest ("DEFAU" / "LT",
-// "Length-Delimit" / "ed") is the end of that word.
-bool continues_word(std::string_view cell, std::string_view next, bool fills) {
-    const std::size_t space = cell.rfind(' ');
-    const std::string_view a = space == std::string_view::npos ? cell : cell.substr(space + 1);
-    const std::string_view b = next.substr(0, next.find(' '));
-    if (a.empty() || b.empty()) return false;
-    const auto word_char = [](char c) { return is_alnum(c) || c == '_'; };
-    const auto has = [](std::string_view w, auto pred) { return std::ranges::any_of(w, pred); };
-    // "UART2_" + "RX", "PTA4/" + "LLWU_P"
-    if ((a.back() == '_' || a.back() == '/') && a.size() >= 2 && is_alnum(b.front())) return true;
-    // "auth_srv_payload_field" + "_2", "($1,433,600.00" + ")"
-    if ((b.front() == '_' && word_char(a.back())) || (b == ")" && is_digit(a.back()))) return true;
-    if (!word_char(a.back()) || !std::ranges::all_of(b, word_char)) return false;
-    // "LCD_P2" + "4", "LLWU_P" + "15", "US-GAAP-101" + "0": digits after a name with digits or "_"
-    const bool name = has(a, [](char c) { return c == '_' || is_digit(c); });
-    if (name && b.size() <= 4 && is_digit(b.front()) && std::ranges::all_of(b, is_digit)) return true;
-    // "notification_payload_f" + "ield_23": both halves of one name with "_"
-    if (has(a, [](char c) { return c == '_'; }) && has(b, [](char c) { return c == '_'; }) && is_lower(b.front()) &&
-        is_lower(a.back())) {
-        return true;
-    }
-    // "DEFAU" + "LT", "SPI2_MI" + "SO": a very short rest of a word that fills its column
-    return fills && space == std::string_view::npos && a.size() >= 4 && b.size() <= 3 && next.size() == b.size() &&
-           (std::ranges::all_of(b, is_lower) == std::ranges::all_of(a.substr(a.size() - 1), is_lower));
-}
-
-// Appends the next line of a table cell (see continues_word).
-void join_cell_line(std::string& cell, std::string_view next, bool fills) {
-    if (continues_word(cell, next, fills)) {
-        cell += next;
-    } else {
-        join_line(cell, next, false);
-    }
 }
 
 // A block of monospace lines as text: one line each, with the spacing of the

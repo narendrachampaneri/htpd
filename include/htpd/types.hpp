@@ -117,6 +117,15 @@ struct PageTags {
     bool present() const { return !nodes.empty(); }
 };
 
+// A straight line drawn on the page, parallel to an edge (a rule of a table, a border): a
+// horizontal one has y0 == y1, a vertical one x0 == x1. `width` is its thickness in points.
+// A thin filled bar counts as a line. Lines drawn in white are not kept.
+struct Rule {
+    float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+    float width = 0;
+    bool horizontal() const { return y0 == y1; }
+};
+
 struct PageText {
     int index = 0;                       // 0-based page index
     float width = 0, height = 0;         // display size in points
@@ -129,6 +138,7 @@ struct PageText {
     std::vector<Box> images;             // picture objects (photos, scans, pictures of text)
     std::vector<std::uint64_t> image_keys;   // for each picture: a hash of its data (the same picture, the same key)
     std::vector<Box> paths;              // line and shape objects (drawings, table rules, frames)
+    std::vector<Rule> rules;             // horizontal and vertical lines (empty on a turned page)
     std::vector<Box> forms;              // form objects (groups drawn as one, often a whole drawing)
     std::size_t objects = 0;             // everything drawn on the page: text, pictures, lines, shapes
     PageTags tags;                       // the page's part of the structure tree (tagged PDFs only)

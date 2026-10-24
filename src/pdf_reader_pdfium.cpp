@@ -606,6 +606,110 @@ Result<Image> PdfDocument::render(int index, const Box& region, float scale, boo
     return image;
 }
 
+// The straight lines of a path object, in display space: its horizontal and vertical segments
+// and, for a rectangle, its four edges (stroked) or its long axis (a thin filled bar - the way
+// Word and LibreOffice draw table borders). Curves and slanted lines are not rules.
+static void collect_rules(FPDF_PAGEOBJECT object, const Affine& to_display, std::vector<Rule>& out) {
+    constexpr int kMaxSegments = 600;
+    constexpr std::size_t kMaxRules = 20000;
+    const int count = FPDFPath_CountSegments(object);
+    if (count < 2 || count > kMaxSegments || out.size() >= kMaxRules) return;
+    int fill_mode = 0;
+    FPDF_BOOL stroke = 0;
+    if (!FPDFPath_GetDrawMode(object, &fill_mode, &stroke)) return;
+    const bool fill = fill_mode != FPDF_FILLMODE_NONE;
+    if (!fill && !stroke) return;
+    const auto white = [&](bool fill_colour) {
+        unsigned r = 0, g = 0, b = 0, a = 255;
+        const bool got = fill_colour ? FPDFPageObj_GetFillColor(object, &r, &g, &b, &a)
+                                     : FPDFPageObj_GetStrokeColor(object, &r, &g, &b, &a);
+        return got && (a < 16 || (r > 235 && g > 235 && b > 235));
+    };
+    const bool stroked = stroke && !white(false);
+    const bool filled = fill && !white(true);
+    if (!stroked && !filled) return;
+    float width = 0;
+    if (stroked && !FPDFPageObj_GetStrokeWidth(object, &width)) width = 1;
+    FS_MATRIX m{1, 0, 0, 1, 0, 0};
+    FPDFPageObj_GetMatrix(object, &m);
+    // The thickness the matrix gives the stroke.
+    const float scale = std::sqrt(std::fabs(m.a * m.d - m.b * m.c));
+    const float stroke_width = std::max(width * (scale > 0 ? scale : 1.0f), 0.25f);
+
+    struct Point { float x, y; bool move; bool close; };
+    std::vector<Point> points;
+    points.reserve(static_cast<std::size_t>(count));
+    for (int i = 0; i < count; ++i) {
+        FPDF_PATHSEGMENT seg = FPDFPath_GetPathSegment(object, i);
+        if (seg == nullptr) return;
+        const int type = FPDFPathSegment_GetType(seg);
+        if (type == FPDF_SEGMENT_BEZIERTO) return;   // a curve: a drawing, not a table
+        float x = 0, y = 0;
+        if (!FPDFPathSegment_GetPoint(seg, &x, &y)) return;
+        float ux = m.a * x + m.c * y + m.e, uy = m.b * x + m.d * y + m.f, dx = 0, dy = 0;
+        to_display.apply(ux, uy, dx, dy);
+        points.push_back({dx, dy, type == FPDF_SEGMENT_MOVETO, FPDFPathSegment_GetClose(seg) != 0});
+    }
+    const auto add = [&](float x0, float y0, float x1, float y1, float w) {
+        constexpr float kFlat = 0.6f, kMinLength = 3.0f;
+        Rule r;
+        r.width = w;
+        if (std::fabs(y1 - y0) <= kFlat && std::fabs(x1 - x0) >= kMinLength) {
+            r.x0 = std::min(x0, x1);
+            r.x1 = std::max(x0, x1);
+            r.y0 = r.y1 = (y0 + y1) / 2;
+        } else if (std::fabs(x1 - x0) <= kFlat && std::fabs(y1 - y0) >= kMinLength) {
+            r.y0 = std::min(y0, y1);
+            r.y1 = std::max(y0, y1);
+            r.x0 = r.x1 = (x0 + x1) / 2;
+        } else {
+            return;
+        }
+        out.push_back(r);
+    };
+    // A rectangle: a closed path of four corners (or five points, the last the first).
+    std::size_t n = points.size();
+    if (n == 5 && std::fabs(points[4].x - points[0].x) < 0.01f && std::fabs(points[4].y - points[0].y) < 0.01f) --n;
+    bool rect = n == 4 && points[0].move;
+    for (std::size_t i = 1; rect && i < 4; ++i) rect = !points[i].move;
+    if (rect) {
+        const bool axis = (std::fabs(points[0].y - points[1].y) < 0.01f && std::fabs(points[1].x - points[2].x) < 0.01f &&
+                           std::fabs(points[2].y - points[3].y) < 0.01f && std::fabs(points[3].x - points[0].x) < 0.01f) ||
+                          (std::fabs(points[0].x - points[1].x) < 0.01f && std::fabs(points[1].y - points[2].y) < 0.01f &&
+                           std::fabs(points[2].x - points[3].x) < 0.01f && std::fabs(points[3].y - points[0].y) < 0.01f);
+        if (axis) {
+            const float x0 = std::min({points[0].x, points[1].x, points[2].x, points[3].x});
+            const float x1 = std::max({points[0].x, points[1].x, points[2].x, points[3].x});
+            const float y0 = std::min({points[0].y, points[1].y, points[2].y, points[3].y});
+            const float y1 = std::max({points[0].y, points[1].y, points[2].y, points[3].y});
+            constexpr float kThin = 2.5f;
+            if (filled && !stroked) {
+                // A bar: its long axis, as thick as it is thin. A filled block is shading, not a rule.
+                if (y1 - y0 <= kThin && x1 - x0 >= 3.0f) add(x0, (y0 + y1) / 2, x1, (y0 + y1) / 2, std::max(y1 - y0, 0.25f));
+                else if (x1 - x0 <= kThin && y1 - y0 >= 3.0f) add((x0 + x1) / 2, y0, (x0 + x1) / 2, y1, std::max(x1 - x0, 0.25f));
+            } else if (stroked) {
+                add(x0, y0, x1, y0, stroke_width);
+                add(x0, y1, x1, y1, stroke_width);
+                add(x0, y0, x0, y1, stroke_width);
+                add(x1, y0, x1, y1, stroke_width);
+            }
+            return;
+        }
+    }
+    if (!stroked) return;   // a filled shape that is no rectangle is not a line
+    for (std::size_t i = 1; i < points.size(); ++i) {
+        if (points[i].move) continue;
+        add(points[i - 1].x, points[i - 1].y, points[i].x, points[i].y, stroke_width);
+    }
+    if (points.back().close) {
+        std::size_t start = 0;
+        for (std::size_t i = points.size(); i-- > 0;) {
+            if (points[i].move) { start = i; break; }
+        }
+        add(points.back().x, points.back().y, points[start].x, points[start].y, stroke_width);
+    }
+}
+
 std::vector<FontFacts> PdfDocument::fonts() const {
     std::vector<FontFacts> facts(impl_->fonts.size());
     for (std::size_t i = 1; i < facts.size(); ++i) {
@@ -674,6 +778,7 @@ Result<PageText> PdfDocument::read_page(int index, bool with_tags) const {
             if (box.width() > 1 && box.height() > 1) out.forms.push_back(box);
         } else if (box.width() > 0.1f || box.height() > 0.1f) {   // a line has no height, a dot no size
             out.paths.push_back(box);
+            if (type == FPDF_PAGEOBJ_PATH) collect_rules(object, out.user_to_display, out.rules);
         }
     }
 
@@ -685,6 +790,7 @@ Result<PageText> PdfDocument::read_page(int index, bool with_tags) const {
     if (const int quarters = main_text_direction(tp, count, out.user_to_display); quarters != 0) {
         out.user_to_display = then(out.user_to_display, turn(quarters, out.width, out.height));
         out.turned = quarters;
+        out.rules.clear();   // found before the turn: tables on a turned page are read by their text alone
     }
     const Affine& to_display = out.user_to_display;
     if (count > 0) out.glyphs.reserve(static_cast<std::size_t>(count));

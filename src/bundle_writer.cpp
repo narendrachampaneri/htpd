@@ -485,6 +485,16 @@ std::string conversion_notes(const BundleInfo& info) {
         }
         md += "\n";
     }
+    if (info.lattice.tables > 0) {
+        md += std::format("* {} table{} read from the lines drawn on the pages ({} rows): the cells are the boxes the lines make.",
+                          info.lattice.tables, info.lattice.tables == 1 ? "" : "s", info.lattice.rows);
+        if (info.lattice.spans > 0) {
+            md += std::format(" {} cell{} span{} columns or rows (written `[>]` for one more column, `[=]` for one more "
+                              "row; the covered cells are empty).", info.lattice.spans, info.lattice.spans == 1 ? "" : "s",
+                              info.lattice.spans == 1 ? "s" : "");
+        }
+        md += "\n";
+    }
     if (!info.furniture_removed) {
         md += "* Running headers and footers were kept.\n";
     } else if (info.furniture.removed_lines == 0) {
@@ -704,7 +714,7 @@ std::string reading_rules(const BundleInfo& info, std::string_view doc_title) {
                               "is. Its picture is at the very end of this file under `# Figures`, as PNG in "
                               "base64, for tools that can show pictures: never read that data as text. When an "
                               "answer may be in a figure, name it (F<n>, its caption and page).\n") +
-            std::string(info.tags.spans == 0
+            std::string(info.tags.spans + info.lattice.spans == 0
                             ? ""
                             : "13. In a table, `[>]` at the end of a cell means that it spans one more column to its right "
                               "(`[>>]`: two more), and `[=]` one more row below it (a cell can have both); the cells "

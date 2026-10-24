@@ -20,6 +20,7 @@
 #include "htpd/png.hpp"
 #include "htpd/sections.hpp"
 #include "htpd/sha256.hpp"
+#include "htpd/tables.hpp"
 #include "htpd/tags.hpp"
 #include "htpd/structure.hpp"
 #include "htpd/styles.hpp"
@@ -44,6 +45,7 @@ struct Analysis {
     std::size_t unmapped = 0;
     std::size_t pages_without_text = 0;
     std::size_t table_gaps = 0;           // column gaps found from the strips rows leave free
+    LatticeReport lattice;                // tables read from the rules drawn on the pages (tables.hpp)
     OcrReport ocr;
     std::vector<FigureFile> figures;
     TagReport tags;                       // what the PDF's structure tags gave (tags.hpp)
@@ -110,6 +112,7 @@ struct AnalysisOptions {
     HeadingMode headings = HeadingMode::Auto;
     std::function<void(int, int)> on_progress;
     TagMode tags = TagMode::Auto;
+    TableMode tables = TableMode::Auto;
 };
 
 Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptions& options) {
@@ -212,6 +215,7 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
     std::vector<float> heights(pages.size(), 0.0f);
     a.page_transforms.resize(pages.size());
     a.page_links.resize(pages.size());
+    std::vector<std::vector<Rule>> page_rules(pages.size());   // the lines drawn on each page (tables.hpp)
     for (int p = 0; p < page_count; ++p) {
         const auto index = static_cast<std::size_t>(p);
         if (auto page = doc.read_page(p, read_tags)) {
@@ -221,6 +225,7 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
             a.unmapped += page->unmapped;
             pages[index] = build_tagged_lines(*page, a.tags).lines;
             a.page_links[index] = std::move(page->links);
+            if (options.tables == TableMode::Auto && page->rules.size() >= 4) page_rules[index] = std::move(page->rules);
 
             // A page with (almost) no text that shows something is a scan (or
             // its text is drawn as shapes): OCR reads all of it. Without OCR its
@@ -418,7 +423,17 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
         add_artifacts(a.furniture, artifacts, pages.size());
     }
 
-    // 2b. Tables set tight: their columns, from the strips every row leaves free.
+    // 2b. Tables drawn with lines: the cells the rules make; then tables set tight: their columns,
+    // from the strips every row leaves free.
+    std::int32_t lattice_id = kLatticeTableId;
+    for (std::size_t i = 0; i < pages.size(); ++i) {
+        if (page_rules[i].empty()) continue;
+        const LatticeReport r = find_lattice_tables(pages[i], page_rules[i], lattice_id);
+        a.lattice.tables += r.tables;
+        a.lattice.rows += r.rows;
+        a.lattice.spans += r.spans;
+        a.lattice.left += r.left;
+    }
     for (auto& page : pages) {
         std::vector<char> code;
         code.reserve(page.size());
@@ -490,7 +505,7 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     auto analysed = analyse_with_gate(options.input, {options.password, options.figures, options.figure_dpi, options.ocr,
                                             options.ocr_options,
                                             options.keep_furniture, options.margin_band, options.headings,
-                                            options.on_progress, options.tags});
+                                            options.on_progress, options.tags, options.tables});
     if (!analysed) return std::unexpected(analysed.error());
     Analysis& a = *analysed;
 
@@ -520,6 +535,7 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     info.furniture_removed = !options.keep_furniture;
     info.furniture = a.furniture;
     info.tags = a.tags;
+    info.lattice = a.lattice;
     info.tag_title = a.tag_title;
     info.producer = a.producer;
     info.producer_text = a.producer_text;
@@ -561,6 +577,7 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     report.page_parts = a.structure.page_parts;
     report.furniture = std::move(a.furniture);
     report.tags = info.tags;
+    report.lattice = info.lattice;
     report.headings_from_tags = info.headings_from_tags;
     report.skipped_rotated = a.skipped_rotated;
     report.unmapped = a.unmapped;

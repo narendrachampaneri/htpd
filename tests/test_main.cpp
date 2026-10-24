@@ -35,6 +35,7 @@
 #include "htpd/sha256.hpp"
 #include "htpd/structure.hpp"
 #include "htpd/styles.hpp"
+#include "htpd/tables.hpp"
 #include "htpd/tags.hpp"
 #include "htpd/text.hpp"
 
@@ -741,6 +742,159 @@ TEST(columns_of_a_tight_table_are_found_from_its_rows) {
     list.push_back(placed_line(128, {{72, "3."}, {100, "Check"}, {133, "it."}}));
     mark_table_columns(list, {});
     CHECK(!list[0].table && !list[1].table && !list[2].table);
+}
+
+
+// ---- the table engine: the text of a cell, and tables drawn with lines ------------
+
+TEST(table_cell_lines_join_without_a_space_only_where_a_name_is_broken_inside_itself) {
+    // A code in capitals that breaks at its own hyphen; a minus sign after a word is not a break.
+    CHECK(continues_word("US-GAAP", "-1010", false));
+    CHECK(!continues_word("Voltage range", "-0.3 to 3", false));
+    CHECK(!continues_word("range", "-0.3", false));
+    // An amount broken inside itself: the cents are completed, or a group of three digits follows.
+    CHECK(continues_word("($1,433,600.", "00)", false));
+    CHECK(continues_word("($788,400.0", "0)", false));
+    CHECK(continues_word("$1,433,", "600.00", false));
+    CHECK(!continues_word("$1,433,600.00", "00)", false));
+    CHECK(!continues_word("See step 5.", "10 items", false));
+    // Names with "_" in capitals: two halves of one name, but not two names of one kind.
+    CHECK(continues_word("CAN_FD_CONT", "ROL_STATUS", false));
+    CHECK(continues_word("CAN_FD_TIM", "ING_A", false));
+    CHECK(!continues_word("SPI_CLK", "SPI_MISO", false));
+    // Numbers one under the other are not a name: "10" over "11" is not "1011".
+    CHECK(!continues_word("0", "0", false));
+    CHECK(!continues_word("10", "11", false));
+    CHECK(continues_word("LCD_P2", "4", false));        // as before
+    CHECK(continues_word("US-GAAP-101", "0", false));
+    std::string cell = "CAN_FD_CONT";
+    join_cell_line(cell, "ROL_STATUS", false);
+    CHECK_EQ(cell, std::string("CAN_FD_CONTROL_STATUS"));
+    join_cell_line(cell, "sticky bits", false);
+    CHECK_EQ(cell, std::string("CAN_FD_CONTROL_STATUS sticky bits"));
+}
+
+namespace {
+
+// A page of lines placed in the cells of a grid: the rules of the grid (a rectangle per cell, as
+// a table of a word processor draws them) and the words.
+Rule h_rule(float y, float x0, float x1) { return Rule{x0, y, x1, y, 0.5f}; }
+Rule v_rule(float x, float y0, float y1) { return Rule{x, y0, x, y1, 0.5f}; }
+
+std::vector<Rule> grid_rules(std::vector<float> xs, std::vector<float> ys) {
+    std::vector<Rule> rules;
+    for (const float y : ys) rules.push_back(h_rule(y, xs.front(), xs.back()));
+    for (const float x : xs) rules.push_back(v_rule(x, ys.front(), ys.back()));
+    return rules;
+}
+
+Line text_in(float x, float baseline, const char* text) {
+    return placed_line(baseline, {{x, text}});
+}
+
+}  // namespace
+
+TEST(lattice_reads_a_ruled_table_and_its_merged_cells) {
+    // Three columns (x 50, 150, 250, 350), three rows (y 100, 120, 140, 160). The title spans the
+    // three columns; the cell "North" spans the two rows under it.
+    std::vector<Rule> rules = {h_rule(100, 50, 350), h_rule(160, 50, 350), v_rule(50, 100, 160), v_rule(350, 100, 160),
+                               h_rule(120, 50, 350), v_rule(150, 120, 160), v_rule(250, 120, 160), h_rule(140, 150, 350)};
+    std::vector<Line> lines;
+    lines.push_back(text_in(60, 114, "Sales"));
+    lines.push_back(placed_line(134, {{60, "North"}, {160, "Urban"}, {260, "10"}}));
+    lines.push_back(placed_line(154, {{160, "Rural"}, {260, "7"}}));
+    std::int32_t id = kLatticeTableId;
+    const LatticeReport report = find_lattice_tables(lines, rules, id);
+    CHECK_EQ(report.tables, std::size_t{1});
+    CHECK_EQ(report.spans, std::size_t{2});
+    CHECK_EQ(lines.size(), std::size_t{3});
+    CHECK(lines[0].cells == (std::vector<std::string>{"Sales [>>]", "", ""}));
+    CHECK(lines[1].cells == (std::vector<std::string>{"North [=]", "Urban", "10"}));
+    CHECK(lines[2].cells == (std::vector<std::string>{"", "Rural", "7"}));
+    CHECK(lines[0].tag_table == lines[2].tag_table && lines[0].tag_table >= kLatticeTableId);
+    CHECK(lines[1].table);
+}
+
+TEST(lattice_joins_a_cell_of_several_lines_and_a_name_broken_in_it) {
+    const std::vector<Rule> rules = grid_rules({50, 130, 230}, {100, 120, 160});
+    std::vector<Line> lines;
+    lines.push_back(placed_line(114, {{56, "Name"}, {136, "Meaning"}}));
+    lines.push_back(placed_line(134, {{56, "CAN_FD_CONT"}, {136, "Controls"}, {180, "the"}}));
+    lines.push_back(placed_line(148, {{56, "ROL_STATUS"}, {136, "status"}, {170, "flags"}}));
+    std::int32_t id = kLatticeTableId;
+    CHECK_EQ(find_lattice_tables(lines, rules, id).tables, std::size_t{1});
+    CHECK_EQ(lines.size(), std::size_t{2});
+    CHECK(lines[1].cells == (std::vector<std::string>{"CAN_FD_CONTROL_STATUS", "Controls the status flags"}));
+}
+
+TEST(lattice_splits_values_stacked_in_a_cell_into_rows_but_not_a_cell_that_wraps) {
+    const std::vector<Rule> rules = grid_rules({50, 150, 200, 250}, {100, 120, 190});
+    std::vector<Line> lines;
+    lines.push_back(placed_line(114, {{56, "Threshold"}, {156, "Min"}, {206, "Max"}}));
+    for (int i = 0; i < 3; ++i) {
+        const float y = 134 + 14.0f * static_cast<float>(i);
+        const std::string number = std::to_string(i + 1);
+        const std::string lo = "2." + std::to_string(i) + "0", hi = "2." + std::to_string(i) + "9";
+        lines.push_back(placed_line(y, {{56, "Level"}, {92, number.c_str()}, {156, lo.c_str()}, {206, hi.c_str()}}));
+    }
+    std::int32_t id = kLatticeTableId;
+    CHECK_EQ(find_lattice_tables(lines, rules, id).tables, std::size_t{1});
+    CHECK_EQ(lines.size(), std::size_t{4});           // the header and one row per level
+    CHECK(lines[2].cells == (std::vector<std::string>{"Level 2", "2.10", "2.19"}));
+
+    // Wrapped text: the lines of one cell are one cell.
+    std::vector<Line> wrapped;
+    wrapped.push_back(placed_line(114, {{56, "Name"}, {156, "Note"}, {206, "Max"}}));
+    wrapped.push_back(placed_line(134, {{56, "Reset"}, {156, "Holds"}, {186, "it"}, {206, "5"}}));
+    wrapped.push_back(placed_line(148, {{156, "reg"}}));
+    std::int32_t id2 = kLatticeTableId;
+    CHECK_EQ(find_lattice_tables(wrapped, rules, id2).tables, std::size_t{1});
+    CHECK(wrapped[1].cells == (std::vector<std::string>{"Reset", "Holds it reg", "5"}));
+}
+
+TEST(lattice_leaves_a_grid_that_is_not_a_table_to_the_other_methods) {
+    // A chart: grid lines with numbers outside and no text in the boxes.
+    std::vector<Rule> rules = grid_rules({100, 140, 180, 220, 260}, {100, 130, 160, 190, 220});
+    std::vector<Line> chart;
+    chart.push_back(placed_line(100, {{70, "40"}}));
+    chart.push_back(placed_line(130, {{70, "30"}}));
+    chart.push_back(placed_line(160, {{70, "20"}}));
+    chart.push_back(placed_line(240, {{98, "Jan"}, {138, "Feb"}, {178, "Mar"}}));
+    std::int32_t id = kLatticeTableId;
+    const LatticeReport report = find_lattice_tables(chart, rules, id);
+    CHECK_EQ(report.tables, std::size_t{0});
+    CHECK_EQ(chart.size(), std::size_t{4});
+    CHECK(chart[0].cells.empty());
+
+    // A frame round a paragraph is one cell: not a table.
+    std::vector<Line> frame;
+    frame.push_back(placed_line(120, {{60, "Note:"}, {100, "do"}, {120, "not"}, {150, "open"}}));
+    frame.push_back(placed_line(134, {{60, "the"}, {80, "cover."}}));
+    std::vector<Rule> box = {h_rule(100, 50, 300), h_rule(150, 50, 300), v_rule(50, 100, 150), v_rule(300, 100, 150)};
+    std::int32_t id2 = kLatticeTableId;
+    CHECK_EQ(find_lattice_tables(frame, box, id2).tables, std::size_t{0});
+
+    // Rows drawn in blocks: two cells hold four lines each, the rules between the rows are not
+    // drawn - the lines are read by the text.
+    const std::vector<Rule> blocks = grid_rules({50, 150, 250}, {100, 120, 190});
+    std::vector<Line> block;
+    block.push_back(placed_line(114, {{56, "Code"}, {156, "Meaning"}}));
+    const char* names[] = {"Reserved", "Software", "Timer", "External"};
+    for (int i = 0; i < 4; ++i) {
+        const std::string code = "c" + std::to_string(i);
+        block.push_back(placed_line(134 + 12.0f * static_cast<float>(i), {{56, code.c_str()}, {156, names[i]}}));
+    }
+    std::int32_t id3 = kLatticeTableId;
+    CHECK_EQ(find_lattice_tables(block, blocks, id3).tables, std::size_t{0});
+}
+
+TEST(lattice_leaves_a_table_alone_when_a_word_crosses_a_line_of_the_grid) {
+    const std::vector<Rule> rules = grid_rules({50, 100, 150}, {100, 120, 140});
+    std::vector<Line> lines;
+    lines.push_back(placed_line(114, {{56, "Name"}, {106, "Value"}}));
+    lines.push_back(placed_line(134, {{56, "overflowing"}, {120, "5"}}));   // "overflowing" runs over the line at x = 100
+    std::int32_t id = kLatticeTableId;
+    CHECK_EQ(find_lattice_tables(lines, rules, id).tables, std::size_t{0});
 }
 
 // ---- headings ---------------------------------------------------------------
@@ -3229,6 +3383,31 @@ TEST(end_to_end_figures_are_stored_with_their_caption) {
     REQUIRE(convert(options).has_value());
     CHECK(!all_section_text(options.output_dir).contains("<!-- figure"));
     CHECK(!fs::exists(options.output_dir / "figures"));
+}
+
+TEST(end_to_end_a_ruled_table_is_read_from_its_lines) {
+    ConvertOptions options;
+    options.input = fs::path(HTPD_TEST_DATA) / "ruled_tables.pdf";
+    options.output_dir = fresh_temp_dir("e2e_ruled");
+    const auto report = convert(options);
+    REQUIRE(report.has_value());
+    CHECK_EQ(report->lattice.tables, std::size_t{2});        // the merged table and the one of two columns, not the chart
+    CHECK_EQ(report->lattice.spans, std::size_t{5});
+    const std::string text = all_section_text(options.output_dir);
+    CHECK(text.contains("Region [=] | Area [=] | Sales [>>] |  | \n |  | Q1 | Q2 | Q3\n"));
+    CHECK(text.contains("North [=] | Urban | 10 | 11 | 12\n | Rural | 5 | 6 | 7\n"));
+    CHECK(text.contains("Operating voltage | The controller works from 3.0 V to 3.6 V and switches itself off below 2.7 V.\n"
+                        "Protection class | IP20"));
+    CHECK(!text.contains("40 | "));                              // the numbers of the chart are not a table
+    CHECK(read_file(options.output_dir / "document.md").contains("2 tables read from the lines drawn on the pages (8 rows)"));
+
+    // Without the lines the table is read by its text alone: no spans.
+    options.output_dir = fresh_temp_dir("e2e_ruled_text");
+    options.tables = TableMode::Text;
+    const auto plain = convert(options);
+    REQUIRE(plain.has_value());
+    CHECK_EQ(plain->lattice.tables, std::size_t{0});
+    CHECK(!all_section_text(options.output_dir).contains("[=]"));
 }
 
 TEST(end_to_end_ocr_reads_pictures_and_scanned_pages) {

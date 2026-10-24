@@ -277,6 +277,14 @@ How the converter decides:
   cells is written as a plain paragraph. (A table that the tags of the PDF
   describe is the exception: section 4.6.) A line of justified text - every
   space wide, all about equally wide, mostly ordinary words - is not a row.
+* **A table drawn with lines** (the page draws a grid of horizontal and vertical rules, or thin bars as
+  borders): the cells are the boxes the lines make. A row has one entry per column of the grid; a cell
+  that spans columns or rows is written in the cell it starts in with the same marks as for tags
+  (section 4.6: `[>]` for one more column, `[>>]` for two, `[=]` for one more row), and the cells it
+  covers are empty. This needs a grid of at least two columns and two rows, in which every word lies
+  inside one cell; it also gives a table of two columns. A chart with grid lines is no table. Values stacked
+  in the cells of a row ("Level 1..4 falling | 2.62 | 2.70 | 2.78": a number on every line of two or more
+  cells) are one row per line. The conversion notes say how many tables were read this way.
 * **A cell with several lines** stays one cell: a line right under a row
   that starts in a column after the first, and whose pieces each stay in
   one column, is the rest of a cell and is joined to it with one space.
