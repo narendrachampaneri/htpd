@@ -113,6 +113,27 @@ class Furniture(unittest.TestCase):
         self.assertIn(("alpha", "page", "#"), norms)
         self.assertIn(("beta", "page", "#"), norms)
 
+    def test_a_header_whose_title_never_repeats_is_found_by_its_end(self):
+        pats = [(True, ["preamble", "page", "#"], True)]
+        pages = [[rb.tokens(f"12.{n}. Title number {n} | Page {n}"), rb.tokens("body text")]
+                 for n in range(1, 6)]
+        got = rb.expand_furniture(pats, pages)
+        out, n = rb.strip_furniture(pages[0], got)
+        self.assertEqual((n, out[0], out[1]), (1, [], ["body", "text"]))
+
+    def test_the_end_of_a_header_needs_three_different_titles(self):
+        pats = [(True, ["preamble", "page", "#"], True)]
+        pages = [[rb.tokens(f"12.{n}. Title {n} | Page {n}"), rb.tokens("body text")] for n in range(1, 3)]
+        got = rb.expand_furniture(pats, pages)
+        out, n = rb.strip_furniture(pages[0], got)
+        self.assertEqual(n, 0)
+
+    def test_a_header_inside_a_merged_line_is_found(self):
+        pats = [(True, ["acme", "manual", "rev", "#", "#"])]
+        page = [rb.tokens("ACME Manual Rev 1.2    Register map")]
+        out, n = rb.strip_furniture(page, pats)
+        self.assertEqual((n, out[0]), (1, ["register", "map"]))
+
 
 HTPD = """---
 htpd_file: "0.1"

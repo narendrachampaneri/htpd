@@ -582,6 +582,11 @@ def removed_furniture(notes: list[str]) -> list[tuple[bool, list[str], bool]]:
     return out
 
 
+class TailWords(list):
+    """The constant end of a running header that changes ("... | Page #"): a line in the band that
+    ends with these words is that header, whatever its title says."""
+
+
 def expand_furniture(patterns: list[tuple[bool, list[str], bool]], pages: list[list[list[str]]],
                      band: int = 3) -> list[tuple[bool, list[str]]]:
     """Where the converter named only an example of a running header that changes (a chapter
@@ -601,6 +606,21 @@ def expand_furniture(patterns: list[tuple[bool, list[str], bool]], pages: list[l
         for norm, n in seen.items():
             if n >= 3 and len(have & set(norm)) >= 2 and list(norm) != words:
                 out.append((header, list(norm)))
+        # A title that changes on every page ("12.4. Usage examples | Page 64") never repeats, but
+        # its end ("page #") does: a band line with that end, on at least three pages, is the header.
+        tail = words[-2:]
+        if len(words) > 2 and tail[0].isalpha():
+            ends = set()
+            for lines in pages:
+                raw = [x for x in lines if x]
+                if not raw:
+                    continue
+                edge = raw[0] if header else raw[-1]
+                norm = digits_to_hash(edge)
+                if len(norm) > len(tail) and norm[-len(tail):] == tail:
+                    ends.add(tuple(edge))
+            if len(ends) >= 3:  # three different titles, so it is a header that changes
+                out.append((header, TailWords(tail)))
     return out
 
 
@@ -614,8 +634,15 @@ def strip_furniture(lines: list[list[str]], patterns: list[tuple[bool, list[str]
     for header, words in sorted(patterns, key=lambda p: -len(p[1])):
         n = len(words)
         cands = live[:band] if header else live[-band:][::-1]
+        tail = isinstance(words, TailWords)
         for i in cands:
             norm = digits_to_hash(lines[i])
+            if tail:
+                if len(norm) > n and norm[-n:] == words:
+                    taken += 1
+                    lines[i] = []
+                    break
+                continue
             if n <= 2 and norm != words:
                 continue  # a lone page number or word must be the whole line, not a number in the text
             for s in range(len(norm) - n + 1):
