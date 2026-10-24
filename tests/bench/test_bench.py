@@ -103,6 +103,11 @@ class RowsMatch(unittest.TestCase):
         file = [["vector", "16b", "index", "vlxei16", "vsxei16"]]
         self.assertEqual(rb.match_rows(pdf, file), (1, 0))
 
+    def test_the_last_piece_of_a_name_the_file_joined_matches_too(self):
+        pdf = [["542", "tprel_page21", "page", "p"]]
+        file = [["542", "r_cls_tlsie_adr_gottprel_page21", "page", "p"]]
+        self.assertEqual(rb.match_rows(pdf, file), (1, 0))
+
     def test_a_short_word_must_match_whole(self):
         self.assertEqual(rb.match_rows([["a", "b", "ab"]], [["a", "b", "abc"]]), (0, 1))
 

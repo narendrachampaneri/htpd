@@ -745,9 +745,9 @@ def match_rows(pdf_rows: list[list[str]], h_rows: list[list[str]],
     """(PDF rows found inside a row of the file, rows of the file that hold no PDF row).
     `rich[k]`: the row k of the file has three cells with text; a row with fewer is never stray (the PDF
     side counts cells with text, an empty cell is not one).
-    A word of the PDF row also matches a longer word of the file that starts with it (at least five
-    letters): the file has the whole name where pdftotext cut it off at the cell or joined only its
-    first piece ("R_AARCH64_AUTH_GOT_ADR_P" / "REL_LO21" is one name in the file)."""
+    A word of the PDF row also matches a longer word of the file that starts or ends with it (at least
+    five letters): the file has the whole name where pdftotext cut it off at the cell or gave only one
+    piece of it ("R_AARCH64_AUTH_GOT_ADR_P" / "REL_LO21" is one name in the file)."""
     index: dict[str, set[int]] = defaultdict(set)
     for k, r in enumerate(h_rows):
         for w in set(r):
@@ -761,10 +761,13 @@ def match_rows(pdf_rows: list[list[str]], h_rows: list[list[str]],
                 if not vocab[i].startswith(w):
                     break
                 found |= index[vocab[i]]
+            for v in vocab:
+                if v.endswith(w):
+                    found |= index[v]
         return found
 
     def same(w: str, v: str) -> bool:
-        return w == v or (len(w) >= 5 and v.startswith(w))
+        return w == v or (len(w) >= 5 and (v.startswith(w) or v.endswith(w)))
 
     def in_row(p: list[str], row: list[str]) -> bool:
         it = iter(row)
