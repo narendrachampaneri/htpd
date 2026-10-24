@@ -21,6 +21,7 @@ ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
 import run_bench as rb  # noqa: E402
+import table_score as ts  # noqa: E402
 
 CONVERTER = ROOT / "build" / "htpd"
 SAMPLE = ROOT / "tests" / "data" / "sample.pdf"
@@ -370,3 +371,67 @@ class EndToEnd(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TableScore(unittest.TestCase):
+    TRUTH = {"rows": [["Name", "Min", "Max"], ["Supply", "3.0", ""], ["Group [=]", "A", "1"], ["", "B", "2"]],
+             "row_pages": [1, 1, 1, 2]}
+
+    def blocks(self, *lines):
+        return [[(1, line) for line in lines]]
+
+    def test_every_cell_right_scores_full(self):
+        s = ts.score_table(self.TRUTH, [[(1, "Name | Min | Max"), (1, "Supply | 3.0 | "), (1, "Group [=] | A | 1"),
+                                         (2, "| B | 2")]])
+        self.assertEqual((s["tbl_cells"], s["tbl_cells_ok"]), (12, 12))
+        self.assertEqual((s["tbl_rows"], s["tbl_rows_ok"]), (4, 4))
+        self.assertEqual(s["tbl_pages_ok"], 4)
+        self.assertEqual(s.get("tbl_extra", 0), 0)
+
+    def test_a_cell_in_the_wrong_column_is_not_in_the_right_place_but_in_the_right_row(self):
+        s = ts.score_table(self.TRUTH, self.blocks("Name | Min | Max", "Supply |  | 3.0", "Group [=] | A | 1", "| B | 2"))
+        self.assertEqual(s["tbl_vals_ok"], 9)       # "3.0" is in the wrong column
+        self.assertEqual(s["tbl_vals_row"], 10)     # but in the right row
+        self.assertEqual(s["tbl_rows_ok"], 3)
+
+    def test_a_row_cut_in_two_leaves_an_extra_row_and_a_wrong_cell(self):
+        s = ts.score_table(self.TRUTH, self.blocks("Name | Min | Max", "Supply | 3", "| .0 | ", "Group [=] | A | 1", "| B | 2"))
+        self.assertEqual(s["tbl_extra"], 1)
+        self.assertLess(s["tbl_rows_ok"], 4)
+
+    def test_the_mark_of_a_span_does_not_matter_for_the_place_of_a_value(self):
+        s = ts.score_table(self.TRUTH, self.blocks("Name | Min | Max", "Supply | 3.0 | ", "Group | A | 1", "| B | 2"))
+        self.assertEqual(s["tbl_vals_ok"], 10)
+        self.assertEqual(s["tbl_cells_ok"], 11)     # strictly the mark is missing
+
+    def test_a_chart_has_no_rows(self):
+        truth = {"rows": [], "kind": "chart"}
+        self.assertEqual(ts.score_table(truth, self.blocks("Jan | Feb | Mar"))["tbl_extra"], 1)
+        self.assertEqual(ts.score_table(truth, [])["tbl_extra"], 0)
+
+    def test_split_row_reads_empty_cells_at_the_ends(self):
+        self.assertEqual(ts.split_row("| B | 2"), ["", "B", "2"])
+        self.assertEqual(ts.split_row("a |  | b"), ["a", "", "b"])
+        self.assertEqual(ts.split_row("a | b | "), ["a", "b", ""])
+
+    def test_a_row_level_page_mark_inside_a_table_block_moves_the_page_of_the_next_rows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp) / "t.htpd"
+            f.write_text(HTPD.replace("a | b | c\n1 | 2 | 3\n", "a | b | c\n<!-- page 3 -->\n1 | 2 | 3\n"),
+                         encoding="utf-8")
+            h = rb.parse_htpd(f)
+            self.assertEqual(h.table_blocks[0], [(2, "a | b | c"), (3, "1 | 2 | 3")])
+
+
+class Generator(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("pdftotext"), "needs pdftotext")
+    def test_the_generator_makes_a_pdf_and_a_truth_for_a_case(self):
+        import make_tables
+        with tempfile.TemporaryDirectory() as tmp:
+            make_tables.build("multipage", Path(tmp))
+            truth = json.loads((Path(tmp) / "multipage.truth.json").read_text(encoding="utf-8"))
+            self.assertGreaterEqual(max(truth["row_pages"]), 3)
+            self.assertEqual(truth["rows"][0], ["Part", "Name", "Qty", "Price"])
+            firsts = [r for r, row in enumerate(truth["rows"]) if row == truth["rows"][0]]
+            self.assertGreaterEqual(len(firsts), 3)        # the header repeats on each page
+            self.assertEqual(truth["row_pages"][firsts[1]], truth["row_pages"][firsts[1] + 1])

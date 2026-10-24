@@ -45,6 +45,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
+sys.path.insert(0, str(HERE))
+from table_score import score_table  # noqa: E402
 SCHEMA = 1
 
 # Limits of the work rules: accuracy never worse, time at most +10 %, size at most +5 %.
@@ -58,8 +60,9 @@ SETS = {
     "eval": lambda: sorted((ROOT / "eval" / "docs").glob("*.pdf")),
     "zoo": lambda: sorted((ROOT / "build" / "zoo").glob("*.pdf")),
     "data": lambda: sorted((ROOT / "tests" / "data").glob("*.pdf")),
+    "tables": lambda: sorted((ROOT / "build" / "tables").glob("*.pdf")),
 }
-PUBLIC = ("data", "eval", "zoo")
+PUBLIC = ("data", "eval", "zoo", "tables")
 
 # ---------------------------------------------------------------------------------------------
 # Words
@@ -441,6 +444,7 @@ class Htpd:
         self.page_lines: dict[int, list[str]] = defaultdict(list)
         self.page_titles: dict[int, set[int]] = defaultdict(set)  # indexes in page_lines that are titles
         self.page_rows: dict[int, list[str]] = defaultdict(list)
+        self.table_blocks: list[list[tuple[int, str]]] = []   # each table block: (page, row) per row
         self.figures: list[dict] = []
         self.image_ids: set[str] = set()
         self.unpaged_words = 0
@@ -455,6 +459,7 @@ def parse_htpd(path: Path) -> Htpd:
     lines = data.decode("utf-8", "replace").split("\n")
     part = "front"
     fence: tuple[str, bool] | None = None
+    block: list[tuple[int, str]] | None = None
     page: int | None = None
     heading: str | None = None  # title waiting for its page
     section_page = 1
@@ -481,8 +486,17 @@ def parse_htpd(path: Path) -> Htpd:
         if fence:
             if line == fence[0]:
                 fence = None
+                if block is not None:
+                    h.table_blocks.append(block)
+                    block = None
             elif part == "sections":
+                pm = PAGE_MARK.match(line) if fence[1] else None
+                if pm:   # a row-level page mark: the table goes on over a page break (FORMAT.md 4.2)
+                    page = int(pm.group(1))
+                    continue
                 add(line, fence[1])
+                if block is not None and page is not None:
+                    block.append((page, line))
             continue
         if line in ("# How to read this file", "# Contents", "# Conversion notes", "# Sections", "# Figures"):
             if heading is not None:
@@ -545,6 +559,7 @@ def parse_htpd(path: Path) -> Htpd:
             m = FENCE_OPEN.match(line)
             if m:
                 fence = (m.group(1), m.group(2) == "text")
+                block = [] if fence[1] else None
                 continue
             m = IMAGE.match(line)
             if m:
@@ -871,6 +886,13 @@ def analyse(job: dict) -> dict:
     m["notes_figs"] = noted if noted is not None else 0
     m["notes_ok"] = int(m["notes_figs"] == len(h.figures))
     m["htpd_bytes"] = h.size
+    truth_file = pdf.with_suffix(".truth.json")
+    for k in TABLE_KEYS:
+        m[k] = None
+    if truth_file.exists():
+        got = score_table(json.loads(truth_file.read_text(encoding="utf-8")), h.table_blocks)
+        for k in TABLE_KEYS:
+            m[k] = got.get(k, 0)
     return {"m": m, "d": d}
 
 
@@ -901,6 +923,9 @@ def convert(converter: Path, pdf: Path, out: Path, repeat: int, extra: list[str]
 # ---------------------------------------------------------------------------------------------
 # Metrics: name, label, polarity ("up" higher is better, "down" lower is better, "info" no verdict), format
 
+TABLE_KEYS = ("tbl_cells", "tbl_cells_ok", "tbl_rows", "tbl_rows_ok", "tbl_vals", "tbl_vals_row", "tbl_vals_ok",
+              "tbl_pages_ok", "tbl_extra")
+
 METRICS = [
     ("time_s", "time s", "time", "{:.3f}"),
     ("cpu_s", "cpu s", "noise", "{:.3f}"),
@@ -926,6 +951,15 @@ METRICS = [
     ("rows_pdf", "rows in PDF", "info", "{:,}"),
     ("rows_htpd", "rows in file", "info", "{:,}"),
     ("rows_stray", "stray rows", "down", "{:,}"),
+    ("tbl_cells_ok", "cells exact", "up", "{:,}"),
+    ("tbl_cells", "cells in truth", "info", "{:,}"),
+    ("tbl_rows_ok", "rows exact", "up", "{:,}"),
+    ("tbl_rows", "rows in truth", "info", "{:,}"),
+    ("tbl_vals_ok", "values right place", "up", "{:,}"),
+    ("tbl_vals_row", "values right row", "up", "{:,}"),
+    ("tbl_vals", "values in truth", "info", "{:,}"),
+    ("tbl_pages_ok", "rows right page", "up", "{:,}"),
+    ("tbl_extra", "extra rows", "down", "{:,}"),
     ("figs_found", "figures found", "up", "{:,}"),
     ("figs_pdf", "captions in PDF", "info", "{:,}"),
     ("figs_htpd", "figures in file", "info", "{:,}"),
@@ -987,6 +1021,11 @@ def write_markdown(rep: dict, path: Path) -> None:
           [("toc_found", "headings found"), ("toc_missing", "missing"), ("toc_extra", "extra"),
            ("rows_found", "rows found"), ("rows_pdf", "of"), ("rows_htpd", "rows in file"), ("rows_stray", "stray"),
            ("figs_found", "figures found"), ("figs_pdf", "of"), ("figs_htpd", "in file"), ("notes_ok", "notes ok")])
+    if any(docs[n].get("tbl_cells") is not None for n in names if "error" not in docs[n]):
+        table("Tables with known cells (make_tables.py)",
+              [("tbl_cells_ok", "cells exact"), ("tbl_cells", "of"), ("tbl_rows_ok", "rows exact"), ("tbl_rows", "of"),
+               ("tbl_vals_ok", "values right"), ("tbl_vals_row", "in right row"), ("tbl_vals", "of"),
+               ("tbl_pages_ok", "right page"), ("tbl_extra", "extra rows")])
     src = [f"{n}: {docs[n].get('toc_source')}" for n in names if "error" not in docs[n]]
     L += ["Headings come from: " + ", ".join(src) + ".", "",
           "Documents without a text layer (scans) have no PDF text to compare: their text, table and figure "
@@ -1116,7 +1155,7 @@ def collect(args) -> list[tuple[str, Path]]:
             if not pdfs and s == "private" and args.set != "private":
                 continue
             if not pdfs:
-                print(f"note: set {s!r} is empty" + (" (run with --fetch)" if s in ("eval", "zoo") else ""),
+                print(f"note: set {s!r} is empty" + (" (run with --fetch)" if s in ("eval", "zoo", "tables") else ""),
                       file=sys.stderr)
             found += [(s, p) for p in pdfs]
     if args.only:
@@ -1130,6 +1169,8 @@ def fetch() -> None:
     if not any((ROOT / "build" / "zoo").glob("*.pdf")):
         subprocess.run([sys.executable, str(ROOT / "tests" / "zoo" / "make_zoo.py"), str(ROOT / "build" / "zoo")],
                        check=False)
+    if not any((ROOT / "build" / "tables").glob("*.pdf")):
+        subprocess.run([sys.executable, str(HERE / "make_tables.py"), str(ROOT / "build" / "tables")], check=False)
 
 
 def run(args) -> int:
