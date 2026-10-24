@@ -183,6 +183,12 @@ bool name_says_bold(std::string_view font_name) {
            n.contains("demi") || n.ends_with("-bd") || n.ends_with(",bd");
 }
 
+bool name_says_italic(std::string_view font_name) {
+    const std::string n = text::to_lower_ascii(font_name);
+    return n.contains("italic") || n.contains("oblique") || n.ends_with("-it") || n.ends_with(",it") ||
+           n.ends_with("-ital");
+}
+
 constexpr bool is_space_like(char32_t cp) {
     return cp == U' ' || cp == U'\t' || cp == 0x00A0 || (cp >= 0x2000 && cp <= 0x200A) ||
            cp == 0x202F || cp == 0x205F || cp == 0x3000;
@@ -262,6 +268,8 @@ bool name_says_monospace(std::string_view font_name) {
 // one in the same word. That is the width a character takes on the line, and
 // in a monospace font it is the same for every character.
 struct FontState {
+    std::string name;                // without the subset tag
+    bool italic = false;
     bool decided = false;
     bool monospace = false;          // until decided: the guess from flag and name
     float min_advance = 1e9f;
@@ -488,14 +496,17 @@ struct PdfDocument::Impl {
     std::unordered_map<std::string, std::uint16_t> font_ids;
     std::vector<FontState> fonts = std::vector<FontState>(1);
 
-    std::uint16_t font_id(std::string_view name, bool fixed_pitch_flag) {
+    std::uint16_t font_id(std::string_view name, bool fixed_pitch_flag, bool italic_flag) {
         if (name.size() > 7 && name[6] == '+') name.remove_prefix(7);
         if (name.empty()) return 0;
         const auto [it, inserted] = font_ids.try_emplace(std::string(name), std::uint16_t{0});
         if (inserted) {
             if (fonts.size() >= 0xFFFF) return 0;   // absurd number of fonts: treat as unknown
             it->second = static_cast<std::uint16_t>(fonts.size());
-            fonts.emplace_back().monospace = fixed_pitch_flag || name_says_monospace(name);
+            FontState& font = fonts.emplace_back();
+            font.name = std::string(name);
+            font.italic = italic_flag || name_says_italic(name);
+            font.monospace = fixed_pitch_flag || name_says_monospace(name);
         }
         return it->second;
     }
@@ -538,6 +549,8 @@ DocumentMeta PdfDocument::meta() const {
     meta.title = meta_text(impl_->doc, "Title");
     meta.author = meta_text(impl_->doc, "Author");
     meta.subject = meta_text(impl_->doc, "Subject");
+    meta.creator = meta_text(impl_->doc, "Creator");
+    meta.producer = meta_text(impl_->doc, "Producer");
     meta.page_count = page_count();
     return meta;
 }
@@ -597,6 +610,8 @@ std::vector<FontFacts> PdfDocument::fonts() const {
     std::vector<FontFacts> facts(impl_->fonts.size());
     for (std::size_t i = 1; i < facts.size(); ++i) {
         const FontState& font = impl_->fonts[i];
+        facts[i].name = font.name;
+        facts[i].italic = font.italic;
         facts[i].monospace = font.monospace;
         if (font.samples > 0) facts[i].advance = static_cast<float>(font.sum_advance / font.samples);
     }
@@ -936,7 +951,12 @@ Result<PageText> PdfDocument::read_page(int index, bool with_tags) const {
         g.bold = FPDFText_GetFontWeight(tp, i) >= 600 || (font_flags & kForceBold) != 0 ||
                  name_says_bold(name);
         constexpr int kFixedPitch = 1 << 0;   // PDF font descriptor flag, bit 1
-        g.font = impl_->font_id(name, (font_flags & kFixedPitch) != 0);
+        constexpr int kItalic = 1 << 6;       // PDF font descriptor flag, bit 7
+        g.font = impl_->font_id(name, (font_flags & kFixedPitch) != 0, (font_flags & kItalic) != 0);
+        {
+            unsigned int r = 0, gr = 0, b = 0, a = 0;
+            if (FPDFText_GetFillColor(tp, i, &r, &gr, &b, &a) != 0) g.color = ((r & 255u) << 16) | ((gr & 255u) << 8) | (b & 255u);
+        }
 
         // Measure the font until it is clear whether it is monospace: when
         // this character directly follows the previous one, on the same line

@@ -153,12 +153,14 @@ public:
         if (g.bold) ++bold_count_;
         count(sizes_, static_cast<int>(std::lround(g.size * 4.0f)));   // quarter points
         count(fonts_, g.font);
+        count(colors_, static_cast<int>(g.color));
     }
 
     Line finish() {
         flush_pending();
         line_.size = static_cast<float>(most_common(sizes_)) / 4.0f;
         line_.font = static_cast<std::uint16_t>(most_common(fonts_));
+        line_.color = static_cast<std::uint32_t>(most_common(colors_));
         line_.bold = bold_count_ * 10 >= glyph_count_ * 6;   // at least 60 % bold
         return std::move(line_);
     }
@@ -228,6 +230,7 @@ private:
     std::size_t bold_count_ = 0;
     Tally sizes_;
     Tally fonts_;
+    Tally colors_;
 };
 
 // PDFs normally store text in reading order. Two kinds of pages do not, and

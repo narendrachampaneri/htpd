@@ -53,6 +53,7 @@ struct Glyph {
     float origin_x = 0;       // x of the glyph origin (where the pen stood)
     float baseline = 0;       // y of the glyph origin
     float size = 0;           // effective font size in points
+    std::uint32_t color = 0;  // fill colour, 0xRRGGBB (black is 0)
     // Tagged PDF: the marked-content ID of the text object this character is
     // drawn by (-1 when it has none), and whether the PDF marks it as an
     // /Artifact (not content: header, footer, page number, watermark).
@@ -141,6 +142,7 @@ struct Line {
     float size = 0;                      // dominant font size of the line
     bool bold = false;                   // most glyphs are bold
     std::uint16_t font = 0;              // dominant font of the line (see Glyph::font)
+    std::uint32_t color = 0;             // dominant fill colour of the line, 0xRRGGBB
     std::string text;                    // UTF-8, single spaces between words
     // Byte offsets in `text` of spaces that stand for a WIDE horizontal gap
     // (a column gap in a table row, or the gap after a heading number).
@@ -177,6 +179,7 @@ struct Line {
     std::int32_t tag = 0;
     std::uint8_t tag_heading = 0;
     bool tag_item = false;
+    bool tag_title = false;   // a line of the document's Title element
     bool artifact = false;
     // A row of a table that the tags describe cell by cell: one entry per
     // column, "" for an empty or covered cell. `text` holds the same words
@@ -199,12 +202,16 @@ struct OutlineEntry {
 struct FontFacts {
     bool monospace = false;   // every character has the same width (code, listings)
     float advance = 0.6f;     // typical character width as a fraction of the font size
+    std::string name = {};    // the font's name without the subset tag ("ABCDEF+")
+    bool italic = false;      // the font is italic or oblique (flag, or its name says so)
 };
 
 struct DocumentMeta {
     std::string title;
     std::string author;
     std::string subject;
+    std::string creator;      // the program that made the document (Writer, Chrome ...)
+    std::string producer;     // the program that made the PDF (LibreOffice, Skia/PDF, pdfTeX ...)
     int page_count = 0;
 };
 
