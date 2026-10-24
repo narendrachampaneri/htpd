@@ -18,6 +18,7 @@
 #include "htpd/furniture.hpp"
 #include "htpd/headings.hpp"
 #include "htpd/ocr.hpp"
+#include "htpd/order.hpp"
 #include "htpd/tables.hpp"
 #include "htpd/tags.hpp"
 #include "htpd/types.hpp"
@@ -40,6 +41,7 @@ struct ConvertOptions {
     OcrOptions ocr_options;
     TagMode tags = TagMode::Auto;        // use the structure tags of a tagged PDF where they can be trusted
     TableMode tables = TableMode::Auto;  // read the cells of a table from the lines drawn on the page, too
+    OrderMode order = OrderMode::Auto;   // pages with columns, boxes or a wrong stored order are read in reading order
     TablePages table_pages = TablePages::Split;   // a table over a page break: one block per page, or one block with a row-level page mark
     std::function<void(int done, int total)> on_progress;   // called once per page
 };
@@ -61,6 +63,7 @@ struct ConvertReport {
     std::size_t page_parts = 0;          // parts of long text, cut by pages
     FurnitureReport furniture;
     LatticeReport lattice;               // tables read from the lines drawn on the pages
+    OrderReport order;                   // pages put into reading order
     TagReport tags;                      // what the structure tags of the PDF gave
     std::size_t headings_from_tags = 0;  // headings that come from the tags
     std::size_t skipped_rotated = 0;

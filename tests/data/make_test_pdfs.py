@@ -899,6 +899,61 @@ def multipage_table(path):
                Paragraph('Spare parts', h2), Paragraph('The spare parts kit holds:', body), other])
 
 
+def reading_order(path):
+    """Page 1: two columns stored line by line (a line of the left column, a line of the right one, ...).
+    Page 2: one column of text with a framed box stored in the middle of a sentence."""
+    import textwrap
+    left = textwrap.wrap('The charger controller samples the bus voltage every ten milliseconds and reports the value over '
+                         'the internal bus. When the value leaves the allowed range for more than three samples the '
+                         'controller opens the contactor and writes a fault code into the status register of the unit. '
+                         'The fault code stays set until a host clears it by hand.', 44)
+    right = textwrap.wrap('Output current is measured by a shunt resistor in the return path and filtered before the '
+                          'converter reads it. The filter has a corner frequency of two hundred hertz which keeps the '
+                          'ripple of the stage out of the result and makes the reading stable enough for the limit '
+                          'checks of the control loop that runs every single millisecond.', 44)
+    c = canvas.Canvas(path, pagesize=letter, pageCompression=0)
+    c.setTitle('Reading order')
+    c.setFont('Helvetica', 10)
+    import itertools
+    for i, (l, r) in enumerate(itertools.zip_longest(left, right)):
+        y = H - 100 - 13 * i
+        if l:
+            c.drawString(72, y, l)
+        if r:
+            c.drawString(330, y, r)
+    c.showPage()
+    lines = ['The supply stage is checked at start-up and again every',
+             'second while the charger runs. A reading outside the limits is',
+             'reported to the host and, when it lasts for more than the',
+             'filter time, switches the output off before the stage and the',
+             'cable can be damaged by the current that flows into the',
+             'fault. After that the controller waits for the host.']
+    c.setFont('Helvetica', 10)
+    for i, ln in enumerate(lines[:3]):
+        c.drawString(72, H - 100 - 13 * i, ln)
+    c.rect(80, H - 190, 380, 40, stroke=1, fill=0)
+    c.setFont('Helvetica-Bold', 9)
+    c.drawString(88, H - 166, 'Note on the limits')
+    c.setFont('Helvetica', 9)
+    c.drawString(88, H - 180, 'The limits are given in the table of the data sheet.')
+    c.setFont('Helvetica', 10)
+    for i, ln in enumerate(lines[3:]):
+        c.drawString(72, H - 215 - 13 * i, ln)
+    c.showPage()
+    c.save()
+    # What a person reads, page by page (tests/bench/layout_score.py scores the converter against it).
+    import json
+    truth = {'case': 'reading_order', 'pages': [
+        {'page': 1, 'paragraphs': [{'id': 'left', 'kind': 'body', 'text': ' '.join(left)},
+                                   {'id': 'right', 'kind': 'body', 'text': ' '.join(right)}]},
+        {'page': 2, 'paragraphs': [{'id': 'body', 'kind': 'body', 'text': ' '.join(lines)},
+                                   {'id': 'box', 'kind': 'box',
+                                    'text': 'Note on the limits The limits are given in the table of the data sheet.'}]}]}
+    with open(path.replace('.pdf', '.truth.json'), 'w', encoding='utf-8') as f:
+        json.dump(truth, f, indent=1)
+        f.write('\n')
+
+
 if __name__ == '__main__':
     Manual(os.path.join(OUT, 'sample.pdf'), bookmarks=True).build(manual_story())
     Manual(os.path.join(OUT, 'sample_nobookmarks.pdf'), bookmarks=False).build(manual_story())
@@ -918,4 +973,5 @@ if __name__ == '__main__':
     tagged_styled(os.path.join(OUT, 'tagged_styled.pdf'))
     ruled_tables(os.path.join(OUT, 'ruled_tables.pdf'))
     multipage_table(os.path.join(OUT, 'multipage_table.pdf'))
-    print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf, sideways.pdf, links.pdf, ocr.pdf, figures.pdf, actualtext.pdf, tagged.pdf, tagged_bookmarks.pdf, tagged_disagree.pdf, styles_weight.pdf, latex_chapters.pdf, chrome_template.pdf, tagged_styled.pdf, ruled_tables.pdf, multipage_table.pdf to', OUT)
+    reading_order(os.path.join(OUT, 'reading_order.pdf'))
+    print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf, sideways.pdf, links.pdf, ocr.pdf, figures.pdf, actualtext.pdf, tagged.pdf, tagged_bookmarks.pdf, tagged_disagree.pdf, styles_weight.pdf, latex_chapters.pdf, chrome_template.pdf, tagged_styled.pdf, ruled_tables.pdf, multipage_table.pdf, reading_order.pdf to', OUT)

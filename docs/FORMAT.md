@@ -167,7 +167,8 @@ The body of `document.md` has two parts:
   their roles (`heading 2: Arial Bold 12 pt, 84 lines`; one line for body
   text, each heading level, captions, table text, code, header/footer,
   footnotes), which header and footer lines were removed, how many rotated
-  characters were skipped, how many pages have no text. These lines are for
+  characters were skipped, how many pages have no text, which pages were put
+  into reading order (section 7, "Order"). These lines are for
   a person or an AI to read; no field of the format depends on them.
 
 ### 3.3 Two special sections
@@ -547,7 +548,17 @@ changes:
 * **Order**: the text is kept in the order in which the PDF stores it,
   which is the reading order in almost all PDFs. Only a page that is
   stored from bottom to top, or in no order at all, is sorted from top to
-  bottom.
+  bottom, and only a page whose stored order is clearly not the order a
+  person reads is put into reading order: columns that the PDF stores line
+  by line are read column by column (a line that holds the text of two
+  columns is two lines then); a box, a pull quote or a margin note that
+  stands in the middle of a sentence or beside a paragraph is read after that
+  paragraph, which is one paragraph; a caption or a box stored far from its
+  place is where the page shows it; on a page of columns the footnotes are
+  read last. A page in good order - one column, columns stored column by
+  column, a table, a tagged or scanned page - is not touched. The
+  conversion notes count the pages that were put in order (`--order stored`
+  keeps the order of the PDF).
 * **One backslash** may be added at the start of a paragraph (section 4.3).
 
 ## 8. What is not in a bundle

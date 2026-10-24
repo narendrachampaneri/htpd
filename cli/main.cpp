@@ -43,6 +43,11 @@ Options for convert:
                                     pages, or all on one level (default)
                               on    whenever the PDF has tags
                               off   never
+      --order <mode>        The order of the text of a page:
+                              auto   pages with columns, boxes or an order
+                                     that is clearly wrong are read in
+                                     reading order (default)
+                              stored the order in which the PDF stores it
       --tables <mode>       How the cells of a table are found:
                               auto  from the PDF's tags, from the lines drawn
                                     on the page, and from the text (default)
@@ -171,6 +176,9 @@ int run_convert(Args& args) {
         print(std::format("  ruled tables    {} tables ({} rows) from the lines drawn on the pages\n", r.lattice.tables,
                           r.lattice.rows));
     }
+    if (r.order.pages > 0) {
+        print(std::format("  reading order   {} pages not in the order the PDF stores them\n", r.order.pages));
+    }
     if (r.figures > 0) {
         print(std::format("  figures         {} stored as pictures ({})\n", r.figures, megabytes(r.figure_bytes)));
     }
@@ -291,6 +299,9 @@ int main(int argc, char** argv) {
         } else if (arg == "--table-pages") {
             if (!value(v) || (v != "split" && v != "join")) return usage_error("--table-pages must be split or join");
             args.convert.table_pages = v == "join" ? htpd::TablePages::Join : htpd::TablePages::Split;
+        } else if (arg == "--order") {
+            if (!value(v) || (v != "auto" && v != "stored")) return usage_error("--order must be auto or stored");
+            args.convert.order = v == "stored" ? htpd::OrderMode::Stored : htpd::OrderMode::Auto;
         } else if (arg == "--tables") {
             if (!value(v) || (v != "auto" && v != "text")) return usage_error("--tables must be auto or text");
             args.convert.tables = v == "text" ? htpd::TableMode::Text : htpd::TableMode::Auto;

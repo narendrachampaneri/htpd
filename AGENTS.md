@@ -83,7 +83,11 @@ same for `eval/tests` and `model/tests`). Tests must not need the internet.
   headings found in the text below them. It does not "pick the best mode".
 * `src/layout.cpp` does not work out columns. It keeps the order in which
   the PDF stores the text. Only a page stored from bottom to top, or in no
-  order at all, is sorted. (Inside a table, `src/sections.cpp` puts cells
+  order at all, is sorted. `src/order.cpp` (XY-cut) then changes the order of
+  a page only where the page shows that the stored order is clearly wrong
+  (columns stored line by line, a box in the middle of a sentence, ...); a
+  change that none of its rules explains is not made, so a page in good order
+  stays byte for byte. (Inside a table, `src/sections.cpp` puts cells
   together by position: FORMAT.md 4.2.)
 * A table row needs three or more cells. An empty cell is only written
   when the columns are certain (`rows_text` in `src/sections.cpp`).
@@ -101,6 +105,7 @@ same for `eval/tests` and `model/tests`). Tests must not need the internet.
 | 2b. Style sheet and producer (styles, roles; used by 3 and 4) | `src/styles.cpp` |
 | 3. Headers and footers | `src/furniture.cpp` |
 | 3b. Columns of tables set tight | `src/columns.cpp` |
+| 3c. Reading order of pages with columns, boxes, margin notes | `src/order.cpp` |
 | 4. Headings (bookmarks, a printed table of contents, the text) | `src/headings.cpp` |
 | 4b. Structure for few headings, parts of long text | `src/structure.cpp` |
 | 5. Sections, paragraphs, tables, code | `src/sections.cpp` |

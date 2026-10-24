@@ -1365,6 +1365,8 @@ std::vector<Paragraph> build_paragraphs_impl(std::span<const Line> lines, float 
                 std::fabs(line.size - previous->size) > same_size * size ||
                 starts_term(index) || back_left) {
                 start_new = true;
+            } else if (line.joined && line.page == previous->page) {
+                start_new = false;   // the paragraph goes on below a box that the reading order moved behind it
             } else if (moved_to_new_area) {
                 // Next page or next column: the paragraph continues unless the
                 // previous line ended a sentence.

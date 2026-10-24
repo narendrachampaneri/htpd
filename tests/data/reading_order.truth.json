@@ -1,0 +1,35 @@
+{
+ "case": "reading_order",
+ "pages": [
+  {
+   "page": 1,
+   "paragraphs": [
+    {
+     "id": "left",
+     "kind": "body",
+     "text": "The charger controller samples the bus voltage every ten milliseconds and reports the value over the internal bus. When the value leaves the allowed range for more than three samples the controller opens the contactor and writes a fault code into the status register of the unit. The fault code stays set until a host clears it by hand."
+    },
+    {
+     "id": "right",
+     "kind": "body",
+     "text": "Output current is measured by a shunt resistor in the return path and filtered before the converter reads it. The filter has a corner frequency of two hundred hertz which keeps the ripple of the stage out of the result and makes the reading stable enough for the limit checks of the control loop that runs every single millisecond."
+    }
+   ]
+  },
+  {
+   "page": 2,
+   "paragraphs": [
+    {
+     "id": "body",
+     "kind": "body",
+     "text": "The supply stage is checked at start-up and again every second while the charger runs. A reading outside the limits is reported to the host and, when it lasts for more than the filter time, switches the output off before the stage and the cable can be damaged by the current that flows into the fault. After that the controller waits for the host."
+    },
+    {
+     "id": "box",
+     "kind": "box",
+     "text": "Note on the limits The limits are given in the table of the data sheet."
+    }
+   ]
+  }
+ ]
+}

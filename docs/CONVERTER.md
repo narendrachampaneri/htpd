@@ -341,6 +341,59 @@ the removed Chrome header, which `pdftotext` mixes into another line and the
 bench cannot take out of the PDF page; the removed header is listed in the
 notes with its text.
 
+### Reading order
+
+The converter keeps the order in which the PDF stores the text: that is the reading order of almost every PDF, also
+with two columns. `src/order.cpp` (step 3c, after the tables and before the headings) changes it on a page only
+where the page itself shows that the stored order is not the order a person reads. The rest stays as it is, byte for
+byte: a page of one column in good order, two columns stored column by column, a table stored cell by cell, a page of a
+tagged PDF whose lines the tags place, a scanned page, text from right to left.
+
+**Blocks.** The page is cut by an XY-cut: at the widest strip that no text crosses, down (columns) and across (bands),
+again and again in each part. Columns win over bands unless a band is far wider than the gutter (two paragraphs that
+happen to end at the same height are no bands). The parts are blocks; every block of a tree knows whether it lies
+above, below or beside the others. A table, a listing (monospace text) and a framed or shaded area that holds two
+lines or more (a box, found from the shapes the page draws) are blocks of their own: no cut goes through them. The place
+of a figure, the words drawn inside a figure (the labels of a diagram) and signs from a symbol font (icons) are no
+part of the cut: each stays at the line before it in the PDF.
+
+**What is changed**, each by a rule of its own:
+
+| Where the PDF is clearly wrong | What is done |
+|---|---|
+| Columns stored line by line (the left line, the right line, ...), or in no order | each column is read to its end, left before right. A line that holds the text of two columns (the PDF stores the two lines one after the other) is cut at its gap into its two lines (`Line` pieces; the notes count them). Only where the page shows columns of running text: every column of at least three lines, four words or more to a line, lines nearly as wide as the column. Short cells are a table: a table is never cut. |
+| A box, a caption or a figure stored far from its place (one or two small stretches that, taken out, leave every column in one piece) | it goes to its place on the page |
+| Two blocks of text (two lines or more, one of them eight words or more) stored the wrong way round in a stack | read from the top down. A heading, a number or an icon that the PDF stores a little off stays where it is |
+| A box, a pull quote or another block that stands in the middle of a sentence (the block above ends without a full stop, the block below starts in lower case) | the paragraph is read to its end, the block after it; the paragraph is one paragraph (`Line::joined`). A box between two sentences stays where it is: it cannot be told from a box between two paragraphs |
+| Notes in the margin: a narrow column of smaller text beside running text | each note after the paragraph beside it |
+| Footnotes (the style sheet's footnote role) on a page of columns | at the end of the page, so that a paragraph that runs from the first column to the second is not cut by the footnote |
+
+**Safety.** A change that none of the rules above explains is not made. A page is left as it is when it holds text read
+by OCR, lines placed by the PDF's tags, text from right to left (Hebrew, Arabic), fewer than 6 or more than 2500 lines.
+The cells of a table stored column by column or cell by cell are put together by position later (`src/sections.cpp`),
+which needs the PDF's order, so columns that hold a table or a listing are left alone. No line is lost or written
+twice: the new order is checked against the old before it is used. `--order stored` switches all of it off.
+
+**Not done.** Text that wraps round a box is cut where the box stands, but a box that touches its text with no free
+strip is kept in the same block (the box is then read after the lines beside it, not after the paragraph); a line that
+holds two columns of different sizes is cut into pieces that take the size of the whole line; the order of the columns
+of a page the PDF stores right column first is the PDF's (no guess about the reading direction); reading order across
+pages (a paragraph that goes on over a page break) is as before; a table that runs from one column to the next is two
+tables.
+
+Cost and gain (`tests/bench`, the 95 documents of the public sets `data`, `eval`, `zoo` and `tables`, best of 5, converter
+before and after on the same machine, two runs each): total conversion time 5.05 s and 4.92 s before, 4.82 s and 4.92 s
+after (the difference between two runs of one build is as large as the difference between the builds); total size
++186 bytes (6,540,584 to 6,540,770: the one note line of the only document that is re-ordered). Of these 95 documents
+94 give the same file as before, byte for byte except the time of the conversion: the manuals of the evaluation, the
+zoo (also its six two-column Word documents) and the tables. The only one that changes is `tests/data/reading_order.pdf`,
+made for this step. The evaluation (test and tune split) is the same question by question. What it gives
+(`tests/bench/make_layouts.py`, 34 PDFs of 36 pages whose reading order is known, each also with the text stored in another order,
+and `reading_order.pdf`): words in reading order 10 371 of 12 302 to 12 300, words that are in the file but not in their
+place 1 931 to 2, pages in perfect order 14 of 36 to 35, paragraphs found whole 219 of 305 to 298, paragraphs split 85 to
+7 (details in `tests/bench/README.md`). The cost is not measurable and the gain is clear, so the step is on by default;
+`--order stored` is the way out.
+
 ## Build
 
 ### 1. Get PDFium
@@ -412,6 +465,7 @@ htpd info manual.pdf                     # show what would be found, write nothi
 | `--keep-headers` | Keeps the running headers and footers in the text. |
 | `--dehyphenate` | `inter-` + `rupt` becomes `interrupt` instead of `inter-rupt`. |
 | `--tags auto\|on\|off` | The structure tags of a tagged PDF (headings, tables, lists, figures, page furniture), used where they agree with the page text. `auto` (default): when the PDF is tagged and the headings found without the tags are poor (see "Tagged PDFs"). `on`: whenever the PDF has tags. `off`: read every PDF as if it had no tags. Reading the tags costs time, see "Tagged PDFs". |
+| `--order auto\|stored` | The order of the text of a page. `auto` (default): a page that has columns, a box or a pull quote in the middle of a sentence, a margin note, or an order that is clearly wrong (columns stored line by line, a caption stored far from its figure) is read in the order a person reads it; every other page keeps the order of the PDF, byte for byte. `stored`: always the order of the PDF. See "Reading order". |
 | `--tables auto\|text` | How the cells of a table are found. `auto` (default): from the PDF's tags, from the lines drawn on the page (lattice) and from the text. `text`: not from the lines drawn on the page. See "Tables". |
 | `--table-pages split\|join` | A table that goes on over a page break. `split` (default): one block per page. `join`: one block, with a row-level page mark (`<!-- page N -->` between two rows) where the page changes - when the columns match and the header is printed again or the table ends at the bottom and goes on at the top of the next page. Off by default: a reader that takes the page of a block from the mark above it (the reader of this project) then gives the first page for all the rows (page accuracy of the evaluation 0.640 -> 0.505), see "Tables". |
 | `--ocr auto\|on\|off` | Read text from pictures and scanned pages with Tesseract. `auto` (default): when it is installed. `on`: stop with an error when it is not. `off`: never. |
@@ -463,6 +517,7 @@ One PDF goes through seven steps. Each step is one small file.
 | 3. Headers and footers | `src/furniture.cpp` | Lines that repeat at the page edge on many pages are taken out and reported (in a document of two or three pages: on every page). A running header is set apart from the text: a line that stands right on top of the text below it (closer than 2.5 of its font sizes) stays in the text - a heading or the header row of a table at the top of the page - unless it holds the number of its page or stands on almost every page. |
 | 3a. Ruled tables | `src/tables.cpp` | Tables drawn with lines: the cells the rules make, spans, stacked values, names broken in a cell. See "Tables". The rules of a page come from `src/pdf_reader_pdfium.cpp`. |
 | 3b. Columns | `src/columns.cpp` | A table set tight (LaTeX, web pages, slides) has column gaps narrower than two font sizes. Its rows leave the same strips of the page free; the spaces on those strips become column gaps, also in the header row. Running text crosses the strips and is left alone. |
+| 3c. Reading order | `src/order.cpp` | Pages with columns, boxes, pull quotes, margin notes or a stored order that is clearly wrong are put into reading order (XY-cut into blocks). See "Reading order" above. A page in good order is not touched. |
 | 4. Headings | `src/headings.cpp` | From the bookmarks of the PDF (each found as its heading line on its page - the line in the largest font, so not a running header with the same words - or at the top of the next page); or from a table of contents printed in the document, whose titles are looked for in the text after it, in order (also when the text shows them without their number); or from the text: section numbers (also `Register 30.2.43: ...`, one level below its section), font size, bold, another font, and a heading style of the style sheet (a colour or a weight of its own). A numbered cell of a table row (another cell beside it on its line) is no heading. Large titles in a smaller style than the numbered headings, used three times or more, are headings one level below them. |
 | 4b. Structure | `src/structure.cpp` | For documents with few headings: a running header that changes starts a section with its text as title. Text longer than a few pages is cut into parts of about 2 pages, where a sentence ends (FORMAT.md 3.3). |
 | 5. Sections | `src/sections.cpp` | The text is cut at the headings. Lines become paragraphs, table rows (wrapped cells and tables stored cell by cell are put together) and code blocks. The tree of sections is built. |
@@ -513,7 +568,7 @@ as values (`std::expected`); the library does not throw for a bad PDF.
 
 ## What was tested
 
-* **170 automatic tests** (`make test`). Most build their input in memory.
+* **188 automatic tests** (`make test`). Most build their input in memory.
   The others convert small PDFs in `tests/data` through the real PDF
   library: rotated pages, scaled fonts, text spaced only by kerning,
   two columns, code listings, fonts whose names lie about their widths,
@@ -552,6 +607,13 @@ as values (`std::expected`); the library does not throw for a bad PDF.
   `--compare before.json after.json` shows what a change did and whether it stays within
   the limits (accuracy never worse, time at most +10 %, size at most +5 %). How to use it and
   what each number means: [`tests/bench/README.md`](../tests/bench/README.md).
+* **Pages with a known reading order** (`tests/bench/make_layouts.py`). 34 small PDFs (36 pages) whose paragraphs are known in the
+  order a person reads them: two and three columns, a paragraph that runs over from one column to the next, a full-width
+  title and figure, a framed and a shaded box and a pull quote in the middle of a sentence, a caption beside its figure,
+  footnotes, notes in the margin, a table and a listing between columns, a newsletter and a two-page paper - each also with
+  the text stored line by line, bottom to top, in no order, or the box stored last. `run_bench.py --set layouts` scores the
+  words in reading order and the paragraphs found whole, split or joined (`tests/bench/README.md`). The zoo has a Word
+  report in two columns (`word-2col`, LibreOffice) whose stored order is right: it must come out unchanged.
 * **Tables with known cells** (`tests/bench/make_tables.py`). 29 small PDFs whose tables have known cells: ruled
   grids, rules only above and below the header, no rules at all, cells over columns and rows, a header of two
   levels, cells that wrap, values stacked in a cell, names and amounts broken inside themselves, empty cells,
@@ -627,9 +689,12 @@ honest about the rest.
   is not stored. Charts and diagrams that are one picture are stored, but
   what they mean is only in the picture: an AI must look at it.
 * **Formulas** lose their form (fractions, indices, roots).
-* **Reading order** is the order in which the PDF stores the text. That is
-  right for almost all PDFs, also with two columns. The converter does not
-  work out columns by itself.
+* **Reading order** is the order in which the PDF stores the text, which is
+  right for almost all PDFs, also with two columns. Only a page that is
+  clearly out of order is changed (see "Reading order"). A page with text
+  wrapped round a box, a table that runs from one column to the next, a page
+  of a tagged PDF whose tags place the lines, and text from right to left keep
+  the order of the PDF.
 * **Headings.** Bookmarks are the best source. Without bookmarks the
   converter uses a table of contents printed in the document (its titles
   must stand alone on a line in the text), numbered headings (`2.1 Supply`)
@@ -644,8 +709,8 @@ honest about the rest.
   (closer than 2.5 of its font sizes) that has no page number and is not on
   almost every page. Everything that is removed is listed in
   `document.md`.
-* **Footnotes** stay where they stand on the page, so they can sit in the
-  middle of a section's text.
+* **Footnotes** stay where they stand on a page of one column, so they can sit
+  in the middle of a section's text; on a page of columns they are read last.
 * **The bundle is not smaller than the text of the PDF.** It is organised,
   not compressed. The gain is that an AI can read 3 kB instead of 5 MB.
   The converter does not make any AI faster or smarter by itself; that

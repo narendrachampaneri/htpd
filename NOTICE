@@ -13,3 +13,7 @@ Camelot (both MIT licensed): for tables drawn with lines, the rules merged into 
 the cells taken from the boxes they make; for tables without lines, the columns taken from the
 strips of the page that the words leave free. No code of either project is used; the
 algorithms are written anew in C++.
+
+The reading order (src/order.cpp) is an XY-cut, the recursive cut of a page at its widest free strips
+described by Nagy and Seth (1984) and used in many layout analysers. No code of any project is used; it is
+written anew in C++.

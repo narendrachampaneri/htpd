@@ -22,6 +22,7 @@
 #include "htpd/figures.hpp"
 #include "htpd/furniture.hpp"
 #include "htpd/ocr.hpp"
+#include "htpd/order.hpp"
 #include "htpd/styles.hpp"
 #include "htpd/tables.hpp"
 #include "htpd/tags.hpp"
@@ -53,6 +54,7 @@ struct BundleInfo {
     FurnitureReport furniture;
     std::size_t joined_tables = 0;       // tables over a page break written as one block (a row-level page mark)
     LatticeReport lattice;               // tables read from the rules drawn on the pages
+    OrderReport order;                   // pages put into reading order
     TagReport tags;                      // what the PDF's structure tags gave
     std::size_t headings_from_tags = 0;  // headings that come from the tags
     std::size_t skipped_rotated = 0;

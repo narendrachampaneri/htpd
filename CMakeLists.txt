@@ -68,6 +68,7 @@ add_library(htpd_core STATIC
   src/headings.cpp
   src/layout.cpp
   src/links.cpp
+  src/order.cpp
   src/structure.cpp
   src/styles.cpp
   src/tables.cpp

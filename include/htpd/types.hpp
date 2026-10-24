@@ -201,6 +201,9 @@ struct Line {
     // (the same value) from the rows of the next.
     std::vector<std::string> cells;
     std::int32_t tag_table = 0;
+    // Reading order (order.hpp): this line goes on the paragraph of the line before it, across a box or a
+    // pull quote that was moved behind the paragraph. The space between the two is no paragraph break.
+    bool joined = false;
 };
 
 // A PDF bookmark (outline entry).

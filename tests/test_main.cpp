@@ -29,6 +29,7 @@
 #include "htpd/figures.hpp"
 #include "htpd/links.hpp"
 #include "htpd/ocr.hpp"
+#include "htpd/order.hpp"
 #include "htpd/pdf_reader.hpp"
 #include "htpd/png.hpp"
 #include "htpd/sections.hpp"
@@ -3187,6 +3188,429 @@ TEST(bundle_writer_protects_existing_folders) {
     std::ofstream(other / "notes.txt") << "keep me";
     CHECK(!write_bundle(other, sections, example_info(), force).has_value());   // never someone else's
     CHECK(fs::exists(other / "notes.txt"));
+}
+
+// ---- reading order (S4) --------------------------------------------------------------
+
+namespace {
+
+// A line of running text: `words` words of about five letters from x, each 5.5 points per letter. `seed`
+// makes the words differ from line to line.
+Line prose_line(float baseline, float x, int seed, int words = 6, float size = 10) {
+    static const char* const vocabulary[] = {"alpha", "bravo", "cargo", "delta", "echoes", "forum", "gamma", "hotel", "index", "joker"};
+    std::vector<std::pair<float, const char*>> placed;
+    std::vector<std::string> keep;
+    keep.reserve(static_cast<std::size_t>(words));
+    float at = x;
+    for (int k = 0; k < words; ++k) {
+        keep.push_back(std::string(vocabulary[(seed * 3 + k * 7) % 10]) + std::to_string((seed + k) % 7));
+        placed.emplace_back(at, nullptr);
+        at += 5.5f * static_cast<float>(keep.back().size()) + 5.5f;
+    }
+    Line line;
+    line.baseline = baseline;
+    line.size = size;
+    line.y0 = baseline - 7;
+    line.y1 = baseline + 2;
+    line.x0 = line.origin_x = x;
+    float right = x;
+    for (int k = 0; k < words; ++k) {
+        if (k > 0) {
+            line.text += ' ';
+            line.space_begin.push_back(right);
+            line.space_end.push_back(placed[static_cast<std::size_t>(k)].first);
+            line.space_spans.push_back(placed[static_cast<std::size_t>(k)].first - right);
+        }
+        line.text += keep[static_cast<std::size_t>(k)];
+        right = placed[static_cast<std::size_t>(k)].first + 5.5f * static_cast<float>(keep[static_cast<std::size_t>(k)].size());
+    }
+    line.x1 = right;
+    return line;
+}
+
+Line with_text(Line line, std::string text) {
+    line.text = std::move(text);
+    return line;
+}
+
+// Two lines of one baseline stored as one: the line builder does that when a PDF stores the left column's line and the
+// right column's line one after the other.
+Line row_of_two(const Line& left, const Line& right) {
+    Line line = left;
+    line.gaps.push_back(static_cast<std::uint32_t>(line.text.size()));
+    line.gap_begin.push_back(left.x1);
+    line.gap_end.push_back(right.x0);
+    line.space_begin.push_back(left.x1);
+    line.space_end.push_back(right.x0);
+    line.space_spans.push_back(right.x0 - left.x1);
+    line.text += ' ';
+    line.text += right.text;
+    for (std::size_t k = 0; k < right.space_spans.size(); ++k) {
+        line.space_begin.push_back(right.space_begin[k]);
+        line.space_end.push_back(right.space_end[k]);
+        line.space_spans.push_back(right.space_spans[k]);
+    }
+    line.x1 = right.x1;
+    return line;
+}
+
+std::vector<std::string> line_texts(const std::vector<Line>& lines) {
+    std::vector<std::string> out;
+    for (const Line& l : lines) out.push_back(l.text);
+    return out;
+}
+
+// n lines of a column, 12.5 points apart, from baseline `top`.
+std::vector<Line> column_of(int n, float x, float top, int seed) {
+    std::vector<Line> out;
+    for (int i = 0; i < n; ++i) out.push_back(prose_line(top + 12.5f * static_cast<float>(i), x, seed + i));
+    return out;
+}
+
+}  // namespace
+
+TEST(order_keeps_two_columns_stored_column_by_column) {
+    std::vector<Line> page = column_of(10, 72, 100, 0);
+    for (Line& l : column_of(10, 330, 100, 40)) page.push_back(std::move(l));
+    const std::vector<std::string> before = line_texts(page);
+    OrderReport report;
+    CHECK(!order_page(page, {}, report));
+    CHECK(line_texts(page) == before);
+    CHECK_EQ(report.pages, std::size_t{0});
+}
+
+TEST(order_keeps_a_page_of_one_column) {
+    std::vector<Line> page = column_of(24, 72, 100, 0);
+    for (std::size_t i = 10; i < page.size(); ++i) page[i].baseline += 8;   // a gap between two paragraphs
+    for (Line& l : page) { l.y0 = l.baseline - 7; l.y1 = l.baseline + 2; }
+    const std::vector<std::string> before = line_texts(page);
+    OrderReport report;
+    CHECK(!order_page(page, {}, report));
+    CHECK(line_texts(page) == before);
+}
+
+TEST(order_reads_columns_stored_line_by_line) {
+    // Left line, right line, left line, right line ...
+    const std::vector<Line> left = column_of(10, 72, 100, 0), right = column_of(10, 330, 100, 40);
+    std::vector<Line> page;
+    for (std::size_t i = 0; i < 10; ++i) {
+        page.push_back(left[i]);
+        page.push_back(right[i]);
+    }
+    OrderReport report;
+    CHECK(order_page(page, {}, report));
+    REQUIRE(page.size() == 20);
+    for (std::size_t i = 0; i < 10; ++i) {
+        CHECK_EQ(page[i].text, left[i].text);
+        CHECK_EQ(page[10 + i].text, right[i].text);
+    }
+    CHECK_EQ(report.pages, std::size_t{1});
+}
+
+TEST(order_cuts_a_line_that_holds_the_text_of_two_columns) {
+    // The PDF stores the left line and the right line one after the other: one line with a wide gap.
+    const std::vector<Line> left = column_of(10, 72, 100, 0), right = column_of(10, 330, 100, 40);
+    std::vector<Line> page;
+    for (std::size_t i = 0; i < 10; ++i) page.push_back(row_of_two(left[i], right[i]));
+    OrderReport report;
+    CHECK(order_page(page, {}, report));
+    REQUIRE(page.size() == 20);
+    for (std::size_t i = 0; i < 10; ++i) {
+        CHECK_EQ(page[i].text, left[i].text);
+        CHECK_EQ(page[10 + i].text, right[i].text);
+        CHECK(page[i].gaps.empty());
+        CHECK(page[i].x1 < 330);                   // the pieces are the columns
+        CHECK(page[10 + i].x0 >= 330);
+    }
+    CHECK_EQ(report.lines_split, std::size_t{10});
+}
+
+TEST(order_does_not_cut_the_rows_of_a_table) {
+    // Short cells in every row: a table, not two columns of text.
+    std::vector<Line> page;
+    for (int i = 0; i < 10; ++i) {
+        page.push_back(placed_line(100 + 12.5f * static_cast<float>(i), {{72, "Supply"}, {330, "3.3"}, {360, "V"}}));
+    }
+    const std::vector<std::string> before = line_texts(page);
+    OrderReport report;
+    CHECK(!order_page(page, {}, report));
+    CHECK(line_texts(page) == before);
+}
+
+TEST(order_leaves_a_table_stored_cell_by_cell) {
+    // Cell lines of two columns that alternate: short cells are a table whatever the order says.
+    std::vector<Line> page;
+    for (int i = 0; i < 8; ++i) {
+        page.push_back(placed_line(100 + 14.0f * static_cast<float>(i), {{72, "Name"}, {110, "of"}, {125, "pin"}}));
+        page.push_back(placed_line(100 + 14.0f * static_cast<float>(i), {{330, "Input"}, {370, "or"}}));
+    }
+    // Same baseline twice: the PDF stores them as two lines (the second jumps back); here they are separate lines.
+    const std::vector<std::string> before = line_texts(page);
+    OrderReport report;
+    CHECK(!order_page(page, {}, report));
+    CHECK(line_texts(page) == before);
+}
+
+TEST(order_makes_no_change_that_no_rule_explains) {
+    // Two blocks whose lines the PDF stores one after the other in turn, with no columns to explain it:
+    // lines 0 and 2 stand together at the top, lines 1 and 3 together below. Nothing here is "clearly wrong".
+    std::vector<Line> page;
+    page.push_back(prose_line(100, 72, 1));
+    page.push_back(prose_line(200, 72, 2));
+    page.push_back(prose_line(112.5f, 72, 3));
+    page.push_back(prose_line(212.5f, 72, 4));
+    page.push_back(prose_line(300, 72, 5));
+    page.push_back(prose_line(312.5f, 72, 6));
+    const std::vector<std::string> before = line_texts(page);
+    OrderReport report;
+    CHECK(!order_page(page, {}, report));
+    CHECK(line_texts(page) == before);
+}
+
+TEST(order_leaves_right_to_left_text_as_it_is) {
+    const std::vector<Line> left = column_of(10, 72, 100, 0), right = column_of(10, 330, 100, 40);
+    std::vector<Line> page;
+    for (std::size_t i = 0; i < 10; ++i) {
+        page.push_back(with_text(left[i], "\xD7\xA9\xD7\x9C\xD7\x95\xD7\x9D " + left[i].text));
+        page.push_back(with_text(right[i], "\xD7\xA9\xD7\x9C\xD7\x95\xD7\x9D " + right[i].text));
+    }
+    const std::vector<std::string> before = line_texts(page);
+    OrderReport report;
+    CHECK(!order_page(page, {}, report));
+    CHECK(line_texts(page) == before);
+}
+
+TEST(order_leaves_text_read_by_ocr_as_it_is) {
+    const std::vector<Line> left = column_of(10, 72, 100, 0), right = column_of(10, 330, 100, 40);
+    std::vector<Line> page;
+    for (std::size_t i = 0; i < 10; ++i) {
+        page.push_back(left[i]);
+        page.push_back(right[i]);
+    }
+    page[3].ocr = Line::Ocr::Page;
+    const std::vector<std::string> before = line_texts(page);
+    OrderReport report;
+    CHECK(!order_page(page, {}, report));
+    CHECK(line_texts(page) == before);
+}
+
+TEST(order_puts_a_block_stored_out_of_its_place_where_it_stands) {
+    // A caption of three lines stored last, set between two paragraphs.
+    std::vector<Line> page = column_of(8, 72, 100, 0);
+    page.back().text += ".";
+    std::vector<Line> second = column_of(8, 72, 100 + 12.5f * 8 + 60, 20);
+    std::vector<Line> caption = column_of(3, 72, 100 + 12.5f * 8 + 14, 60);
+    for (Line& l : caption) { l.size = 8.5f; l.y0 = l.baseline - 6; l.y1 = l.baseline + 2; }
+    for (const Line& l : second) page.push_back(l);
+    for (const Line& l : caption) page.push_back(l);
+    OrderReport report;
+    CHECK(order_page(page, {}, report));
+    REQUIRE(page.size() == 19);
+    CHECK_EQ(page[8].text, caption[0].text);
+    CHECK_EQ(page[10].text, caption[2].text);
+    CHECK_EQ(page[11].text, second[0].text);
+}
+
+TEST(order_reads_a_box_in_the_middle_of_a_sentence_after_the_paragraph) {
+    // A paragraph of 8 lines; after its 3rd a framed box of two lines stands; the sentence goes on below it.
+    std::vector<Line> page = column_of(3, 72, 100, 0);
+    page.back().text += " and the";                 // no full stop: the sentence goes on
+    std::vector<Line> box = column_of(2, 80, 100 + 12.5f * 3 + 14, 50);
+    for (Line& l : box) l.x1 = 280;
+    std::vector<Line> rest = column_of(5, 72, 100 + 12.5f * 3 + 14 + 12.5f * 2 + 14, 20);
+    rest.front().text = "next " + rest.front().text;   // lower case: the sentence goes on
+    page.insert(page.end(), box.begin(), box.end());
+    page.insert(page.end(), rest.begin(), rest.end());
+    const Box frame{74, 141, 290, 173};
+    OrderOptions options;
+    options.frames = std::span<const Box>(&frame, 1);
+    OrderReport report;
+    CHECK(order_page(page, options, report));
+    REQUIRE(page.size() == 10);
+    CHECK_EQ(page[3].text, rest[0].text);            // the paragraph goes on
+    CHECK(page[3].joined);                           // ... and is one paragraph
+    CHECK_EQ(page[8].text, box[0].text);             // the box after it
+    CHECK_EQ(page[9].text, box[1].text);
+
+    // The same without a frame: a pull quote in large letters is read after the paragraph too.
+    std::vector<Line> quoted = column_of(3, 72, 100, 0);
+    quoted.back().text += " and the";
+    std::vector<Line> quote = column_of(2, 80, 100 + 12.5f * 3 + 20, 50);
+    for (Line& l : quote) { l.size = 15; l.y0 = l.baseline - 11; l.y1 = l.baseline + 3; }
+    quote[1].baseline += 6;
+    quote[1].y0 += 6;
+    quote[1].y1 += 6;
+    std::vector<Line> rest_q = column_of(5, 72, 210, 20);
+    rest_q.front().text = "next " + rest_q.front().text;
+    quoted.insert(quoted.end(), quote.begin(), quote.end());
+    quoted.insert(quoted.end(), rest_q.begin(), rest_q.end());
+    OrderReport second;
+    CHECK(order_page(quoted, {}, second));
+    CHECK_EQ(quoted[3].text, rest_q[0].text);
+    CHECK_EQ(quoted[8].text, quote[0].text);
+
+    // A box between two sentences stays where it is: it may as well stand between two paragraphs.
+    std::vector<Line> between = column_of(3, 72, 100, 0);
+    between.back().text += " done.";
+    between.insert(between.end(), box.begin(), box.end());
+    between.insert(between.end(), rest.begin(), rest.end());
+    OrderReport third;
+    CHECK(!order_page(between, options, third));
+}
+
+TEST(order_reads_notes_in_the_margin_after_the_paragraph_beside_them) {
+    // Three paragraphs of four lines in a wide column and a note beside each, small and narrow. The PDF stores the
+    // paragraphs, then the notes.
+    std::vector<Line> page;
+    std::vector<Line> notes;
+    for (int p = 0; p < 3; ++p) {
+        const float top = 100 + 80.0f * static_cast<float>(p);
+        for (Line& l : column_of(4, 72, top, p * 10)) page.push_back(std::move(l));
+        std::vector<Line> note = column_of(2, 440, top, 70 + p * 10);
+        for (Line& l : note) {
+            l.size = 8;
+            l.text = l.text.substr(0, l.text.find(' ', 14));
+            l.x1 = l.x0 + 5.0f * static_cast<float>(l.text.size());
+            l.y0 = l.baseline - 6;
+            l.y1 = l.baseline + 2;
+            notes.push_back(l);
+        }
+    }
+    for (const Line& n : notes) page.push_back(n);
+    OrderReport report;
+    CHECK(order_page(page, {}, report));
+    REQUIRE(page.size() == 18);
+    CHECK_EQ(page[4].text, notes[0].text);
+    CHECK_EQ(page[5].text, notes[1].text);
+    CHECK_EQ(page[10].text, notes[2].text);
+    CHECK_EQ(page[16].text, notes[4].text);
+}
+
+TEST(order_reads_footnotes_last_on_a_page_of_columns) {
+    // Two columns; the first column ends with a footnote, which the PDF stores before the second column.
+    std::vector<std::vector<Line>> pages(1);
+    std::vector<Line>& page = pages[0];
+    for (Line& l : column_of(10, 72, 100, 0)) page.push_back(std::move(l));
+    std::vector<Line> notes;
+    for (int i = 0; i < 3; ++i) {
+        Line n = prose_line(640 + 9.0f * static_cast<float>(i), 72, 90 + i, 5, 7);
+        n.y0 = n.baseline - 5;
+        n.y1 = n.baseline + 1.5f;
+        notes.push_back(n);
+        page.push_back(n);
+    }
+    for (Line& l : column_of(10, 330, 100, 40)) page.push_back(std::move(l));
+    const std::vector<float> heights{792};
+    const StyleSheet sheet = build_style_sheet(pages, heights, {}, Producer::Unknown);
+    REQUIRE(sheet.role_of(page[10]) == Role::Footnote);
+    OrderOptions options;
+    options.styles = &sheet;
+    options.page_height = 792;
+    OrderReport report;
+    CHECK(order_page(page, options, report));
+    REQUIRE(page.size() == 23);
+    CHECK_EQ(page[10].text, column_of(10, 330, 100, 40)[0].text);   // the second column follows the first
+    CHECK_EQ(page[20].text, notes[0].text);                          // the footnotes close the page
+    CHECK_EQ(page[22].text, notes[2].text);
+}
+
+TEST(order_keeps_the_labels_of_a_diagram_where_the_pdf_has_them) {
+    // A drawing with its labels in an odd order, and a figure mark: none of it is moved.
+    std::vector<Line> page = column_of(6, 72, 100, 0);
+    Line mark;
+    mark.figure = 1;
+    mark.x0 = 100;
+    mark.x1 = 300;
+    mark.y0 = 200;
+    mark.y1 = 300;
+    page.push_back(mark);
+    page.push_back(placed_line(290, {{110, "Output"}, {150, "stage"}}));
+    page.push_back(placed_line(210, {{110, "Input"}, {150, "stage"}}));
+    page.push_back(placed_line(250, {{110, "Clock"}, {150, "tree"}}));
+    for (Line& l : column_of(6, 72, 330, 20)) page.push_back(std::move(l));
+    const std::vector<std::string> before = line_texts(page);
+    OrderReport report;
+    CHECK(!order_page(page, {}, report));
+    CHECK(line_texts(page) == before);
+}
+
+TEST(sections_a_line_that_goes_on_below_a_moved_box_is_the_same_paragraph) {
+    std::vector<Line> lines;
+    lines.push_back(make_line(0, "The clock tree decides how much of the", 100));
+    lines.push_back(make_line(0, "supply budget is left for the load and", 112.5f));
+    lines.push_back(make_line(0, "the rest goes to the output stage.", 195));
+    const float pitch = typical_line_pitch(lines);
+    CHECK_EQ(build_paragraphs(lines, pitch).size(), std::size_t{2});   // the gap starts a paragraph
+    lines[2].joined = true;
+    CHECK_EQ(build_paragraphs(lines, pitch).size(), std::size_t{1});
+}
+
+TEST(order_keeps_the_pdf_order_where_only_a_small_block_is_off) {
+    // A heading of one line stored after its paragraph, and an icon from a symbol font stored first: small things the
+    // PDF has in an odd place are not a reason to read the page in another order.
+    std::vector<Line> page;
+    Line icon = placed_line(100, {{40, "\xEF\x82\xA9"}});
+    page.push_back(icon);
+    for (Line& l : column_of(4, 72, 140, 0)) page.push_back(std::move(l));
+    for (Line& l : column_of(4, 72, 230, 20)) page.push_back(std::move(l));
+    page.push_back(placed_line(112, {{72, "Heading", }}, 12));   // above the paragraph, stored last
+    const std::vector<std::string> before = line_texts(page);
+    OrderReport report;
+    CHECK(!order_page(page, {}, report));
+    CHECK(line_texts(page) == before);
+}
+
+TEST(order_leaves_an_icon_at_the_line_before_it) {
+    // Columns stored line by line, and a sign from a symbol font in the margin stored in the middle of them: it is no
+    // column of its own, it stays at the line before it.
+    const std::vector<Line> left = column_of(10, 72, 100, 0), right = column_of(10, 330, 100, 40);
+    Line icon = placed_line(150, {{40, "\xEF\x82\xA9"}});
+    std::vector<Line> page;
+    for (std::size_t i = 0; i < 10; ++i) {
+        page.push_back(left[i]);
+        page.push_back(right[i]);
+        if (i == 3) page.push_back(icon);
+    }
+    OrderReport report;
+    CHECK(order_page(page, {}, report));
+    REQUIRE(page.size() == 21);
+    CHECK_EQ(page[0].text, left[0].text);
+    CHECK_EQ(page[9].text, left[9].text);
+    CHECK_EQ(page[13].text, right[3].text);
+    CHECK_EQ(page[14].text, icon.text);
+}
+
+TEST(end_to_end_a_page_is_read_in_reading_order_when_the_pdf_stores_it_otherwise) {
+    ConvertOptions options;
+    options.input = fs::path(HTPD_TEST_DATA) / "reading_order.pdf";
+    options.output_dir = fresh_temp_dir("reading_order_auto");
+    options.ocr = OcrMode::Off;
+    const auto report = convert(options);
+    REQUIRE(report.has_value());
+    CHECK_EQ(report->order.pages, std::size_t{2});
+    const std::string text = read_file(options.output_dir / "sections/0001-page-1.md");
+    // Page 1: two columns stored line by line: each column is read to its end.
+    CHECK(text.contains("every ten milliseconds and reports the value"));
+    CHECK(text.contains("filtered before the converter reads it"));
+    // Page 2: the note is read after the paragraph it stood in, which goes on below it as one paragraph.
+    const std::string second = read_file(options.output_dir / "sections/0002-page-2.md");
+    const std::size_t end_of_paragraph = second.find("After that the controller waits for the host.");
+    const std::size_t note = second.find("Note on the limits");
+    CHECK(end_of_paragraph != std::string::npos);
+    CHECK(note != std::string::npos);
+    CHECK(note > end_of_paragraph);
+    CHECK(second.contains("reported to the host and, when it lasts for more than the filter time, switches"));
+    CHECK(read_file(options.output_dir / "document.md").contains("2 pages read in reading order"));
+
+    // --order stored: the order of the PDF, and no note about it.
+    ConvertOptions stored = options;
+    stored.output_dir = fresh_temp_dir("reading_order_stored");
+    stored.order = OrderMode::Stored;
+    const auto kept = convert(stored);
+    REQUIRE(kept.has_value());
+    CHECK_EQ(kept->order.pages, std::size_t{0});
+    CHECK(!read_file(stored.output_dir / "sections/0001-page-1.md").contains("every ten milliseconds and reports the value"));
+    CHECK(!read_file(stored.output_dir / "document.md").contains("read in reading order"));
 }
 
 // ---- end to end (needs the PDF library and tests/data) -----------------------

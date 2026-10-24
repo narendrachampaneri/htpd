@@ -1,0 +1,127 @@
+%PDF-1.3
+%“Œ‹ž ReportLab Generated PDF document (opensource)
+1 0 obj
+<<
+/F1 2 0 R /F2 4 0 R
+>>
+endobj
+2 0 obj
+<<
+/BaseFont /Helvetica /Encoding /WinAnsiEncoding /Name /F1 /Subtype /Type1 /Type /Font
+>>
+endobj
+3 0 obj
+<<
+/Contents 9 0 R /MediaBox [ 0 0 612 792 ] /Parent 8 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+4 0 obj
+<<
+/BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding /Name /F2 /Subtype /Type1 /Type /Font
+>>
+endobj
+5 0 obj
+<<
+/Contents 10 0 R /MediaBox [ 0 0 612 792 ] /Parent 8 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+6 0 obj
+<<
+/PageMode /UseNone /Pages 8 0 R /Type /Catalog
+>>
+endobj
+7 0 obj
+<<
+/Author (anonymous) /CreationDate (D:20000101000000+00'00') /Creator (anonymous) /Keywords () /ModDate (D:20000101000000+00'00') /Producer (ReportLab PDF Library - \(opensource\)) 
+  /Subject (unspecified) /Title (Reading order) /Trapped /False
+>>
+endobj
+8 0 obj
+<<
+/Count 2 /Kids [ 3 0 R 5 0 R ] /Type /Pages
+>>
+endobj
+9 0 obj
+<<
+/Length 1253
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F1 10 Tf 12 TL ET
+BT 1 0 0 1 72 692 Tm (The charger controller samples the bus) Tj T* ET
+BT 1 0 0 1 330 692 Tm (Output current is measured by a shunt) Tj T* ET
+BT 1 0 0 1 72 679 Tm (voltage every ten milliseconds and reports) Tj T* ET
+BT 1 0 0 1 330 679 Tm (resistor in the return path and filtered) Tj T* ET
+BT 1 0 0 1 72 666 Tm (the value over the internal bus. When the) Tj T* ET
+BT 1 0 0 1 330 666 Tm (before the converter reads it. The filter) Tj T* ET
+BT 1 0 0 1 72 653 Tm (value leaves the allowed range for more than) Tj T* ET
+BT 1 0 0 1 330 653 Tm (has a corner frequency of two hundred hertz) Tj T* ET
+BT 1 0 0 1 72 640 Tm (three samples the controller opens the) Tj T* ET
+BT 1 0 0 1 330 640 Tm (which keeps the ripple of the stage out of) Tj T* ET
+BT 1 0 0 1 72 627 Tm (contactor and writes a fault code into the) Tj T* ET
+BT 1 0 0 1 330 627 Tm (the result and makes the reading stable) Tj T* ET
+BT 1 0 0 1 72 614 Tm (status register of the unit. The fault code) Tj T* ET
+BT 1 0 0 1 330 614 Tm (enough for the limit checks of the control) Tj T* ET
+BT 1 0 0 1 72 601 Tm (stays set until a host clears it by hand.) Tj T* ET
+BT 1 0 0 1 330 601 Tm (loop that runs every single millisecond.) Tj T* ET
+ 
+endstream
+endobj
+10 0 obj
+<<
+/Length 829
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F1 10 Tf 12 TL ET
+BT 1 0 0 1 72 692 Tm (The supply stage is checked at start-up and again every) Tj T* ET
+BT 1 0 0 1 72 679 Tm (second while the charger runs. A reading outside the limits is) Tj T* ET
+BT 1 0 0 1 72 666 Tm (reported to the host and, when it lasts for more than the) Tj T* ET
+n 80 602 380 40 re S
+BT /F2 9 Tf 10.8 TL ET
+BT 1 0 0 1 88 626 Tm (Note on the limits) Tj T* ET
+BT /F1 9 Tf 10.8 TL ET
+BT 1 0 0 1 88 612 Tm (The limits are given in the table of the data sheet.) Tj T* ET
+BT /F1 10 Tf 12 TL ET
+BT 1 0 0 1 72 577 Tm (filter time, switches the output off before the stage and the) Tj T* ET
+BT 1 0 0 1 72 564 Tm (cable can be damaged by the current that flows into the) Tj T* ET
+BT 1 0 0 1 72 551 Tm (fault. After that the controller waits for the host.) Tj T* ET
+ 
+endstream
+endobj
+xref
+0 11
+0000000000 65535 f 
+0000000061 00000 n 
+0000000102 00000 n 
+0000000209 00000 n 
+0000000402 00000 n 
+0000000514 00000 n 
+0000000708 00000 n 
+0000000776 00000 n 
+0000001042 00000 n 
+0000001107 00000 n 
+0000002411 00000 n 
+trailer
+<<
+/ID 
+[<83e2952f7ad8497aae43b1057295a8f8><83e2952f7ad8497aae43b1057295a8f8>]
+% ReportLab generated PDF document -- digest (opensource)
+
+/Info 7 0 R
+/Root 6 0 R
+/Size 11
+>>
+startxref
+3291
+%%EOF

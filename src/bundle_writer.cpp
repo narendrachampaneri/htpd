@@ -506,6 +506,24 @@ std::string conversion_notes(const BundleInfo& info) {
         }
         md += "\n";
     }
+    if (info.order.pages > 0) {
+        md += std::format("* {} page{} read in reading order, not in the order the PDF stores the text (columns, boxes or a stored order "
+                          "that is clearly wrong)", info.order.pages, info.order.pages == 1 ? "" : "s");
+        if (info.order.lines_split > 0) {
+            md += std::format("; {} line{} that held the text of two columns {} cut into their columns",
+                              info.order.lines_split, info.order.lines_split == 1 ? "" : "s", info.order.lines_split == 1 ? "was" : "were");
+        }
+        md += ".";
+        if (!info.order.page_numbers.empty()) {
+            md += info.order.pages == 1 ? " Page " : " Pages ";
+            for (std::size_t i = 0; i < info.order.page_numbers.size(); ++i) {
+                md += std::format("{}{}", i > 0 ? ", " : "", info.order.page_numbers[i] + 1);
+            }
+            if (info.order.pages > info.order.page_numbers.size()) md += ", ...";
+            md += ".";
+        }
+        md += "\n";
+    }
     if (info.joined_tables > 0) {
         md += std::format("* {} table{} that go{} on over a page break {} written as one block, with a page mark (`<!-- page N -->`) "
                           "as a line of its own between two rows where the page changes (`--table-pages join`).\n",

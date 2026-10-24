@@ -16,6 +16,7 @@
 #include "htpd/figures.hpp"
 #include "htpd/layout.hpp"
 #include "htpd/links.hpp"
+#include "htpd/order.hpp"
 #include "htpd/pdf_reader.hpp"
 #include "htpd/png.hpp"
 #include "htpd/sections.hpp"
@@ -46,6 +47,7 @@ struct Analysis {
     std::size_t pages_without_text = 0;
     std::size_t table_gaps = 0;           // column gaps found from the strips rows leave free
     LatticeReport lattice;                // tables read from the rules drawn on the pages (tables.hpp)
+    OrderReport order;                    // pages put into reading order (order.hpp)
     OcrReport ocr;
     std::vector<FigureFile> figures;
     TagReport tags;                       // what the PDF's structure tags gave (tags.hpp)
@@ -113,6 +115,7 @@ struct AnalysisOptions {
     std::function<void(int, int)> on_progress;
     TagMode tags = TagMode::Auto;
     TableMode tables = TableMode::Auto;
+    OrderMode order = OrderMode::Auto;
 };
 
 Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptions& options) {
@@ -213,6 +216,8 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
     // 1. Pages -> lines.
     std::vector<std::vector<Line>> pages(static_cast<std::size_t>(page_count));
     std::vector<float> heights(pages.size(), 0.0f);
+    std::vector<float> widths(pages.size(), 0.0f);
+    std::vector<std::vector<Box>> page_frames(pages.size());   // areas drawn as a frame or a shade: boxes of the reading order (order.hpp)
     a.page_transforms.resize(pages.size());
     a.page_links.resize(pages.size());
     std::vector<std::vector<Rule>> page_rules(pages.size());   // the lines drawn on each page (tables.hpp)
@@ -220,6 +225,12 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
         const auto index = static_cast<std::size_t>(p);
         if (auto page = doc.read_page(p, read_tags)) {
             heights[index] = page->height;
+            widths[index] = page->width;
+            if (options.order == OrderMode::Auto) {
+                for (const Box& box : page->paths) {
+                    if (box.width() >= 40 && box.height() >= 18 && page_frames[index].size() < 400) page_frames[index].push_back(box);
+                }
+            }
             a.page_transforms[index] = page->user_to_display;
             a.skipped_rotated += page->skipped_rotated;
             a.unmapped += page->unmapped;
@@ -444,6 +455,20 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
         a.table_gaps += mark_table_columns(page, code);
     }
 
+    // 3c. Reading order: the pages with columns, boxes or a stored order that is clearly wrong (order.hpp). The lines
+    // of a page that the PDF's tags place are left as they are.
+    if (options.order == OrderMode::Auto) {
+        OrderOptions order_options;
+        order_options.styles = &a.styles;
+        order_options.fonts = a.fonts;
+        for (std::size_t i = 0; i < pages.size(); ++i) {
+            order_options.frames = page_frames[i];
+            order_options.page_width = widths[i];
+            order_options.page_height = heights[i];
+            order_page(pages[i], order_options, a.order);
+        }
+    }
+
     // 3. One flat list of lines.
     std::size_t total = 0;
     for (const auto& page : pages) total += page.size();
@@ -508,7 +533,7 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     auto analysed = analyse_with_gate(options.input, {options.password, options.figures, options.figure_dpi, options.ocr,
                                             options.ocr_options,
                                             options.keep_furniture, options.margin_band, options.headings,
-                                            options.on_progress, options.tags, options.tables});
+                                            options.on_progress, options.tags, options.tables, options.order});
     if (!analysed) return std::unexpected(analysed.error());
     Analysis& a = *analysed;
 
@@ -540,6 +565,7 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     info.furniture = a.furniture;
     info.tags = a.tags;
     info.lattice = a.lattice;
+    info.order = a.order;
     for (const Section& s : sections) {
         for (const Paragraph& p : s.paragraphs) info.joined_tables += p.kind == ParagraphKind::Rows && !p.page_starts.empty();
     }
@@ -585,6 +611,7 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     report.furniture = std::move(a.furniture);
     report.tags = info.tags;
     report.lattice = info.lattice;
+    report.order = info.order;
     report.headings_from_tags = info.headings_from_tags;
     report.skipped_rotated = a.skipped_rotated;
     report.unmapped = a.unmapped;
