@@ -22,6 +22,7 @@
 #include "htpd/figures.hpp"
 #include "htpd/furniture.hpp"
 #include "htpd/ocr.hpp"
+#include "htpd/tags.hpp"
 #include "htpd/types.hpp"
 
 namespace htpd {
@@ -46,6 +47,8 @@ struct BundleInfo {
 
     bool furniture_removed = true;      // false when the user kept headers/footers
     FurnitureReport furniture;
+    TagReport tags;                      // what the PDF's structure tags gave
+    std::size_t headings_from_tags = 0;  // headings that come from the tags
     std::size_t skipped_rotated = 0;
     std::size_t unmapped = 0;
     std::size_t pages_without_text = 0;

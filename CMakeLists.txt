@@ -64,6 +64,7 @@ add_library(htpd_core STATIC
   src/columns.cpp
   src/converter.cpp
   src/furniture.cpp
+  src/tags.cpp
   src/headings.cpp
   src/layout.cpp
   src/links.cpp

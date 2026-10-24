@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "htpd/types.hpp"
@@ -28,6 +29,10 @@ std::vector<Section> build_sections(std::span<const Line> lines, std::span<const
                                     const SectionOptions& options = {});
 
 // ---- building blocks, exposed for testing --------------------------------
+
+// Appends the next line of a paragraph (or of a table cell) to `paragraph`:
+// with a space, or without one where a word is broken at a hyphen.
+void append_wrapped_line(std::string& paragraph, std::string_view line, bool dehyphenate);
 
 // Median distance between the baselines of consecutive lines, in font sizes
 // (about 1.2 for single-spaced text).

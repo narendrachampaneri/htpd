@@ -401,6 +401,228 @@ def ocr(path):
     c.save()
 
 
+class Tagged:
+    """A tagged PDF written by hand: pages with marked content, a structure tree
+    of the standard types and a parent tree, as Word or LibreOffice write them.
+    Text is Helvetica; y counts from the bottom of the page, as in a PDF."""
+
+    class Elem:
+        def __init__(self, kind, kids, attrs='', alt=None):
+            self.kind, self.kids, self.attrs, self.alt = kind, kids, attrs, alt
+
+    def __init__(self, pages=1):
+        self.ops = [[] for _ in range(pages)]
+        self.mcids = [0] * pages
+
+    def _next(self, page):
+        self.mcids[page] += 1
+        return self.mcids[page] - 1
+
+    def text(self, page, x, y, s, size=11, font='F1', tag='P'):
+        """Tagged text; returns its marked-content ID (a leaf for elem())."""
+        mcid = self._next(page)
+        self.ops[page].append('/%s <</MCID %d>> BDC BT /%s %g Tf %g %g Td (%s) Tj ET EMC' % (tag, mcid, font, size, x, y, s))
+        return ('mc', page, mcid)
+
+    def plain(self, page, x, y, s, size=11, font='F1'):
+        """Text without any tag: not part of the structure tree."""
+        self.ops[page].append('BT /%s %g Tf %g %g Td (%s) Tj ET' % (font, size, x, y, s))
+
+    def artifact(self, page, x, y, s, size=9, kind='Header'):
+        self.ops[page].append('/Artifact <</Type /Pagination /Subtype /%s>> BDC BT /F1 %g Tf %g %g Td (%s) Tj ET EMC'
+                              % (kind, size, x, y, s))
+
+    def rect(self, page, x, y, w, h):
+        """A filled rectangle that is a tagged piece of content (a drawing)."""
+        mcid = self._next(page)
+        self.ops[page].append('/Figure <</MCID %d>> BDC 0.8 0.85 0.95 rg %g %g %g %g re f 0 g EMC' % (mcid, x, y, w, h))
+        return ('mc', page, mcid)
+
+    def elem(self, kind, *kids, attrs='', alt=None):
+        return Tagged.Elem(kind, [k for k in kids], attrs, alt)
+
+    def write(self, path, document, bookmarks=()):
+        """`bookmarks`: (title, page index) pairs for the outline."""
+        pages = len(self.ops)
+        objects = []                       # bodies, object number = index + 1
+
+        def add(body):
+            objects.append(body)
+            return len(objects)
+
+        add(b'')                                                  # 1: catalog (filled below)
+        add(b'')                                                  # 2: pages
+        add(b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>')
+        add(b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>')
+        page_numbers = []
+        for index, ops in enumerate(self.ops):
+            content = ('\n'.join(ops)).encode('latin-1')
+            c = add(b'<< /Length %d >>\nstream\n' % len(content) + content + b'\nendstream')
+            page_numbers.append(add(b''))
+            objects[page_numbers[-1] - 1] = (
+                b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents %d 0 R /StructParents %d '
+                b'/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>' % (c, index))
+        root = add(b'')                                           # structure tree root
+        parent_tree = add(b'')
+        # number the elements, parents first
+        flat = []
+
+        def number(e, parent):
+            e.number, e.parent = add(b''), parent
+            flat.append(e)
+            for k in e.kids:
+                if isinstance(k, Tagged.Elem):
+                    number(k, e)
+
+        number(document, None)
+        owner = {}                                                # (page, mcid) -> element
+        for e in flat:
+            body = b'<< /Type /StructElem /S /%s /P %d 0 R' % (e.kind.encode(), e.parent.number if e.parent else root)
+            kids = []
+            first_page = None
+            for k in e.kids:
+                if isinstance(k, Tagged.Elem):
+                    kids.append(b'%d 0 R' % k.number)
+                else:
+                    _, pg, mcid = k
+                    first_page = pg if first_page is None else first_page
+                    owner[(pg, mcid)] = e
+                    kids.append(b'<< /Type /MCR /Pg %d 0 R /MCID %d >>' % (page_numbers[pg], mcid))
+            if first_page is not None:
+                body += b' /Pg %d 0 R' % page_numbers[first_page]
+            body += b' /K [' + b' '.join(kids) + b']'
+            if e.attrs:
+                body += b' /A << /O /Table ' + e.attrs.encode() + b' >>'
+            if e.alt:
+                body += b' /Alt (' + e.alt.encode() + b')'
+            objects[e.number - 1] = body + b' >>'
+        objects[root - 1] = b'<< /Type /StructTreeRoot /K [%d 0 R] /ParentTree %d 0 R >>' % (document.number, parent_tree)
+        nums = b''
+        for index in range(pages):
+            refs = b' '.join(b'%d 0 R' % owner[(index, m)].number if (index, m) in owner else b'null'
+                             for m in range(self.mcids[index]))
+            nums += b'%d [%s] ' % (index, refs)
+        objects[parent_tree - 1] = b'<< /Nums [%s] >>' % nums
+        outline = b''
+        if bookmarks:
+            first = len(objects) + 2
+            outline_root = add(b'')
+            for k, (title, pg) in enumerate(bookmarks):
+                add(b'<< /Title (%s) /Parent %d 0 R /Dest [%d 0 R /Fit]%s%s >>' % (
+                    title.encode(), outline_root, page_numbers[pg],
+                    b' /Prev %d 0 R' % (first + k - 1) if k else b'',
+                    b' /Next %d 0 R' % (first + k + 1) if k + 1 < len(bookmarks) else b''))
+            objects[outline_root - 1] = b'<< /Type /Outlines /First %d 0 R /Last %d 0 R /Count %d >>' % (
+                first, first + len(bookmarks) - 1, len(bookmarks))
+            outline = b' /Outlines %d 0 R' % outline_root
+        objects[0] = (b'<< /Type /Catalog /Pages 2 0 R /StructTreeRoot %d 0 R /MarkInfo << /Marked true >> /Lang (en-US)%s >>'
+                      % (root, outline))
+        objects[1] = b'<< /Type /Pages /Kids [%s] /Count %d >>' % (b' '.join(b'%d 0 R' % n for n in page_numbers), pages)
+        raw_pdf(path, objects)
+
+
+def tagged(path, bookmarks=False):
+    """A tagged PDF whose headings are set in the body font (only the tags tell
+    they are headings): H1, H2, a table with a cell of three lines, an empty cell the
+    tags leave out, a cell over two columns and one over two rows, a list whose
+    labels are no list marks, a drawing with a caption, and a running header and
+    footer marked as artifacts - on two pages."""
+    t = Tagged(2)
+    for page, header in ((0, 'Charger overview sheet'), (1, 'Safety summary 2024')):   # a header that differs on every page
+        t.artifact(page, 72, 760, header, kind='Header')
+        t.artifact(page, 280, 30, 'Page %d' % (page + 1), kind='Footer')
+    body = []
+    body.append(t.elem('H1', t.text(0, 72, 715, 'Introduction', tag='H1')))
+    body.append(t.elem('P', t.text(0, 72, 695, 'This charger has two connectors and one safety controller.')))
+    body.append(t.elem('H2', t.text(0, 72, 665, 'Scope', tag='H2')))
+    body.append(t.elem('P', t.text(0, 72, 645, 'The limits below apply over the full temperature range'),
+                       ))
+    # the table: columns at x = 72, 190, 330, 430
+    xs = (72, 190, 330, 430)
+
+    def cell(kind, x, lines, y, **kw):
+        return t.elem(kind, t.elem('P', *[t.text(0, x, y - 12 * i, line) for i, line in enumerate(lines)]), **kw)
+
+    rows = []
+    y = 610
+    rows.append(t.elem('TR', *[cell('TH', x, [name], y) for x, name in zip(xs, ('Name', 'Description', 'Min', 'Max'))]))
+    y -= 16
+    rows.append(t.elem('TR', cell('TD', xs[0], ['VIN'], y),
+                       cell('TD', xs[1], ['Supply voltage of the', 'main power stage', 'at the connector'], y),
+                       cell('TD', xs[2], ['-0.5'], y), cell('TD', xs[3], ['32'], y)))
+    y -= 40
+    rows.append(t.elem('TR', cell('TD', xs[0], ['IOUT'], y), cell('TD', xs[1], ['Output current'], y),
+                       cell('TD', xs[3], ['2.5'], y)))               # the empty Min cell is left out of the tags
+    y -= 16
+    rows.append(t.elem('TR', cell('TD', xs[0], ['Combined limits'], y, attrs='/ColSpan 2'),
+                       cell('TD', xs[2], ['-1'], y), cell('TD', xs[3], ['40'], y)))
+    y -= 16
+    rows.append(t.elem('TR', cell('TD', xs[0], ['Group'], y, attrs='/RowSpan 2'), cell('TD', xs[1], ['Alpha'], y),
+                       cell('TD', xs[2], ['1'], y), cell('TD', xs[3], ['2'], y)))
+    y -= 16
+    rows.append(t.elem('TR', cell('TD', xs[1], ['Beta'], y), cell('TD', xs[2], ['3'], y), cell('TD', xs[3], ['4'], y)))
+    body.append(t.elem('Table', *rows))
+    # a list: labels that are no list marks
+    y = 470
+    items = []
+    for label, lines in (('A.', ['Connect the vehicle']), ('B.', ['Check the lock and', 'the cable temperature']), ('C.', ['Start charging'])):
+        items.append(t.elem('LI', t.elem('Lbl', t.text(0, 72, y, label)),
+                            t.elem('LBody', t.elem('P', *[t.text(0, 100, y - 12 * i, line) for i, line in enumerate(lines)]))))
+        y -= 12 * len(lines) + 4
+    body.append(t.elem('L', *items))
+    # a drawing with a caption that does not start with "Figure"
+    body.append(t.elem('Figure', t.rect(0, 72, 290, 150, 80), alt='Block diagram of the power path'))
+    body.append(t.elem('Caption', t.text(0, 72, 270, 'Power path of the charger', size=9, tag='Caption')))
+    # page 2
+    body.append(t.elem('H2', t.text(1, 72, 715, 'Details', tag='H2')))
+    body.append(t.elem('P', t.text(1, 72, 695, 'Every value in this manual is measured at 25 degrees.')))
+    t.write(path, t.elem('Document', *body),
+            bookmarks=(('Introduction', 0), ('Scope', 0), ('Details', 1)) if bookmarks else ())
+
+
+def tagged_disagree(path):
+    """Tags that do not fit the page: a table with text lying on it that the tags
+    do not name, a heading tag on a whole paragraph, a list item whose text is
+    split by other text, a table whose rows are tagged in the wrong order and a
+    table with other text stored in the middle of it.
+    The converter must read all of these as if the tags were not there."""
+    t = Tagged(1)
+    body = []
+    body.append(t.elem('P', t.text(0, 72, 720, 'Opening paragraph of the page.')))
+    # 1. a table with an untagged word lying inside it
+    cells = []
+    for i, (a, b, c) in enumerate((('Pin', 'Name', 'Use'), ('1', 'VCC', 'Supply'), ('2', 'GND', 'Ground'))):
+        y = 690 - 16 * i
+        cells.append(t.elem('TR', *[t.elem('TD', t.elem('P', t.text(0, x, y, v))) for x, v in ((72, a), (180, b), (290, c))]))
+    t.plain(0, 190, 682, 'stray')
+    body.append(t.elem('Table', *cells))
+    # 2. a paragraph tagged as a heading
+    long_text = ('This is a long paragraph that was tagged as a heading by mistake, so the converter should not '
+                 'turn it into a heading of the document, because a heading is short and this text is not short '
+                 'at all, it goes on and on about the charger, its connectors, its controller and its limits, and '
+                 'it has more than three hundred characters in it altogether.')
+    body.append(t.elem('H1', t.text(0, 72, 620, long_text[:100], tag='H1'), t.text(0, 72, 608, long_text[100:200], tag='H1'),
+                       t.text(0, 72, 596, long_text[200:], tag='H1')))
+    # 3. a list item whose two halves have other text between them
+    first = t.text(0, 72, 560, 'Item that is split')
+    t.plain(0, 72, 548, 'Text that stands between the halves of the item.')
+    second = t.text(0, 72, 536, 'into two parts on the page')
+    body.append(t.elem('L', t.elem('LI', t.elem('LBody', t.elem('P', first, second)))))
+    # 4. a table whose rows are tagged in the opposite order of the page
+    rows = []
+    for i, (a, b) in enumerate((('Top row', 'first'), ('Middle row', 'second'), ('Bottom row', 'third'))):
+        y = 480 - 16 * i
+        rows.append((y, a, b))
+    trs = [t.elem('TR', *[t.elem('TD', t.elem('P', t.text(0, x, y, v))) for x, v in ((72, a), (250, b))]) for y, a, b in rows]
+    body.append(t.elem('Table', *reversed(trs)))
+    # 5. a table with unrelated text stored in the middle of it (away from it on the page)
+    first_row = t.elem('TR', *[t.elem('TD', t.elem('P', t.text(0, x, 400, v))) for x, v in ((72, 'Left one'), (250, 'Right one'))])
+    t.plain(0, 450, 380, 'A note in the margin')
+    second_row = t.elem('TR', *[t.elem('TD', t.elem('P', t.text(0, x, 384, v))) for x, v in ((72, 'Left two'), (250, 'Right two'))])
+    body.append(t.elem('Table', first_row, second_row))
+    t.write(path, t.elem('Document', *body))
+
+
 def figures(path):
     """Figures and things that are not figures: a block diagram drawn with
     lines and its caption, a ruled table, a framed listing, a photo without a
@@ -494,4 +716,7 @@ if __name__ == '__main__':
     ocr(os.path.join(OUT, 'ocr.pdf'))
     figures(os.path.join(OUT, 'figures.pdf'))
     actualtext(os.path.join(OUT, 'actualtext.pdf'))
-    print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf, sideways.pdf, links.pdf, ocr.pdf, figures.pdf to', OUT)
+    tagged(os.path.join(OUT, 'tagged.pdf'))
+    tagged(os.path.join(OUT, 'tagged_bookmarks.pdf'), bookmarks=True)
+    tagged_disagree(os.path.join(OUT, 'tagged_disagree.pdf'))
+    print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf, sideways.pdf, links.pdf, ocr.pdf, figures.pdf, actualtext.pdf, tagged.pdf, tagged_bookmarks.pdf, tagged_disagree.pdf to', OUT)

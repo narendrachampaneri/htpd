@@ -34,6 +34,7 @@
 #include "htpd/sections.hpp"
 #include "htpd/sha256.hpp"
 #include "htpd/structure.hpp"
+#include "htpd/tags.hpp"
 #include "htpd/text.hpp"
 
 #ifndef HTPD_TEST_DATA
@@ -3366,6 +3367,311 @@ TEST(end_to_end_rotation_scaling_and_spacing) {
                         "```\n"));
     // One monospace line inside a sentence is a term, not a listing.
     CHECK(text.contains("\n\nSet the file name in charger.conf before the first start.\n"));
+}
+
+// ---- tagged PDF (tests/data/tagged.pdf, tagged_disagree.pdf) -----------------
+
+namespace {
+
+ConvertOptions tagged_options(const char* pdf, const char* name, bool use_tags = true) {   // On or Off, whatever the PDF has
+    ConvertOptions options;
+    options.input = fs::path(HTPD_TEST_DATA) / pdf;
+    options.output_dir = fresh_temp_dir(name);
+    options.ocr = OcrMode::Off;
+    options.tags = use_tags ? TagMode::On : TagMode::Off;
+    return options;
+}
+
+// The text of the section with this file name, from the heading's "# Text" on.
+std::string section_text(const fs::path& dir, const char* file) {
+    const std::string all = read_file(dir / "sections" / file);
+    const auto at = all.find("# Text\n");
+    return at == std::string::npos ? all : all.substr(at);
+}
+
+}  // namespace
+
+TEST(tags_reader_gives_the_structure_tree_and_the_marks_of_the_text) {
+    const auto doc = PdfDocument::open(fs::path(HTPD_TEST_DATA) / "tagged.pdf");
+    REQUIRE(doc.has_value());
+    const auto page = doc->read_page(0);
+    REQUIRE(page.has_value());
+    REQUIRE(page->tags.present());
+    const auto count = [&](std::string_view type) {
+        return std::ranges::count_if(page->tags.nodes, [&](const TagNode& n) { return n.type == type; });
+    };
+    CHECK_EQ(count("H1"), 1);
+    CHECK_EQ(count("H2"), 1);
+    CHECK_EQ(count("Table"), 1);
+    CHECK_EQ(count("TR"), 6);
+    CHECK_EQ(count("TH"), 4);
+    CHECK_EQ(count("LI"), 3);
+    CHECK_EQ(count("Figure"), 1);
+    CHECK_EQ(count("Caption"), 1);
+    // Spans of table cells.
+    CHECK(std::ranges::any_of(page->tags.nodes, [](const TagNode& n) { return n.type == "TD" && n.col_span == 2; }));
+    CHECK(std::ranges::any_of(page->tags.nodes, [](const TagNode& n) { return n.type == "TD" && n.row_span == 2; }));
+    // The drawing carries a marked-content ID; header and footer are artifacts without one.
+    CHECK_EQ(page->tags.objects.size(), std::size_t{1});
+    std::size_t artifacts = 0, marked = 0;
+    for (const Glyph& g : page->glyphs) {
+        if (g.is_space) continue;
+        if (g.artifact) {
+            ++artifacts;
+            CHECK(g.mcid < 0);
+        } else if (g.mcid >= 0) {
+            ++marked;
+        }
+    }
+    CHECK_EQ(artifacts, std::size_t{25});   // the letters of "Charger overview sheet" and "Page 1"
+    CHECK(marked > 200);
+
+    // Without tags asked for, or in a PDF without tags, the page is read as before.
+    const auto plain = doc->read_page(0, false);
+    REQUIRE(plain.has_value());
+    CHECK(!plain->tags.present());
+    CHECK(std::ranges::all_of(plain->glyphs, [](const Glyph& g) { return g.mcid < 0 && !g.artifact; }));
+    const auto sample = PdfDocument::open(fs::path(HTPD_TEST_DATA) / "sample.pdf");
+    REQUIRE(sample.has_value());
+    const auto untagged = sample->read_page(0);
+    REQUIRE(untagged.has_value());
+    CHECK(!untagged->tags.present());
+    CHECK(std::ranges::all_of(untagged->glyphs, [](const Glyph& g) { return g.mcid < 0 && !g.artifact; }));
+}
+
+TEST(tags_headings_come_from_h1_and_h2_with_their_levels) {
+    ConvertOptions options = tagged_options("tagged.pdf", "tags_headings");
+    const auto report = convert(options);
+    REQUIRE(report.has_value());
+    CHECK(report->heading_source == HeadingSource::Tags);
+    CHECK_EQ(report->sections, std::size_t{3});
+    CHECK_EQ(report->headings_from_tags, std::size_t{3});
+    CHECK(fs::exists(options.output_dir / "sections/0001-introduction.md"));
+    const std::string scope = read_file(options.output_dir / "sections/0002-scope.md");
+    CHECK(scope.contains("heading_from: tags"));
+    CHECK(scope.contains("level: 2"));
+    CHECK(scope.contains("parent: \"sections/0001-introduction\""));
+    CHECK(read_file(options.output_dir / "sections/0003-details.md").contains("level: 2"));
+    // The notes say where the structure comes from.
+    const std::string notes = read_file(options.output_dir / "document.md");
+    CHECK(notes.contains("Structure from PDF tags: 3 headings, 1 tables (6 rows), 1 lists (3 items), 1 figures, "
+                         "4 artifact lines"));
+    CHECK(notes.contains("headings_from: tags"));
+
+    // The headings are set in the body font: nothing but the tags finds them.
+    const auto plain = convert(tagged_options("tagged.pdf", "tags_headings_off", false));
+    REQUIRE(plain.has_value());
+    CHECK(plain->heading_source == HeadingSource::None);
+    CHECK(!plain->tags.any());
+}
+
+TEST(tags_give_table_cells_over_several_lines) {
+    ConvertOptions options = tagged_options("tagged.pdf", "tags_table_lines");
+    REQUIRE(convert(options).has_value());
+    const std::string text = section_text(options.output_dir, "0002-scope.md");
+    CHECK(text.contains("Name | Description | Min | Max\n"
+                        "VIN | Supply voltage of the main power stage at the connector | -0.5 | 32\n"));
+    // The rows stand under the page and in a block of rows.
+    CHECK(text.contains("```text\nName | Description | Min | Max\n"));
+}
+
+TEST(tags_place_a_row_whose_empty_cell_the_tags_leave_out) {
+    ConvertOptions options = tagged_options("tagged.pdf", "tags_table_short");
+    REQUIRE(convert(options).has_value());
+    // The tags name four cells for the IOUT row's Min/Max columns only three: 2.5 stands under Max.
+    CHECK(section_text(options.output_dir, "0002-scope.md").contains("\nIOUT | Output current |  | 2.5\n"));
+}
+
+TEST(tags_write_row_and_column_spans_in_the_cell_they_start_in) {
+    ConvertOptions options = tagged_options("tagged.pdf", "tags_table_spans");
+    const auto report = convert(options);
+    REQUIRE(report.has_value());
+    CHECK_EQ(report->tags.spans, std::size_t{2});
+    const std::string text = section_text(options.output_dir, "0002-scope.md");
+    CHECK(text.contains("\nCombined limits [>] |  | -1 | 40\n"));       // over two columns: the next cell is covered
+    CHECK(text.contains("\nGroup [=] | Alpha | 1 | 2\n | Beta | 3 | 4\n"));   // over two rows: the cell below is covered
+}
+
+TEST(tags_make_every_list_item_a_paragraph) {
+    ConvertOptions options = tagged_options("tagged.pdf", "tags_list");
+    const auto report = convert(options);
+    REQUIRE(report.has_value());
+    CHECK_EQ(report->tags.lists, std::size_t{1});
+    CHECK_EQ(report->tags.list_items, std::size_t{3});
+    const std::string text = section_text(options.output_dir, "0002-scope.md");
+    CHECK(text.contains("\nA. Connect the vehicle\n\nB. Check the lock and the cable temperature\n\nC. Start charging\n"));
+    // Without the tags the labels are no list marks: the items run together.
+    ConvertOptions off = tagged_options("tagged.pdf", "tags_list_off", false);
+    REQUIRE(convert(off).has_value());
+    CHECK(all_section_text(off.output_dir).contains("A. Connect the vehicle B. Check the lock and the cable temperature C. Start charging"));
+}
+
+TEST(tags_give_a_figure_with_its_caption) {
+    ConvertOptions options = tagged_options("tagged.pdf", "tags_figure");
+    options.figures = true;
+    const auto report = convert(options);
+    REQUIRE(report.has_value());
+    CHECK_EQ(report->figures, std::size_t{1});
+    CHECK_EQ(report->tags.figures, std::size_t{1});
+    CHECK(all_section_text(options.output_dir).contains("![F1: Power path of the charger](../figures/F0001.png)"));
+    // A drawing of one rectangle and a caption without "Figure N" is no figure for the ordinary rules.
+    ConvertOptions off = tagged_options("tagged.pdf", "tags_figure_off", false);
+    off.figures = true;
+    const auto plain = convert(off);
+    REQUIRE(plain.has_value());
+    CHECK_EQ(plain->figures, std::size_t{0});
+}
+
+TEST(tags_take_header_and_footer_artifacts_out_and_list_them) {
+    ConvertOptions options = tagged_options("tagged.pdf", "tags_artifacts");
+    const auto report = convert(options);
+    REQUIRE(report.has_value());
+    CHECK_EQ(report->tags.artifact_lines, std::size_t{4});
+    CHECK_EQ(report->furniture.removed_lines, std::size_t{4});
+    const std::string text = all_section_text(options.output_dir);
+    CHECK(!text.contains("Charger overview sheet"));
+    CHECK(!text.contains("Safety summary 2024"));
+    CHECK(!text.contains("Page 2"));
+    const std::string notes = read_file(options.output_dir / "document.md");
+    CHECK(notes.contains("* Removed 4 running header/footer lines"));
+    CHECK(notes.contains("`Charger overview sheet`"));
+    CHECK(notes.contains("`Safety summary 2024`"));
+    // A header that differs on every page is not found by the ordinary rules.
+    const auto plain = convert(tagged_options("tagged.pdf", "tags_artifacts_off", false));
+    REQUIRE(plain.has_value());
+    CHECK(plain->furniture.removed_lines < 4);
+    // --keep-headers keeps them.
+    ConvertOptions keep = tagged_options("tagged.pdf", "tags_artifacts_kept");
+    keep.keep_furniture = true;
+    REQUIRE(convert(keep).has_value());
+    CHECK(all_section_text(keep.output_dir).contains("Charger overview sheet"));
+}
+
+TEST(tags_that_disagree_with_the_page_text_leave_it_to_the_ordinary_rules) {
+    const auto with = convert(tagged_options("tagged_disagree.pdf", "tags_disagree"));
+    REQUIRE(with.has_value());
+    // Three tables (one with text lying on it that the tags do not name, one whose rows are tagged in the
+    // wrong order, one with other text stored in the middle of it), a heading tag on a whole paragraph and
+    // a list item in two parts: none is used ...
+    CHECK_EQ(with->tags.tables, std::size_t{0});
+    CHECK_EQ(with->tags.tables_left, std::size_t{3});
+    CHECK_EQ(with->tags.headings_left, std::size_t{1});
+    CHECK_EQ(with->tags.items_left, std::size_t{1});
+    CHECK_EQ(with->tags.list_items, std::size_t{0});
+    CHECK(with->heading_source == HeadingSource::None);
+    // ... so the text is exactly the text read without any tags, and no word is lost.
+    ConvertOptions oa = tagged_options("tagged_disagree.pdf", "tags_disagree_a");
+    ConvertOptions ob = tagged_options("tagged_disagree.pdf", "tags_disagree_b", false);
+    REQUIRE(convert(oa).has_value());
+    REQUIRE(convert(ob).has_value());
+    const std::string ta = all_section_text(oa.output_dir), tb = all_section_text(ob.output_dir);
+    const auto body = [](const std::string& t) {
+        std::string out;
+        for (std::size_t at = t.find("# Text\n"); at != std::string::npos; at = t.find("# Text\n", at + 1)) {
+            out += t.substr(at, t.find("\n# ", at + 1) - at);
+        }
+        return out;
+    };
+    CHECK(body(ta) == body(tb));
+    CHECK(ta.contains("stray"));
+    CHECK(ta.contains("Item that is split"));
+    CHECK(ta.contains("Bottom row"));
+    CHECK(ta.contains("Left two"));
+    CHECK(ta.contains("A note in the margin"));
+}
+
+TEST(tags_auto_mode_reads_the_tags_only_where_they_pay_for_themselves) {
+    std::string why;
+    // Not tagged: nothing to read, nothing to say.
+    CHECK(!should_read_tags(TagMode::Auto, false, 0, 10, why) && why.empty());
+    // Tagged, no bookmarks, a small document: read.
+    CHECK(should_read_tags(TagMode::Auto, true, 0, 10, why) && why.empty());
+    CHECK(should_read_tags(TagMode::Auto, true, 2, kAutoTagPages, why));
+    // Bookmarks give the headings already; a long document costs PDFium too much time.
+    CHECK(!should_read_tags(TagMode::Auto, true, 3, 10, why));
+    CHECK(why.contains("bookmarks"));
+    CHECK(!should_read_tags(TagMode::Auto, true, 0, kAutoTagPages + 1, why));
+    CHECK(why.contains("more than 200 pages"));
+    // On reads always, Off never.
+    CHECK(should_read_tags(TagMode::On, true, 50, 5000, why) && why.empty());
+    CHECK(!should_read_tags(TagMode::Off, true, 0, 1, why));
+
+    // End to end: the default reads tagged.pdf (no bookmarks) ...
+    ConvertOptions options = tagged_options("tagged.pdf", "tags_auto_read");
+    options.tags = TagMode::Auto;
+    const auto read = convert(options);
+    REQUIRE(read.has_value());
+    CHECK(read->tags.any());
+    CHECK(!read->tags.unread);
+    // ... and not tagged_bookmarks.pdf: its bookmarks give the headings, and the notes say so.
+    ConvertOptions bookmarked = tagged_options("tagged_bookmarks.pdf", "tags_auto_bookmarks");
+    bookmarked.tags = TagMode::Auto;
+    const auto skipped = convert(bookmarked);
+    REQUIRE(skipped.has_value());
+    CHECK(!skipped->tags.any());
+    CHECK(skipped->tags.unread);
+    CHECK(skipped->heading_source == HeadingSource::Bookmark);
+    CHECK(read_file(bookmarked.output_dir / "document.md")
+              .contains("The PDF is tagged, but its structure tags were not read: it has bookmarks, which give the headings."));
+    // --tags on reads them anyway; with bookmarks they stay the source of the headings.
+    bookmarked = tagged_options("tagged_bookmarks.pdf", "tags_auto_bookmarks_on");
+    const auto forced = convert(bookmarked);
+    REQUIRE(forced.has_value());
+    CHECK(forced->tags.any());
+    CHECK(!forced->tags.unread);
+    CHECK(forced->heading_source == HeadingSource::Bookmark);
+    CHECK_EQ(forced->tags.tables, std::size_t{1});
+    // A PDF without tags says nothing about tags.
+    ConvertOptions untagged;
+    untagged.input = fs::path(HTPD_TEST_DATA) / "sample.pdf";
+    untagged.output_dir = fresh_temp_dir("tags_auto_untagged");
+    const auto plain = convert(untagged);
+    REQUIRE(plain.has_value());
+    CHECK(!plain->tags.unread && !plain->tags.any());
+    CHECK(!read_file(untagged.output_dir / "document.md").contains("structure tags"));
+}
+
+TEST(tags_do_nothing_to_a_pdf_without_tags) {
+    ConvertOptions options;
+    options.input = fs::path(HTPD_TEST_DATA) / "sample.pdf";
+    options.output_dir = fresh_temp_dir("tags_untagged");
+    const auto report = convert(options);
+    REQUIRE(report.has_value());
+    CHECK(!report->tags.any());
+    CHECK(!read_file(options.output_dir / "document.md").contains("Structure from PDF tags"));
+}
+
+TEST(tags_artifacts_become_patterns_of_removed_furniture) {
+    FurnitureReport report;
+    const std::vector<ArtifactLine> lines = {{0, true, "ACME Manual"}, {1, true, "ACME Manual"}, {0, false, "Page 1"},
+                                             {1, false, "Page 2"},     {2, false, "Page 3"}};
+    add_artifacts(report, lines, 3);
+    CHECK_EQ(report.removed_lines, std::size_t{5});
+    REQUIRE(report.patterns.size() == 2);
+    CHECK(report.patterns[0].top);   // headers first
+    CHECK_EQ(report.patterns[0].pages, std::size_t{2});
+    CHECK_EQ(report.patterns[1].pages, std::size_t{3});
+    CHECK_EQ(report.patterns[1].variants, std::size_t{1});   // "Page 1", "Page 2", "Page 3": digits do not count
+    CHECK(report.patterns[1].page_text[2] == "Page 3");
+}
+
+TEST(tags_figures_from_the_tags_add_a_caption_and_a_figure_the_rules_missed) {
+    std::vector<Figure> found = {Figure{0, Box{72, 100, 300, 220}, Figure::Kind::Drawing, "", 0}};
+    const std::vector<TagFigure> tagged = {
+        TagFigure{Box{72, 105, 300, 215}, false, "Power path", true},          // the same drawing: gets the caption
+        TagFigure{Box{72, 300, 250, 400}, true, "A photo", true},              // not found by the rules: added
+        TagFigure{Box{72, 450, 90, 458}, true, "icon", true},                  // an icon: not a figure
+        TagFigure{Box{72, 5, 300, 40}, true, "logo", true}};                   // in the page margin: not a figure
+    const std::size_t used = merge_tag_figures(found, tagged, 0, 612, 792, 0.07);
+    CHECK_EQ(used, std::size_t{2});
+    REQUIRE(found.size() == 2);
+    CHECK(found[0].caption == "Power path");
+    CHECK(found[1].caption == "A photo");
+    CHECK(found[1].kind == Figure::Kind::Picture);
+    // A caption the rules found stays.
+    std::vector<Figure> named = {Figure{0, Box{72, 100, 300, 220}, Figure::Kind::Drawing, "Figure 1. Clock", 0}};
+    CHECK_EQ(merge_tag_figures(named, tagged, 0, 612, 792, 0.07), std::size_t{1});   // only the photo is new
+    CHECK(named[0].caption == "Figure 1. Clock");
 }
 
 TEST(errors_are_reported_not_thrown) {

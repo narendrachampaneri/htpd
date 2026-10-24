@@ -113,7 +113,7 @@ Fields of HTPD (under `htpd:`):
 | `order` | Position in the document, starting at 1. |
 | `number` | The section number as printed: `"3.1"`, `"A.1"`; for "Appendix B" it is `"B"`. Missing when the heading has no number. |
 | `level` | Depth of the heading: 1 = chapter, 2 = section below a chapter, ... |
-| `heading_from` | How the heading was found: `bookmark` (a bookmark of the PDF), `numbering` (a numbered heading found in the text), `font-size` (a large line without a number), `contents` (an entry of a table of contents printed in the document, found as a title in the text; its number comes from the contents, also where the text shows the title without it), `running-title` (a document with few headings: the running header of the pages changes here, and its text is the title), `pages` (a part of a long stretch of text, cut by pages: see 3.3), `none` (no heading: text before the first heading, or one page of a document without headings). For `running-title` and `pages` the title is not in the text of the page. |
+| `heading_from` | How the heading was found: `bookmark` (a bookmark of the PDF), `numbering` (a numbered heading found in the text), `font-size` (a large line without a number), `contents` (an entry of a table of contents printed in the document, found as a title in the text; its number comes from the contents, also where the text shows the title without it), `running-title` (a document with few headings: the running header of the pages changes here, and its text is the title), `pages` (a part of a long stretch of text, cut by pages: see 3.3), `tags` (a heading of the PDF's own structure tree, H or H1-H6, with the level the tags give: see 4.6), `none` (no heading: text before the first heading, or one page of a document without headings). For `running-title` and `pages` the title is not in the text of the page. |
 | `page_start`, `page_end` | First and last page of the text of this section itself. Pages count from 1, as a PDF viewer shows them. |
 | `span_page_end` | Last page of this section **including all its subsections**. |
 | `ocr_pages` | Only when some of its text was read from pictures by OCR (section 8): the pages of its own text that hold such text, e.g. `[5, 6]`. A word on these pages may be misread. |
@@ -135,7 +135,7 @@ The same OKF fields (`type: Document`, `tags: [htpd, document]`), and under
 | `pdf_title`, `pdf_author` | Title and author stored in the PDF. Missing when the PDF has none. |
 | `pages` | Number of pages of the PDF. |
 | `sections` | Number of section files. |
-| `headings_from` | Main source of the headings: `bookmark`, `numbering`, `font-size` or `none`. |
+| `headings_from` | Main source of the headings: `bookmark`, `numbering`, `font-size`, `contents`, `tags` or `none`. |
 | `body_font_size` | Font size of the ordinary text in points. |
 | `children` | IDs of the top-level sections, in order. |
 
@@ -268,7 +268,8 @@ How the converter decides:
 
 * A line is a **table row** when it has at least two wide gaps (wider than
   two font sizes), which means three or more cells. A row with only two
-  cells is written as a plain paragraph. A line of justified text - every
+  cells is written as a plain paragraph. (A table that the tags of the PDF
+  describe is the exception: section 4.6.) A line of justified text - every
   space wide, all about equally wide, mostly ordinary words - is not a row.
 * **A cell with several lines** stays one cell: a line right under a row
   that starts in a column after the first, and whose pieces each stay in
@@ -399,6 +400,26 @@ text:
 * `--figures off` stores no figures; the text is then the same as without
   this section.
 
+### 4.6 Structure from the tags of the PDF
+
+A tagged PDF (Word, LibreOffice, InDesign and others write them) carries a
+structure tree: it says which text is a heading of which level, which is a
+cell of which table, a list item, a figure with its caption, or page
+furniture. The converter reads that tree (the notes say "Structure from PDF
+tags" with the counts) and uses it **only where it can be trusted**: where
+every piece of text an element names is found on its page and the page agrees
+with the tree. Everywhere else it reads the page as it reads a PDF without
+tags (the text is then the same as with `--tags off`), and the notes count the
+elements it left to the ordinary rules.
+
+| Tag | What it gives |
+|---|---|
+| `H`, `H1`-`H6` | A heading with the level of the tag (`H`: one plus the number of `Sect` elements around it), `heading_from: tags`. Used when the PDF has no usable bookmarks, and the tags name at least as many headings as a printed table of contents or numbered headings in the text show. The lines of a heading are its title and are not repeated in the text. A heading tag on more than 200 characters, or on text that is not in one piece, is no heading. |
+| `Table`, `TR`, `TH`, `TD` | The rows of the table with every cell exactly, also a cell of several lines (joined with one space). The block is a table (section 4.2) also when it has only two columns. An empty cell is written as nothing between two bars. A cell that spans columns or rows is written in the cell it starts in, with a mark after its text: `[>]` for one more column, `[>>]` for two more, `[=]` for one more row (a cell can have both). The cells it covers are written empty, so every row has the same number of cells. Where the tags leave out an empty cell, the cells are put into their columns by their positions on the page; where that is not certain, the table is read by the ordinary rules. A table is only taken when its cells lie in the order of the page, nothing else is stored between them, and no text lies on it that the table does not name. |
+| `L`, `LI`, `Lbl`, `LBody` | Every list item is a paragraph of its own, also when its label is no list mark (`A.`, `§1`); the lines of an item stay together. |
+| `Figure`, `Caption` | A figure (section 4.5) with the text of its `Caption` as caption (the element right before or after it, or inside it), or its alternate text when it has no caption. A figure the tags name and the ordinary rules do not find is stored too, unless it is an icon, a frame round the page or a logo in the page margin. |
+| `Artifact` | Header, footer and page number lines (text marked as an artifact, in the top or bottom fifth of the page) are taken out and listed in the notes like any other running header or footer (section 7). PDFium does not tell the type of an artifact, so an artifact of any type in the page margins is taken. |
+
 ## 5. The connections
 
 Every section file names its connections twice: as fields (for programs)
@@ -462,7 +483,8 @@ The aim is: no word of the document is lost or made up. These are all the
 changes:
 
 * **Headers and footers** that repeat at the top or bottom of the pages,
-  and page numbers, are taken out. `# Conversion notes` in `document.md`
+  and page numbers, are taken out. (In a tagged PDF also lines the PDF
+  marks as artifacts at the page edge, repeating or not: section 4.6.) `# Conversion notes` in `document.md`
   lists what was removed and from how many pages. (`--keep-headers` keeps
   them.)
 * **The heading line** is not repeated in the text; it is the `title`.
@@ -509,7 +531,8 @@ changes:
   not added again. Without Tesseract a scanned page has no text at all, and
   the notes say how many pages could not be read.
 * The exact form of tables. Rows and cells are kept as text. Lines around
-  cells and cells that span several columns are not shown; a cell with
+  cells are not shown, and a cell that spans several columns is only shown
+  where the tags of the PDF describe the table (section 4.6); a cell with
   several lines is joined when the columns are certain (section 4.2), and
   paragraph breaks inside a cell become one space. An empty cell is only
   marked when the positions on the page leave no doubt.

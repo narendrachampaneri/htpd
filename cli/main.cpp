@@ -35,6 +35,13 @@ Options for convert:
                             and page (default on)
       --figure-dpi <n>      Resolution of the stored figures, 50 to 300
                             (default 120)
+      --tags <mode>         The structure tags of a tagged PDF (headings, tables,
+                            lists, figures, page furniture), used where they
+                            agree with the page text:
+                              auto  when the PDF has no bookmarks and at most
+                                    200 pages (default)
+                              on    whenever the PDF has tags
+                              off   never
       --ocr <mode>          Text in pictures and scanned pages, read with the
                             free Tesseract program:
                               auto  when Tesseract is installed (default)
@@ -145,6 +152,12 @@ int run_convert(Args& args) {
         print(std::format("  + page parts    {} parts of long text, cut by pages\n", r.page_parts));
     }
     print(std::format("  paragraphs      {}\n", r.paragraphs));
+    if (r.tags.any()) {
+        print(std::format("  PDF tags        {} headings, {} tables ({} rows), {} lists ({} items), {} figures, "
+                          "{} artifact lines\n",
+                          r.headings_from_tags, r.tags.tables, r.tags.table_rows, r.tags.lists, r.tags.list_items,
+                          r.tags.figures, r.tags.artifact_lines));
+    }
     if (r.figures > 0) {
         print(std::format("  figures         {} stored as pictures ({})\n", r.figures, megabytes(r.figure_bytes)));
     }
@@ -262,6 +275,9 @@ int main(int argc, char** argv) {
             if (!value(v) || !parse_fraction(v, args.convert.margin_band)) {
                 return usage_error("--margin-band must be a number from 0 to 0.3");
             }
+        } else if (arg == "--tags") {
+            if (!value(v) || (v != "auto" && v != "on" && v != "off")) return usage_error("--tags must be auto, on or off");
+            args.convert.tags = v == "on" ? htpd::TagMode::On : v == "off" ? htpd::TagMode::Off : htpd::TagMode::Auto;
         } else if (arg == "--figures") {
             if (!value(v) || (v != "on" && v != "off")) return usage_error("--figures must be on or off");
             args.convert.figures = v == "on";

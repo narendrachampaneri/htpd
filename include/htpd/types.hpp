@@ -53,6 +53,14 @@ struct Glyph {
     float origin_x = 0;       // x of the glyph origin (where the pen stood)
     float baseline = 0;       // y of the glyph origin
     float size = 0;           // effective font size in points
+    // Tagged PDF: the marked-content ID of the text object this character is
+    // drawn by (-1 when it has none), and whether the PDF marks it as an
+    // /Artifact (not content: header, footer, page number, watermark).
+    std::int32_t mcid = -1;
+    bool artifact = false;
+    // Set by the tags step (tags.hpp), 0 elsewhere: what the PDF's structure
+    // says this character is part of. A line never mixes two values.
+    std::int32_t tag = 0;
 };
 
 // A link of a page that jumps to another place in the same document.
@@ -79,6 +87,35 @@ struct Image {
     std::vector<std::uint8_t> pixels;
 };
 
+// One element of the structure tree of a tagged PDF, as one page sees it.
+struct TagKid {
+    int node = -1;    // index into PageTags::nodes, or
+    int mcid = -1;    // a marked-content ID: the content of the page that belongs here
+};
+
+struct TagNode {
+    std::string type;                    // the standard type after the PDF's role map: "H1", "P", "Table", "TD" ...
+    int parent = -1;                     // index into PageTags::nodes, -1 for a root
+    int row_span = 1, col_span = 1;      // of a table cell (TH, TD)
+    std::string alt;                     // alternate text (a figure's description)
+    std::vector<TagKid> kids;            // in the order of the tree
+};
+
+// A picture, drawing or group the PDF marks as content (it has a marked-content ID).
+struct TagObject {
+    int mcid = -1;
+    Box box;                             // display space
+    enum class Kind : std::uint8_t { Image, Path, Form } kind = Kind::Image;
+};
+
+// The structure tree of one page (empty for a PDF without tags).
+struct PageTags {
+    std::vector<TagNode> nodes;          // in tree order, parents before their children
+    std::vector<int> roots;              // the top elements of the page
+    std::vector<TagObject> objects;      // non-text content that carries a marked-content ID
+    bool present() const { return !nodes.empty(); }
+};
+
 struct PageText {
     int index = 0;                       // 0-based page index
     float width = 0, height = 0;         // display size in points
@@ -93,6 +130,7 @@ struct PageText {
     std::vector<Box> paths;              // line and shape objects (drawings, table rules, frames)
     std::vector<Box> forms;              // form objects (groups drawn as one, often a whole drawing)
     std::size_t objects = 0;             // everything drawn on the page: text, pictures, lines, shapes
+    PageTags tags;                       // the page's part of the structure tree (tagged PDFs only)
 };
 
 // One visual line of text.
@@ -131,6 +169,21 @@ struct Line {
     // Not text: the place of figure number `figure` (from 1) in the text. Its
     // box is the figure's box; its text is empty.
     int figure = 0;
+    // Tagged PDF (tags.hpp). The element of the structure tree the line is part
+    // of, when the tags step uses it (0: none); a line never mixes two. Of a
+    // line that is a heading by the tags, `tag_heading` is its level (1-6);
+    // `tag_item` marks the first line of a list item; `artifact` a line the PDF
+    // marks as page furniture.
+    std::int32_t tag = 0;
+    std::uint8_t tag_heading = 0;
+    bool tag_item = false;
+    bool artifact = false;
+    // A row of a table that the tags describe cell by cell: one entry per
+    // column, "" for an empty or covered cell. `text` holds the same words
+    // joined by single spaces. `tag_table` tells the rows of one table
+    // (the same value) from the rows of the next.
+    std::vector<std::string> cells;
+    std::int32_t tag_table = 0;
 };
 
 // A PDF bookmark (outline entry).
@@ -158,7 +211,8 @@ struct DocumentMeta {
 // RunningTitle: the running header of the pages changes there (a document with
 // few headings); Pages: a long stretch of text cut into parts of a few pages.
 // Contents: a printed table of contents, its titles found in the text.
-enum class HeadingSource { Bookmark, Numbering, FontSize, None, RunningTitle, Pages, Contents };
+// Tags: the headings of the PDF's own structure tree (tagged PDF).
+enum class HeadingSource { Bookmark, Numbering, FontSize, None, RunningTitle, Pages, Contents, Tags };
 
 constexpr const char* to_string(HeadingSource s) {
     switch (s) {
@@ -169,6 +223,7 @@ constexpr const char* to_string(HeadingSource s) {
         case HeadingSource::RunningTitle: return "running-title";
         case HeadingSource::Pages:     return "pages";
         case HeadingSource::Contents:  return "contents";
+        case HeadingSource::Tags:      return "tags";
     }
     return "none";
 }

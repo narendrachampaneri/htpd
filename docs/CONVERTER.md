@@ -131,6 +131,38 @@ stored and read by OCR once: the later figures point at the first one. A
 1000-page sample with one picture per page, seven different ones, converts
 in 12 s into a file of 1.5 MB.
 
+### Tagged PDFs
+
+Word, LibreOffice, InDesign, Chrome and others write the structure of the
+document into the PDF (a "tagged PDF"): which text is a heading of which
+level, which is a cell of which table, a list item, a figure with its
+caption, or page furniture. The converter reads this tree with PDFium and
+uses it where it can be trusted (`--tags off` switches it off). What it gives
+(FORMAT.md 4.6):
+
+* `H`, `H1`-`H6`: headings with their level (`heading_from: tags`), when the
+  PDF has no usable bookmarks. With bookmarks the bookmarks stay the source.
+* `Table`: the rows with every cell exact, also cells of several lines and
+  cells the page shows far apart; a cell over several columns or rows has
+  `[>]` or `[=]` after its text and the cells it covers are empty.
+* `L`/`LI`: every list item is one paragraph.
+* `Figure` and `Caption`: one figure with its caption.
+* `Artifact` text at the top or bottom of a page: taken out, listed as
+  removed header/footer lines.
+
+Trust, checked per element and per page: all the text an element names must
+be on its page; its characters must stand together in the order the PDF
+stores them; the cells of a table must lie in the order of the page, with
+nothing untagged or tagged otherwise on the table; a heading tag on a long
+paragraph is no heading. An element that fails is read by the ordinary rules,
+so the result is what a PDF without tags gives, and the notes count these
+(`Left to the ordinary rules ...`). Text that is not tagged is never dropped.
+A PDF without tags gives exactly the same file as before.
+
+Cost: reading the tree and the marks of the characters is a few per cent of
+the conversion time of a tagged PDF (measured in `tests/bench`); a PDF without
+tags is not slower.
+
 ## Build
 
 ### 1. Get PDFium
@@ -201,6 +233,7 @@ htpd info manual.pdf                     # show what would be found, write nothi
 | `--headings none` | No headings: one section per page. |
 | `--keep-headers` | Keeps the running headers and footers in the text. |
 | `--dehyphenate` | `inter-` + `rupt` becomes `interrupt` instead of `inter-rupt`. |
+| `--tags on\|off` | Use the structure tags of a tagged PDF (headings, tables, lists, figures, page furniture) where they agree with the page text (default `on`). `off` reads every PDF as if it had no tags. |
 | `--ocr auto\|on\|off` | Read text from pictures and scanned pages with Tesseract. `auto` (default): when it is installed. `on`: stop with an error when it is not. `off`: never. |
 | `--ocr-lang <langs>` | Tesseract languages, e.g. `eng+deu` (default `eng`). Each must be installed (`tesseract --list-langs`). |
 | `--figures on\|off` | Store figures (pictures and drawings) as PNG pictures in the bundle (default `on`). |
@@ -244,6 +277,7 @@ One PDF goes through seven steps. Each step is one small file.
 | 1. Read | `src/pdf_reader_pdfium.cpp` | PDFium gives every character with its position, size and font, and the links of each page. Where the PDF says what glyphs mean (`/ActualText`, used for Gujarati, Hindi and other scripts whose letters are made of several glyphs), that text is taken, once. Page rotation is removed here, and a page whose text mainly runs sideways or upside down is turned, so all later steps see upright pages. This is the only file that knows PDFium. |
 | 1b. OCR | `src/ocr.cpp` | Pages without a text layer and pictures without text of the PDF on them are drawn (by PDFium, in `pdf_reader_pdfium.cpp`) and read by the Tesseract program, several at a time, when it is installed. See "OCR" above. |
 | 1c. Figures | `src/figures.cpp`, `src/png.cpp` | The pictures and drawings of each page that are figures, with their caption; drawn by PDFium and packed as PNG (several at a time). See "Figures" above. |
+| 1d. Tags | `src/tags.cpp` | In a tagged PDF: the structure tree and the marked-content ID of every character (read in `pdf_reader_pdfium.cpp`) tell which characters are a heading, a table cell, a list item, a figure or page furniture. See "Tagged PDFs" above. |
 | 2. Lines | `src/layout.cpp` | Characters become lines. Wide gaps are marked (table columns); raised and lowered numbers stay raised (2³¹). |
 | 3. Headers and footers | `src/furniture.cpp` | Lines that repeat at the page edge on many pages are taken out and reported (in a document of two or three pages: on every page). A running header is set apart from the text: a line that stands right on top of the text below it (closer than 2.5 of its font sizes) stays in the text - a heading or the header row of a table at the top of the page - unless it holds the number of its page or stands on almost every page. |
 | 3b. Columns | `src/columns.cpp` | A table set tight (LaTeX, web pages, slides) has column gaps narrower than two font sizes. Its rows leave the same strips of the page free; the spaces on those strips become column gaps, also in the header row. Running text crosses the strips and is left alone. |
@@ -297,17 +331,25 @@ as values (`std::expected`); the library does not throw for a bad PDF.
 
 ## What was tested
 
-* **128 automatic tests** (`make test`). Most build their input in memory.
+* **140 automatic tests** (`make test`). Most build their input in memory.
   The others convert small PDFs in `tests/data` through the real PDF
   library: rotated pages, scaled fonts, text spaced only by kerning,
   two columns, code listings, fonts whose names lie about their widths,
-  scanned pages, figures, `/ActualText`.
+  scanned pages, figures, `/ActualText`, and tagged PDFs written by hand
+  (`tagged.pdf`: headings set in the body font, a table with a cell of three
+  lines, a cell the tags leave out, cells over two columns and two rows, a
+  list, a drawing with a caption, a header that changes on every page;
+  `tagged_disagree.pdf`: tags that do not fit the page, which must be read as
+  if they were not there).
 * **The document zoo** (`tests/zoo`). The same documents - a datasheet, a
   manual, a report, and short ones in German, Hindi and Gujarati - are made
   into PDFs by the programs real documents come from: Word export
   (LibreOffice), LaTeX (with and without bookmarks, two columns, a book), web pages
   printed by Chromium and wkhtmltopdf, slide decks, scans (straight and
-  turned, with noise) and pages whose letters are drawn as shapes. As the
+  turned, with noise), pages whose letters are drawn as shapes, and tagged
+  Word exports (`word-tagged`: no bookmarks, so only the tags say what a
+  heading is; `word-hf`: with a running header and a footer with the page
+  number). As the
   text of every document is known, `run_zoo.py` measures each `.htpd` file:
   how much of the text it holds in order, how much else, which headings and
   table rows it found.
@@ -369,6 +411,13 @@ honest about the rest.
   page, which a search of the text cannot find; the converter tells you. OCR text may hold misread words, and Tesseract reads small
   or blurred text and handwriting badly; the bundle marks the pages
   (`ocr_pages`).
+* **Tags are only as good as the program that wrote them.** A PDF may carry
+  wrong or incomplete tags (a heading tag on a paragraph, a table with its
+  cells in another order, untagged text between the cells). The checks above
+  catch most of this, not all: a tag that is wrong in a way the page does not
+  show (a body paragraph tagged as `H2` and short) is believed. PDFium does
+  not tell the type of an artifact, so text marked as an artifact in the top or
+  bottom fifth of the page is taken out whatever its type.
 * **Tables are rows of text.** Cells are split by ` | `. A cell that wraps
   onto several lines is joined, and a table that the PDF stores cell by
   cell (register field tables, ledgers whose cells are set in the middle of

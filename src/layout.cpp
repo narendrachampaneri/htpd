@@ -73,6 +73,9 @@ public:
             std::fabs(g.baseline - line_.baseline) <= options_->baseline_tolerance * ref;
         const bool jumped_back = g.x0 < last_x1_ - 2.0f * ref;
         if (jumped_back) return false;
+        // Tagged PDF: text of another element, or page furniture next to content,
+        // never shares a line (both are 0/false in a PDF without tags).
+        if (g.tag != line_.tag || g.artifact != line_.artifact) return false;
         if (same_baseline) return true;
         // A raised or lowered mark set higher than the tolerance (a ® or ™ in
         // "Cortex®-M33", an exponent, an index): smaller than the line, right
@@ -99,6 +102,8 @@ public:
             line_.y1 = g.y1;
             line_.baseline = g.baseline;
             line_.origin_x = g.origin_x;
+            line_.tag = g.tag;
+            line_.artifact = g.artifact;
             main_size_ = g.size;
         } else {
             const float ref = std::max(main_size_, g.size);

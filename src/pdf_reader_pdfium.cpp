@@ -8,13 +8,17 @@
 #include <algorithm>
 #include <cmath>
 #include <format>
+#include <functional>
+#include <memory>
 #include <string_view>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 
+#include <fpdf_catalog.h>
 #include <fpdf_doc.h>
 #include <fpdf_edit.h>
+#include <fpdf_structtree.h>
 #include <fpdf_text.h>
 #include <fpdfview.h>
 
@@ -360,6 +364,119 @@ void read_links(FPDF_DOCUMENT doc, FPDF_PAGE page, PageText& out) {
     }
 }
 
+
+// ---- tagged PDF ------------------------------------------------------------
+
+std::string wide_text(unsigned long needed, const std::function<void(void*, unsigned long)>& fetch) {
+    if (needed <= 2 || needed > (1u << 20)) return {};
+    std::vector<unsigned char> buffer(needed);
+    fetch(buffer.data(), needed);
+    return text::collapse_spaces(text::sanitize_utf8(text::utf16le_to_utf8(buffer)));
+}
+
+std::string element_type(FPDF_STRUCTELEMENT e) {
+    std::string type = wide_text(FPDF_StructElement_GetType(e, nullptr, 0),
+                                 [&](void* b, unsigned long n) { FPDF_StructElement_GetType(e, b, n); });
+    if (type.empty()) {
+        type = wide_text(FPDF_StructElement_GetRawType(e, nullptr, 0), [&](void* b, unsigned long n) {
+            FPDF_StructElement_GetRawType(e, static_cast<FPDF_WCHAR*>(b), n);
+        });
+    }
+    return type;
+}
+
+// RowSpan / ColSpan of a table cell, from its attribute objects.
+void read_spans(FPDF_STRUCTELEMENT e, TagNode& node) {
+    const int attributes = FPDF_StructElement_GetAttributeCount(e);
+    for (int a = 0; a < attributes && a < 16; ++a) {
+        const FPDF_STRUCTELEMENT_ATTR attr = FPDF_StructElement_GetAttributeAtIndex(e, a);
+        if (attr == nullptr) continue;
+        for (const auto& [name, target] : {std::pair{"RowSpan", &node.row_span}, std::pair{"ColSpan", &node.col_span}}) {
+            const FPDF_STRUCTELEMENT_ATTR_VALUE value = FPDF_StructElement_Attr_GetValue(attr, name);
+            float number = 0;
+            if (value != nullptr && FPDF_StructElement_Attr_GetType(value) == FPDF_OBJECT_NUMBER &&
+                FPDF_StructElement_Attr_GetNumberValue(value, &number) && number >= 1 && number <= 1000) {
+                *target = static_cast<int>(number);
+            }
+        }
+    }
+}
+
+constexpr int kMaxTagDepth = 64;
+constexpr std::size_t kMaxTagNodes = 200000;
+
+void read_node(FPDF_STRUCTELEMENT e, int parent, int depth, PageTags& out) {
+    if (depth > kMaxTagDepth || out.nodes.size() >= kMaxTagNodes) return;
+    const int index = static_cast<int>(out.nodes.size());
+    TagNode node;
+    node.parent = parent;
+    node.type = element_type(e);
+    if (node.type == "TH" || node.type == "TD") read_spans(e, node);
+    if (node.type == "Figure") {
+        node.alt = wide_text(FPDF_StructElement_GetAltText(e, nullptr, 0),
+                             [&](void* b, unsigned long n) { FPDF_StructElement_GetAltText(e, b, n); });
+    }
+    out.nodes.push_back(std::move(node));
+    const int count = std::min(FPDF_StructElement_CountChildren(e), 100000);
+    for (int k = 0; k < count; ++k) {
+        const FPDF_STRUCTELEMENT child = FPDF_StructElement_GetChildAtIndex(e, k);
+        if (child != nullptr) {
+            const int child_index = static_cast<int>(out.nodes.size());
+            if (child_index >= static_cast<int>(kMaxTagNodes)) break;
+            out.nodes[static_cast<std::size_t>(index)].kids.push_back({child_index, -1});
+            read_node(child, index, depth + 1, out);
+        } else if (const int mcid = FPDF_StructElement_GetChildMarkedContentID(e, k); mcid >= 0) {
+            out.nodes[static_cast<std::size_t>(index)].kids.push_back({-1, mcid});
+        }
+    }
+}
+
+// The structure tree of a page: empty for a page of a PDF without tags.
+PageTags read_tags(FPDF_PAGE page) {
+    PageTags tags;
+    struct TreeCloser {
+        void operator()(FPDF_STRUCTTREE t) const { FPDF_StructTree_Close(t); }
+    };
+    const std::unique_ptr<std::remove_pointer_t<FPDF_STRUCTTREE>, TreeCloser> tree(FPDF_StructTree_GetForPage(page));
+    if (!tree) return tags;
+    const int count = std::min(FPDF_StructTree_CountChildren(tree.get()), 100000);
+    for (int k = 0; k < count; ++k) {
+        const FPDF_STRUCTELEMENT root = FPDF_StructTree_GetChildAtIndex(tree.get(), k);
+        if (root == nullptr) continue;
+        tags.roots.push_back(static_cast<int>(tags.nodes.size()));
+        read_node(root, -1, 0, tags);
+    }
+    return tags;
+}
+
+// What the marks of a text object say: its marked-content ID and whether it is
+// an /Artifact (content that is not part of the document: header, footer, page
+// number, watermark). PDFium does not give the value of a name in a mark's
+// dictionary, so the /Type of the artifact (Pagination, Layout ...) is not known.
+struct ObjectMarks {
+    std::int32_t mcid = -1;
+    bool artifact = false;
+};
+
+ObjectMarks object_marks(FPDF_PAGEOBJECT object) {
+    ObjectMarks marks;
+    marks.mcid = FPDFPageObj_GetMarkedContentID(object);
+    if (marks.mcid >= 0) return marks;
+    const int count = std::min(FPDFPageObj_CountMarks(object), 32);
+    for (int k = 0; k < count && !marks.artifact; ++k) {
+        const FPDF_PAGEOBJECTMARK mark = FPDFPageObj_GetMark(object, static_cast<unsigned long>(k));
+        unsigned long bytes = 0;
+        if (mark == nullptr || !FPDFPageObjMark_GetName(mark, nullptr, 0, &bytes) || bytes > 64) continue;
+        std::vector<unsigned char> name(bytes);
+        if (!FPDFPageObjMark_GetName(mark, reinterpret_cast<FPDF_WCHAR*>(name.data()), bytes, &bytes) ||
+            text::utf16le_to_utf8(name) != "Artifact") {
+            continue;
+        }
+        marks.artifact = true;
+    }
+    return marks;
+}
+
 }  // namespace
 
 struct PdfDocument::Impl {
@@ -406,6 +523,10 @@ Result<PdfDocument> PdfDocument::open(const std::filesystem::path& path,
         return fail(std::format("cannot open '{}': {}", native, last_error_text()));
     }
     return PdfDocument(std::move(impl));
+}
+
+bool PdfDocument::is_tagged() const {
+    return FPDFCatalog_IsTagged(impl_->doc) != 0;
 }
 
 int PdfDocument::page_count() const {
@@ -482,7 +603,7 @@ std::vector<FontFacts> PdfDocument::fonts() const {
     return facts;
 }
 
-Result<PageText> PdfDocument::read_page(int index) const {
+Result<PageText> PdfDocument::read_page(int index, bool with_tags) const {
     const PagePtr page(FPDF_LoadPage(impl_->doc, index));
     if (!page) {
         return fail(std::format("cannot load page {}: {}", index + 1, last_error_text()));
@@ -500,6 +621,8 @@ Result<PageText> PdfDocument::read_page(int index) const {
 
     // Picture objects, in display space as the page is drawn (before any turn
     // of the text below): the places where OCR may find text.
+    if (with_tags) out.tags = read_tags(page.get());
+    const bool tagged = out.tags.present();
     const int objects = FPDFPage_CountObjects(page.get());
     out.objects = static_cast<std::size_t>(std::max(objects, 0));
     for (int i = 0; i < objects; ++i) {
@@ -519,6 +642,14 @@ Result<PageText> PdfDocument::read_page(int index) const {
         box.y0 = std::max(box.y0, 0.0f);
         box.x1 = std::min(box.x1, out.width);
         box.y1 = std::min(box.y1, out.height);
+        if (tagged) {
+            if (const int mcid = FPDFPageObj_GetMarkedContentID(object); mcid >= 0) {
+                out.tags.objects.push_back({mcid, box,
+                                            type == FPDF_PAGEOBJ_IMAGE  ? TagObject::Kind::Image
+                                            : type == FPDF_PAGEOBJ_FORM ? TagObject::Kind::Form
+                                                                        : TagObject::Kind::Path});
+            }
+        }
         if (type == FPDF_PAGEOBJ_IMAGE) {
             if (box.width() > 1 && box.height() > 1) {
                 out.images.push_back(box);
@@ -561,6 +692,7 @@ Result<PageText> PdfDocument::read_page(int index) const {
         std::u32string text;
     };
     std::unordered_map<FPDF_PAGEOBJECT, Span> spans;
+    std::unordered_map<FPDF_PAGEOBJECT, ObjectMarks> object_info;   // tagged pages: the marks of each text object
     const auto span_of = [&](int ci) -> const Span* {
         const FPDF_PAGEOBJECT obj = FPDFText_GetTextObject(tp, ci);
         if (obj == nullptr) return nullptr;
@@ -742,6 +874,14 @@ Result<PageText> PdfDocument::read_page(int index) const {
 
         Glyph g;
         g.cp = cp;
+        if (tagged) {
+            if (const FPDF_PAGEOBJECT obj = FPDFText_GetTextObject(tp, first_index)) {
+                const auto [it, fresh] = object_info.try_emplace(obj);
+                if (fresh) it->second = object_marks(obj);
+                g.mcid = it->second.mcid;
+                g.artifact = it->second.artifact;
+            }
+        }
         const auto fl = [](double v) { return static_cast<float>(v); };
         float xs[4], ys[4];
         to_display.apply(fl(left), fl(bottom), xs[0], ys[0]);

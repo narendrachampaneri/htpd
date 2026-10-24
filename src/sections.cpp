@@ -1026,6 +1026,7 @@ float typical_line_pitch(std::span<const Line> lines) {
         const Line& a = lines[i - 1];
         const Line& b = lines[i];
         if (a.page != b.page || a.size <= 0 || std::fabs(a.size - b.size) > 0.05f * a.size) continue;
+        if (!a.cells.empty() || !b.cells.empty()) continue;   // a table row of the tags holds several lines
         const float ratio = (b.baseline - a.baseline) / a.size;
         if (ratio > 0.8f && ratio < 3.0f) ratios.push_back(ratio);
     }
@@ -1109,8 +1110,41 @@ std::optional<std::pair<std::size_t, std::size_t>> header_above(std::span<const 
 
 }  // namespace
 
+void append_wrapped_line(std::string& paragraph, std::string_view line, bool dehyphenate) {
+    join_line(paragraph, line, dehyphenate);
+}
+
 std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_pitch,
                                         const SectionOptions& options) {
+    // Rows of a table that the PDF's tags describe cell by cell are complete:
+    // each table is one block of rows, and the lines around it are read as usual.
+    if (std::ranges::any_of(lines, [](const Line& l) { return !l.cells.empty(); })) {
+        std::vector<Paragraph> all;
+        for (std::size_t begin = 0; begin < lines.size();) {
+            std::size_t end = begin;
+            if (!lines[begin].cells.empty()) {
+                Paragraph table;
+                table.page = lines[begin].page;
+                table.kind = ParagraphKind::Rows;
+                while (end < lines.size() && !lines[end].cells.empty() && lines[end].tag_table == lines[begin].tag_table) {
+                    if (end > begin) table.text.push_back('\n');
+                    for (std::size_t c = 0; c < lines[end].cells.size(); ++c) {
+                        if (c > 0) table.text += " | ";
+                        table.text += lines[end].cells[c];
+                    }
+                    ++end;
+                }
+                all.push_back(std::move(table));
+            } else {
+                while (end < lines.size() && lines[end].cells.empty()) ++end;
+                for (Paragraph& p : build_paragraphs(lines.subspan(begin, end - begin), line_pitch, options)) {
+                    all.push_back(std::move(p));
+                }
+            }
+            begin = end;
+        }
+        return all;
+    }
     std::vector<Paragraph> paragraphs;
     Paragraph current;
     std::vector<const Line*> code;   // the lines of `current` when it is a code block
@@ -1256,7 +1290,10 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
             const float same_size = line.ocr == Line::Ocr::Page && previous->ocr == Line::Ocr::Page ? 0.3f : 0.1f;
             // The description of a term ends where a line goes back left of its indent.
             const bool back_left = term_indent > 0 && line.x0 < term_indent - 0.8f * size;
-            if (starts_list_item(line.text) || std::fabs(line.size - previous->size) > same_size * size ||
+            // Tagged list items: the PDF says where an item starts and where it goes on.
+            const bool in_item = line.tag > 0 && previous->tag == line.tag && previous->page == line.page;
+            if (line.tag_item || (starts_list_item(line.text) && !in_item) ||
+                std::fabs(line.size - previous->size) > same_size * size ||
                 starts_term(index) || back_left) {
                 start_new = true;
             } else if (moved_to_new_area) {

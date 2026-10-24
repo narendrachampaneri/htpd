@@ -429,6 +429,10 @@ std::string conversion_notes(const BundleInfo& info) {
                               "one of the contents, also where the text shows the title without it.\n",
                               info.contents_entries, info.contents_located);
             break;
+        case HeadingSource::Tags:
+            md += "* Headings come from the structure tags of the PDF (H, H1-H6), with the levels they give "
+                  "(`heading_from: tags`).\n";
+            break;
         case HeadingSource::None:
             md += "* No headings were found; the text is split by page.\n";
             break;
@@ -444,6 +448,28 @@ std::string conversion_notes(const BundleInfo& info) {
         md += std::format("* {} long stretches of text without headings are cut into parts of a few pages, "
                           "titled by their pages (`heading_from: pages`), always where a sentence ends.\n",
                           info.page_parts);
+    }
+    if (info.tags.unread) {
+        md += std::format("* The PDF is tagged, but its structure tags were not read: {}. `--tags on` reads them "
+                          "(headings, tables, lists, figures, page furniture); it costs time.\n",
+                          info.tags.unread_reason);
+    }
+    if (info.tags.any()) {
+        const TagReport& t = info.tags;
+        md += std::format("* Structure from PDF tags: {} headings, {} tables ({} rows), {} lists ({} items), {} figures, "
+                          "{} artifact lines (header, footer, page number) taken from the tags of {} pages.",
+                          info.headings_from_tags, t.tables, t.table_rows, t.lists, t.list_items, t.figures,
+                          t.artifact_lines, t.pages);
+        if (t.spans > 0) {
+            md += std::format(" {} table cell{} span{} columns or rows (written `[>]` for one more column, `[=]` for "
+                              "one more row; the covered cells are empty).", t.spans, t.spans == 1 ? "" : "s",
+                              t.spans == 1 ? "s" : "");
+        }
+        if (t.headings_left + t.tables_left + t.items_left > 0) {
+            md += std::format(" Left to the ordinary rules because the tags and the page text do not agree: {} "
+                              "headings, {} tables, {} list items.", t.headings_left, t.tables_left, t.items_left);
+        }
+        md += "\n";
     }
     if (!info.furniture_removed) {
         md += "* Running headers and footers were kept.\n";
@@ -662,7 +688,12 @@ std::string reading_rules(const BundleInfo& info, std::string_view doc_title) {
                             : "12. A line `![F<n>: caption](#F<n>)` stands where a figure (a picture or a drawing) "
                               "is. Its picture is at the very end of this file under `# Figures`, as PNG in "
                               "base64, for tools that can show pictures: never read that data as text. When an "
-                              "answer may be in a figure, name it (F<n>, its caption and page).\n"));
+                              "answer may be in a figure, name it (F<n>, its caption and page).\n") +
+            std::string(info.tags.spans == 0
+                            ? ""
+                            : "13. In a table, `[>]` at the end of a cell means that it spans one more column to its right "
+                              "(`[>>]`: two more), and `[=]` one more row below it (a cell can have both); the cells "
+                              "it covers are empty.\n"));
 }
 
 std::string single_file_markdown(const std::vector<Section>& sections, const BundleInfo& info,

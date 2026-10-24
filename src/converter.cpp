@@ -20,6 +20,7 @@
 #include "htpd/png.hpp"
 #include "htpd/sections.hpp"
 #include "htpd/sha256.hpp"
+#include "htpd/tags.hpp"
 #include "htpd/structure.hpp"
 #include "htpd/text.hpp"
 
@@ -44,6 +45,7 @@ struct Analysis {
     std::size_t table_gaps = 0;           // column gaps found from the strips rows leave free
     OcrReport ocr;
     std::vector<FigureFile> figures;
+    TagReport tags;                       // what the PDF's structure tags gave (tags.hpp)
 };
 
 // A figure is drawn at most this large (pixels): enough to read its labels.
@@ -100,6 +102,7 @@ struct AnalysisOptions {
     double margin_band = 0.09;
     HeadingMode headings = HeadingMode::Auto;
     std::function<void(int, int)> on_progress;
+    TagMode tags = TagMode::Auto;
 };
 
 Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptions& options) {
@@ -187,6 +190,16 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
         packing.pop_front();
     };
 
+    // Bookmarks: the headings of the document, and the reason to read the structure tags or not.
+    const std::vector<OutlineEntry> outline = doc.outline();
+    a.outline_entries = outline.size();
+    const auto usable_bookmarks = std::ranges::count_if(outline, [&](const OutlineEntry& e) {
+        return e.page >= 0 && e.page < page_count && !e.title.empty();
+    });
+    const bool read_tags = should_read_tags(options.tags, doc.is_tagged(), static_cast<std::size_t>(usable_bookmarks),
+                                            page_count, a.tags.unread_reason);
+    a.tags.unread = options.tags == TagMode::Auto && !read_tags && !a.tags.unread_reason.empty();
+
     // 1. Pages -> lines.
     std::vector<std::vector<Line>> pages(static_cast<std::size_t>(page_count));
     std::vector<float> heights(pages.size(), 0.0f);
@@ -194,12 +207,12 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
     a.page_links.resize(pages.size());
     for (int p = 0; p < page_count; ++p) {
         const auto index = static_cast<std::size_t>(p);
-        if (auto page = doc.read_page(p)) {
+        if (auto page = doc.read_page(p, read_tags)) {
             heights[index] = page->height;
             a.page_transforms[index] = page->user_to_display;
             a.skipped_rotated += page->skipped_rotated;
             a.unmapped += page->unmapped;
-            pages[index] = build_lines(*page);
+            pages[index] = build_tagged_lines(*page, a.tags).lines;
             a.page_links[index] = std::move(page->links);
 
             // A page with (almost) no text that shows something is a scan (or
@@ -269,8 +282,14 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
                 const bool scan = letters_on(pages[index]) < 20;
                 const std::span<const Box> paths = scan ? std::span<const Box>{} : std::span<const Box>(page->paths);
                 const std::span<const Box> forms = scan ? std::span<const Box>{} : std::span<const Box>(page->forms);
-                for (const Figure& f : find_figures(p, page->width, page->height, page->images, paths, forms,
-                                                    pages[index], page->turned != 0, {}, code, page->image_keys)) {
+                std::vector<Figure> found = find_figures(p, page->width, page->height, page->images, paths, forms,
+                                                         pages[index], page->turned != 0, {}, code, page->image_keys);
+                // The figures and captions the PDF's tags name (not on a scan, not on a turned page).
+                if (!scan && page->turned == 0 && page->tags.present()) {
+                    a.tags.figures += merge_tag_figures(found, tagged_figures(*page), p, page->width, page->height,
+                                                        FigureOptions{}.margin_band);
+                }
+                for (const Figure& f : found) {
                     // A scanned page is one big picture: OCR reads it, it is no figure.
                     if (scan && f.box.width() * f.box.height() > 0.6f * page->width * page->height) continue;
                     store_figure(f, options.figure_dpi);
@@ -366,10 +385,17 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
     a.fonts = doc.fonts();   // measured while the pages were read
 
     // 2. Running headers and footers.
+    const std::size_t marked_artifacts = options.keep_furniture ? 0 : count_artifacts(pages, heights);
     if (!options.keep_furniture) {
         FurnitureOptions furniture;
         furniture.band = options.margin_band;
         a.furniture = remove_furniture(pages, heights, furniture);
+    }
+    if (!options.keep_furniture) {
+        // What the PDF marks as page furniture and the ordinary rules did not find.
+        const std::vector<ArtifactLine> artifacts = take_artifacts(pages, heights);
+        a.tags.artifact_lines = marked_artifacts;
+        add_artifacts(a.furniture, artifacts, pages.size());
     }
 
     // 2b. Tables set tight: their columns, from the strips every row leaves free.
@@ -389,8 +415,6 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
     }
 
     // 4. Headings.
-    const std::vector<OutlineEntry> outline = doc.outline();
-    a.outline_entries = outline.size();
     HeadingOptions heading_options;
     heading_options.mode = options.headings;
     a.headings = detect_headings(a.lines, outline, a.page_transforms, heading_options);
@@ -414,7 +438,7 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     auto analysed = analyse(options.input, {options.password, options.figures, options.figure_dpi, options.ocr,
                                             options.ocr_options,
                                             options.keep_furniture, options.margin_band, options.headings,
-                                            options.on_progress});
+                                            options.on_progress, options.tags});
     if (!analysed) return std::unexpected(analysed.error());
     Analysis& a = *analysed;
 
@@ -442,6 +466,8 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     info.page_parts = a.structure.page_parts;
     info.furniture_removed = !options.keep_furniture;
     info.furniture = a.furniture;
+    info.tags = a.tags;
+    for (const Heading& h : a.headings.headings) info.headings_from_tags += h.source == HeadingSource::Tags;
     info.skipped_rotated = a.skipped_rotated;
     info.unmapped = a.unmapped;
     info.pages_without_text = a.pages_without_text;
@@ -477,6 +503,8 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     report.running_titles = a.structure.running_titles;
     report.page_parts = a.structure.page_parts;
     report.furniture = std::move(a.furniture);
+    report.tags = info.tags;
+    report.headings_from_tags = info.headings_from_tags;
     report.skipped_rotated = a.skipped_rotated;
     report.unmapped = a.unmapped;
     report.pages_without_text = a.pages_without_text;

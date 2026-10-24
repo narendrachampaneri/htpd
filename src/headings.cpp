@@ -548,6 +548,40 @@ HeadingResult detect_from_text(std::span<const Line> lines) {
     return result;
 }
 
+// ---- the PDF's own tags -----------------------------------------------------
+
+// The headings of a tagged PDF (H, H1-H6): the lines the tags step marked,
+// the lines of one element together. The level is the one the tags give.
+HeadingResult detect_from_tags(std::span<const Line> lines) {
+    HeadingResult result;
+    result.source = HeadingSource::Tags;
+    result.body_size = body_font_size(lines);
+    for (std::size_t i = 0; i < lines.size();) {
+        const Line& first = lines[i];
+        if (first.tag_heading == 0 || first.tag <= 0 || first.text.empty() || !first.cells.empty()) {
+            ++i;
+            continue;
+        }
+        std::size_t end = i + 1;
+        while (end < lines.size() && lines[end].tag == first.tag && lines[end].page == first.page &&
+               lines[end].tag_heading == first.tag_heading && !lines[end].text.empty()) {
+            ++end;
+        }
+        Heading h;
+        h.level = first.tag_heading;
+        h.page = first.page;
+        h.line_index = i;
+        h.line_count = end - i;
+        h.source = HeadingSource::Tags;
+        for (std::size_t k = i; k < end; ++k) append_title_line(h.title, text::collapse_spaces(lines[k].text));
+        std::string_view rest;
+        if (const auto number = parse_section_number(h.title, rest)) h.number = number->text;
+        result.headings.push_back(std::move(h));
+        i = end;
+    }
+    return result;
+}
+
 // ---- bookmarks -----------------------------------------------------------
 
 // Skeleton without its leading section number: "521clocktree" -> "clocktree",
@@ -1187,6 +1221,15 @@ HeadingResult detect_headings(std::span<const Line> lines, std::span<const Outli
         // over headings found by their look, unless those are as many and numbered.
         HeadingResult from_contents = detect_from_contents(lines);
         const bool numbered = from_text.source == HeadingSource::Numbering;
+        // The tags of the PDF say what is a heading, with its level: they win unless
+        // the other ways found more headings (then the tags are not complete).
+        if (options.mode == HeadingMode::Auto) {
+            HeadingResult from_tags = detect_from_tags(lines);
+            if (!from_tags.headings.empty() && from_tags.headings.size() >= from_contents.headings.size() &&
+                (!numbered || from_tags.headings.size() >= from_text.headings.size())) {
+                return from_tags;
+            }
+        }
         if (!from_contents.headings.empty() &&
             (!numbered || from_contents.headings.size() > from_text.headings.size())) {
             return from_contents;
