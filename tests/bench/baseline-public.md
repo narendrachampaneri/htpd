@@ -1,6 +1,6 @@
 # HTPD bench: baseline-public
 
-32 documents, 0 errors. Converter `2b57ca1+dirty`, 2026-10-24 03:35:22, best of 3 runs, 4 CPUs, no Tesseract.
+32 documents, 0 errors. Converter `919911d`, 2026-10-24 03:38:13, best of 3 runs, 4 CPUs, no Tesseract.
 
 ## Speed and size
 
@@ -9,36 +9,36 @@
 | data/actualtext | 1 | 0.006 | 0.006 | 2,878 | 0 |
 | data/figures | 2 | 0.018 | 0.020 | 21,322 | 17,191 |
 | data/fonts | 1 | 0.007 | 0.007 | 3,101 | 0 |
-| data/links | 3 | 0.006 | 0.006 | 4,083 | 0 |
-| data/lowlevel | 4 | 0.007 | 0.007 | 4,702 | 0 |
-| data/ocr | 3 | 0.061 | 0.062 | 33,944 | 29,644 |
-| data/sample | 5 | 0.012 | 0.011 | 14,139 | 0 |
+| data/links | 3 | 0.007 | 0.006 | 4,083 | 0 |
+| data/lowlevel | 4 | 0.008 | 0.007 | 4,702 | 0 |
+| data/ocr | 3 | 0.059 | 0.060 | 33,944 | 29,644 |
+| data/sample | 5 | 0.013 | 0.012 | 14,139 | 0 |
 | data/sample_nobookmarks | 5 | 0.012 | 0.011 | 14,178 | 0 |
 | data/sideways | 4 | 0.007 | 0.006 | 3,963 | 0 |
-| eval/aaelf64 | 45 | 0.092 | 0.092 | 131,499 | 0 |
-| eval/aapcs64 | 65 | 0.154 | 0.166 | 264,328 | 52,643 |
-| eval/riscv-debug | 119 | 0.710 | 0.780 | 719,694 | 328,882 |
-| eval/riscv-isa | 670 | 1.768 | 2.109 | 3,043,861 | 1,273,119 |
-| eval/riscv-priv | 172 | 0.613 | 0.736 | 1,229,356 | 630,223 |
-| zoo/datasheet-slides | 19 | 0.052 | 0.122 | 83,003 | 71,127 |
-| zoo/datasheet-web | 3 | 0.041 | 0.043 | 77,871 | 65,674 |
-| zoo/datasheet-word | 3 | 0.008 | 0.007 | 10,137 | 0 |
-| zoo/german-slides | 7 | 0.042 | 0.088 | 61,394 | 55,447 |
-| zoo/german-web | 1 | 0.008 | 0.007 | 4,501 | 0 |
-| zoo/german-word | 1 | 0.004 | 0.004 | 4,120 | 0 |
-| zoo/gujarati-slides | 9 | 0.052 | 0.117 | 75,891 | 68,555 |
-| zoo/gujarati-web | 1 | 0.012 | 0.011 | 5,747 | 0 |
-| zoo/gujarati-word | 1 | 0.006 | 0.006 | 5,118 | 0 |
-| zoo/hindi-slides | 7 | 0.045 | 0.096 | 56,437 | 49,957 |
+| eval/aaelf64 | 45 | 0.090 | 0.090 | 131,499 | 0 |
+| eval/aapcs64 | 65 | 0.157 | 0.172 | 264,328 | 52,643 |
+| eval/riscv-debug | 119 | 0.735 | 0.811 | 719,694 | 328,882 |
+| eval/riscv-isa | 670 | 1.714 | 2.098 | 3,043,861 | 1,273,119 |
+| eval/riscv-priv | 172 | 0.640 | 0.753 | 1,229,356 | 630,223 |
+| zoo/datasheet-slides | 19 | 0.062 | 0.145 | 83,003 | 71,127 |
+| zoo/datasheet-web | 3 | 0.041 | 0.045 | 77,871 | 65,674 |
+| zoo/datasheet-word | 3 | 0.009 | 0.008 | 10,137 | 0 |
+| zoo/german-slides | 7 | 0.044 | 0.092 | 61,394 | 55,447 |
+| zoo/german-web | 1 | 0.008 | 0.008 | 4,501 | 0 |
+| zoo/german-word | 1 | 0.005 | 0.005 | 4,120 | 0 |
+| zoo/gujarati-slides | 9 | 0.051 | 0.112 | 75,891 | 68,555 |
+| zoo/gujarati-web | 1 | 0.012 | 0.012 | 5,747 | 0 |
+| zoo/gujarati-word | 1 | 0.007 | 0.006 | 5,118 | 0 |
+| zoo/hindi-slides | 7 | 0.046 | 0.099 | 56,437 | 49,957 |
 | zoo/hindi-web | 1 | 0.009 | 0.009 | 5,099 | 0 |
-| zoo/hindi-word | 1 | 0.005 | 0.005 | 4,601 | 0 |
-| zoo/manual-slides | 16 | 0.057 | 0.155 | 109,741 | 99,359 |
-| zoo/manual-web | 2 | 0.029 | 0.032 | 52,133 | 42,497 |
-| zoo/manual-word | 3 | 0.048 | 0.047 | 25,523 | 16,517 |
-| zoo/report-slides | 13 | 0.053 | 0.125 | 89,892 | 80,688 |
-| zoo/report-web | 2 | 0.012 | 0.012 | 7,663 | 0 |
-| zoo/report-word | 2 | 0.006 | 0.005 | 6,940 | 0 |
-| **TOTAL** | 1,191 | 3.963 | 4.910 | 6,176,859 | 2,881,523 |
+| zoo/hindi-word | 1 | 0.006 | 0.005 | 4,601 | 0 |
+| zoo/manual-slides | 16 | 0.066 | 0.152 | 109,741 | 99,359 |
+| zoo/manual-web | 2 | 0.035 | 0.035 | 52,133 | 42,497 |
+| zoo/manual-word | 3 | 0.059 | 0.058 | 25,523 | 16,517 |
+| zoo/report-slides | 13 | 0.060 | 0.135 | 89,892 | 80,688 |
+| zoo/report-web | 2 | 0.013 | 0.013 | 7,663 | 0 |
+| zoo/report-word | 2 | 0.007 | 0.006 | 6,940 | 0 |
+| **TOTAL** | 1,191 | 4.013 | 5.004 | 6,176,859 | 2,881,523 |
 
 ## Text (pdftotext -layout against the page marks)
 
