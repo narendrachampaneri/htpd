@@ -48,13 +48,14 @@ headings can add "extra" ones), but each one needs an explanation.
 | `zoo` | `build/zoo/*.pdf` - the document zoo (`tests/zoo/make_zoo.py`; only the makers installed on the machine). Its Word, slides and `word-*` PDFs are tagged PDFs: `word-tagged` has no bookmarks, `word-flat` also sets its headings like body text, `word-hf` has a running header and a page number | no (made) |
 | `data` | `tests/data/*.pdf` - the small test PDFs (`tagged*.pdf` are tagged by hand) | yes |
 | `tables` | `build/tables/*.pdf` - tables whose cells are known (`tests/bench/make_tables.py`; needs reportlab). Each PDF has a `<case>.truth.json` next to it; the bench scores the table cell by cell (see "Tables with known cells") | no (made) |
+| `layouts` | `build/layouts/*.pdf` - pages whose reading order is known (`tests/bench/make_layouts.py`; needs reportlab): columns, a full-width title and figure, side boxes, pull quotes, captions, footnotes, margin notes, a newsletter and a paper - each also with the text stored in another order. Each PDF has a `<case>.truth.json`; the bench scores the words in reading order and the paragraphs (see "Reading order with known paragraphs") | no (made) |
 
 `tests/bench/make_long_tagged.py <folder>` writes two tagged PDFs of 320 pages without bookmarks (headings set
 like body text, and headings set bold and larger) to measure what the tag gate of `--tags auto` costs and gives:
 `run_bench.py <folder>` (see "Tagged PDFs" in [`docs/CONVERTER.md`](../../docs/CONVERTER.md)).
 
 The default (`--set auto`) takes `private` when it holds PDFs, then every
-public set that is present. `--set public` takes only `data,eval,zoo,tables`;
+public set that is present. `--set public` takes only `data,eval,zoo,tables,layouts`;
 `--set eval,zoo` any list; a folder as argument takes that folder.
 `--fetch` downloads the eval PDFs and makes the zoo when they are missing.
 `--only REGEX` runs the documents whose `set/name` matches.
@@ -149,6 +150,23 @@ rows after it.
 | `values right row` | cells with text found as a cell of the right row, in any column | higher |
 | `rows right page` | rows on the page where the PDF prints them | higher |
 | `extra rows` | rows of the file (two cells or more) that match no row of the truth: a cell cut into rows, the lines of a chart taken for a table | lower |
+
+**Reading order with known paragraphs.** For the PDFs of `make_layouts.py` the truth is the list of paragraphs
+of every page in the order a person reads them (columns left to right, a full-width title or figure ends the
+columns above it, a side box, a pull quote and a margin note after the paragraph they stand in or beside, a
+caption right after its figure, footnotes at the end of the page). The file's text is cut into blocks (a
+paragraph, a block of rows or code, a heading; a picture line or a blank line ends a block) and its words of
+each page are compared with the truth of that page. A heading made up for a document that has none
+("Page 3", "Front matter") is not counted.
+
+| Number | Meaning | Better |
+|---|---|---|
+| `layout words in order` of `layout words in truth` | words of the truth found on their page in the same order (longest common subsequence) | higher |
+| `layout extra words` | words of the file on a page that are not part of that match (out of order, or not in the truth) | lower |
+| `layout pages ok` of `layout pages` | pages whose words are all in order with no extra word | higher |
+| `paragraphs whole` of `paragraphs in truth` | paragraphs of the truth found complete in one block of the file | higher |
+| `paragraphs split` | paragraphs whose words stand in two runs or more (in two blocks, or cut by other text) | lower |
+| `blocks joined` | blocks of the file that hold words of two paragraphs or more | lower |
 
 ## How far to trust the numbers
 

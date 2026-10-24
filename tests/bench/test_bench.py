@@ -21,6 +21,7 @@ ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
 import run_bench as rb  # noqa: E402
+import layout_score as ls  # noqa: E402
 import table_score as ts  # noqa: E402
 
 CONVERTER = ROOT / "build" / "htpd"
@@ -477,3 +478,52 @@ class Generator(unittest.TestCase):
             firsts = [r for r, row in enumerate(truth["rows"]) if row == truth["rows"][0]]
             self.assertGreaterEqual(len(firsts), 3)        # the header repeats on each page
             self.assertEqual(truth["row_pages"][firsts[1]], truth["row_pages"][firsts[1] + 1])
+
+
+class LayoutScore(unittest.TestCase):
+    TRUTH = {"pages": [{"page": 1, "paragraphs": [
+        {"id": "a", "kind": "body", "text": "one two three four."},
+        {"id": "b", "kind": "body", "text": "five six seven eight."}]}]}
+
+    def score(self, units):
+        return ls.score_layout(self.TRUTH, units, rb.tokens, rb.align)
+
+    def test_the_right_order_scores_full(self):
+        got = self.score([("p", [(1, "one two three four.")]), ("p", [(1, "five six seven eight.")])])
+        self.assertEqual((got["lay_order"], got["lay_extra"], got["lay_pages_ok"], got["lay_paras_ok"]), (8, 0, 1, 2))
+        self.assertEqual((got["lay_split"], got["lay_joined"]), (0, 0))
+
+    def test_a_paragraph_cut_by_another_is_out_of_order_and_split(self):
+        got = self.score([("p", [(1, "one two")]), ("p", [(1, "five six seven eight.")]),
+                          ("p", [(1, "three four.")])])
+        self.assertEqual(got["lay_order"], 6)
+        self.assertEqual(got["lay_extra"], 2)
+        self.assertEqual((got["lay_paras_ok"], got["lay_split"], got["lay_pages_ok"]), (1, 1, 0))
+
+    def test_two_paragraphs_in_one_block_are_joined(self):
+        got = self.score([("p", [(1, "one two three four. five six seven eight.")])])
+        self.assertEqual((got["lay_order"], got["lay_joined"], got["lay_paras_ok"]), (8, 1, 2))
+
+    def test_a_heading_made_up_for_a_page_is_no_text(self):
+        got = self.score([("t", [(1, "Page 1")]), ("p", [(1, "one two three four.")]),
+                          ("p", [(1, "five six seven eight.")])])
+        self.assertEqual(got["lay_extra"], 0)
+
+    def test_the_parser_cuts_blocks_at_blank_lines_pictures_and_fences(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp) / "l.htpd"
+            f.write_text(HTPD, encoding="utf-8")
+            kinds = [k for k, _ in rb.parse_htpd(f).units]
+            self.assertIn("b", kinds)
+            self.assertIn("p", kinds)
+
+    @unittest.skipUnless(shutil.which("pdftotext"), "needs reportlab")
+    def test_the_generator_stores_the_text_in_the_asked_order(self):
+        import make_layouts
+        d = make_layouts.CASES["cols2"][0]("natural")
+        natural = [it.text for it in d.store[0]]
+        make_layouts.apply_variant(d, "reversed")
+        self.assertEqual(sorted(it.text for it in d.store[0]), sorted(natural))
+        self.assertNotEqual([it.text for it in d.store[0]], natural)
+        truth = make_layouts.truth_of(d, "cols2")
+        self.assertEqual(len(truth["pages"][0]["paragraphs"]), 6)
