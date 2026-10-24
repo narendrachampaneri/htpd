@@ -7,3 +7,9 @@ The converter uses PDFium (https://pdfium.googlesource.com/pdfium), which is
 not part of this repository. scripts/get_pdfium.sh downloads a build of it;
 PDFium and the libraries it contains have their own licenses, which are put
 into third_party/pdfium/licenses/ by that script.
+
+The table engine (src/tables.cpp, src/columns.cpp) follows ideas of pdfplumber and
+Camelot (both MIT licensed): for tables drawn with lines, the rules merged into lines and
+the cells taken from the boxes they make; for tables without lines, the columns taken from the
+strips of the page that the words leave free. No code of either project is used; the
+algorithms are written anew in C++.

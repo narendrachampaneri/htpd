@@ -21,6 +21,8 @@ The cases:
     header2            a header of two levels (ruled)
     wrapped            cells of several lines
     stacked            a label cell with four lines and four stacked values beside it
+    stacked_stream     the same without rules
+    conditions         conditions stacked in a cell as list items, a value on each line
     wrapped_ids        identifiers broken inside themselves (LCD_P24, US-GAAP-1010)
     wrapped_mono       the same in a monospace font (CAN_FD_REG_0)
     wrapped_money      money values broken before the closing bracket ("($1,433,600.00)")
@@ -207,6 +209,31 @@ def case_stacked():
     t.setStyle(TableStyle(GRID))
     truth_rows = [["Threshold", "Min", "Typ", "Max", "Unit"]] + [[levels[i], *vals[i], "V"] for i in range(4)]
     return [t], {"rows": truth_rows, "header_rows": 1}
+
+
+def case_stacked_stream():
+    levels = ["Level 1 falling", "Level 2 falling", "Level 3 falling", "Level 4 falling"]
+    vals = [("2.62", "2.70", "2.78"), ("2.35", "2.41", "2.47"), ("2.12", "2.20", "2.26"), ("1.85", "1.91", "1.97")]
+    tall = ["<br/>".join(levels)] + ["<br/>".join(v[k] for v in vals) for k in range(3)] + ["<br/>".join(["V"] * 4)]
+    head = [P(c, CELLB) for c in ["Threshold", "Min", "Typ", "Max", "Unit"]]
+    body = [Paragraph(t, CELL) for t in tall]
+    t = Table([head, body], colWidths=[110, 55, 55, 55, 40])
+    t.setStyle(TableStyle(PLAIN))
+    truth_rows = [["Threshold", "Min", "Typ", "Max", "Unit"]] + [[levels[i], *vals[i], "V"] for i in range(4)]
+    return [t], {"rows": truth_rows, "header_rows": 1}
+
+
+def case_conditions():
+    """Datasheet rows whose conditions are stacked in one cell, a value on each line."""
+    conds = ["25 C", "85 C", "105 C"]
+    vals = ["406", "386", "792"]
+    head = [P(c, CELLB) for c in ["Parameter", "Conditions", "Typ", "Unit"]]
+    t = Table([head, [P("Leakage"), Paragraph("<br/>".join("\u2022 " + c for c in conds), CELL),
+                      Paragraph("<br/>".join(vals), CELL), P("nA")]], colWidths=[80, 70, 50, 40])
+    t.setStyle(TableStyle(PLAIN))
+    rows = [["Parameter", "Conditions", "Typ", "Unit"]] + [["Leakage" if i == 0 else "", "\u2022 " + c, v, "nA" if i == 0 else ""]
+                                                          for i, (c, v) in enumerate(zip(conds, vals))]
+    return [t], {"rows": rows, "header_rows": 1}
 
 
 def case_wrapped_ids():
@@ -438,7 +465,7 @@ CASES = {
     "empty": case_empty, "multipage": case_multipage, "multipage_stream": case_multipage_stream,
     "multipage_plain": case_multipage_plain, "registers": case_registers, "ledger": case_ledger,
     "datasheet": case_datasheet, "chart": case_chart, "registers_stream": case_registers_stream,
-    "registers_narrow": case_registers_narrow, "mono_names": case_mono_names, "mono_table": case_mono_table, "wrapped_middle": case_wrapped_middle, "wrapped_middle_stream": case_wrapped_middle_stream,
+    "stacked_stream": case_stacked_stream, "conditions": case_conditions, "registers_narrow": case_registers_narrow, "mono_names": case_mono_names, "mono_table": case_mono_table, "wrapped_middle": case_wrapped_middle, "wrapped_middle_stream": case_wrapped_middle_stream,
     "rowrules": case_rowrules, "tight": case_tight, "wrapped_first": case_wrapped_first,
 }
 
