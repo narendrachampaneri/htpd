@@ -564,12 +564,12 @@ changes:
   guessed. Text of the PDF itself always wins: what OCR reads on top of it is
   not added again. Without Tesseract a scanned page has no text at all, and
   the notes say how many pages could not be read.
-* The exact form of tables. Rows and cells are kept as text. Lines around
-  cells are not shown, and a cell that spans several columns is only shown
-  where the tags of the PDF describe the table (section 4.6); a cell with
-  several lines is joined when the columns are certain (section 4.2), and
-  paragraph breaks inside a cell become one space. An empty cell is only
-  marked when the positions on the page leave no doubt.
+* The exact form of tables. Rows and cells are kept as text. Lines around cells are not shown. A cell
+  that spans several columns or rows is shown (`[>]`, `[=]`) where the page draws the lines of the table
+  (section 4.2) or the tags of the PDF describe it (section 4.6), and not in a table read from the positions
+  of the text alone; a cell with several lines is joined when the columns are certain (section 4.2), and
+  paragraph breaks inside a cell become one space. An empty cell is only marked when the positions on the
+  page leave no doubt.
 * The form of formulas (fractions, roots, indices).
 * Links to the web and to other files, comments and form fields of the PDF.
   (Links to other places of the document are kept: section 4.4.)

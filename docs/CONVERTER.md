@@ -600,18 +600,22 @@ honest about the rest.
   show (a body paragraph tagged as `H2` and short) is believed. PDFium does
   not tell the type of an artifact, so text marked as an artifact in the top or
   bottom fifth of the page is taken out whatever its type.
-* **Tables are rows of text.** Cells are split by ` | `. A cell that wraps
-  onto several lines is joined, and a table that the PDF stores cell by
-  cell (register field tables, ledgers whose cells are set in the middle of
-  the row, datasheet tables with stacked conditions and values) is put
-  together by position, when the columns are certain; otherwise the lines
-  stay as they stand. A row with
-  only two cells is written as a plain paragraph, and a cell that spans
-  several columns is not shown as such. Empty cells are only marked
+* **Tables are rows of text.** Cells are split by ` | `. A table the PDF draws with lines is read from
+  the lines (cells over rows and columns are marked `[>]` and `[=]`); a table the tags describe is read from
+  the tags; any other is read from the positions of the text. A cell that wraps onto several lines is
+  joined, and a table that the PDF stores cell by cell (register field tables, ledgers whose cells are
+  set in the middle of the row, datasheet tables with stacked conditions and values) is put together by
+  position, when the columns are certain; otherwise the lines stay as they stand. A text-only row with
+  only two cells is written as a plain paragraph, and a cell that spans several columns is not shown as
+  such where the page draws no lines and has no tags. Empty cells are only marked
   when another row of the same table (on the same page) has all cells, so
-  that the columns are certain. Tables whose first column wraps too (change
+  that the columns are certain. Rows set as close as the lines of a cell and without a first cell are not
+  told from the rest of a cell above (see "Tables"). A name broken inside itself in a text-only table is
+  joined only by the rules in "Tables" (a column edge is not known there, so "Sym" over "bol" stays two
+  words). Tables whose first column wraps too (change
   histories, lists of references) can still come out as rows plus loose
-  lines. Always check important numbers from a table against the PDF page.
+  lines. A lattice grid is trusted only when it is consistent; rows whose rules the page does not draw
+  (drawn in blocks) are read by the text. Always check important numbers from a table against the PDF page.
 * **Figures are found by rules.** A drawing without a caption "Figure N"
   must have many shapes and little text; a small drawing without a caption
   is not stored. Charts and diagrams that are one picture are stored, but
