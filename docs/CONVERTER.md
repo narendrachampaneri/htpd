@@ -175,10 +175,32 @@ Cost and gain (`tests/bench`, `tests/zoo`):
   5 ms more for the 3-page documents of the zoo, which convert in 5 to 8 ms). A PDF without tags is
   not slower, and neither is a tagged PDF with `--tags off`.
 * So the default `--tags auto` reads the tags only where they pay for
-  themselves: when the PDF is tagged, has no bookmarks (with bookmarks the
-  headings are known, and the tags changed nothing else on the public
-  documents) and has at most 200 pages. The notes of a tagged PDF whose tags
-  were not read say so and name `--tags on`.
+  themselves: where the headings found without them are poor. A tagged PDF
+  is converted once without its tags (headings from the bookmarks, a printed
+  contents, the style sheet and the text). When these headings are **poor** -
+  none, fewer than 2 + one for every 15 pages (one for a document of one or
+  two pages), or all on one level in a text of more than 1.5 pages per heading
+  - the PDF is converted again with its tags, at any page count. When they
+  are good, the tags are not read, and the notes say so (`its structure tags
+  were not read (it has bookmarks, which give the headings)` or `(the headings
+  found without them are good)`) and name `--tags on`. The first conversion
+  costs about as much as `--tags off`; it is thrown away when the second one
+  is made. Measured on a generated Word-like PDF of 320 pages with 40
+  elements a page and no bookmarks (`tests/bench/make_long_tagged.py`, best
+  of 5): headings set like body text (`long-tagged-flat`): `--tags off`
+  0.100 s and 40 sections, `--tags on` 0.363 s and 360, `auto` 0.463 s and 360
+  (the gate found the headings poor and paid for the first conversion as
+  well: +0.36 s, 9 times the sections); headings set bold and larger
+  (`long-tagged-styled`): `off` 0.103 s, `on` 0.359 s, `auto` 0.105 s - the
+  same 360 sections as `on`, without its 0.25 s. Until S2 a PDF of more than
+  200 pages was never read in `auto`, and one with bookmarks never.
+* Tags also give the document a title when the PDF has none (the `Title`
+  element, after the `/Title` of the PDF and before the title printed on the
+  first page), and, with bookmarks that stop early, the deeper headings of
+  the tags: a tag heading below a bookmark that is a tag heading itself, with
+  a smaller tag level, is added one level below it - but only when the style
+  of its text is a heading style of the document as well (see "Styles and
+  producers").
 * What it gives: on Word exports without bookmarks whose headings look like
   body text, the headings found go from 0 of 6 documents to all 6 (3, 1, 1,
   1, 2 and 2 sections become 16, 4, 5, 4, 12 and 9); the table rows of the
@@ -186,6 +208,82 @@ Cost and gain (`tests/bench`, `tests/zoo`):
   that have bookmarks gain too: a running header and a page number on a
   one-page document are taken out (the noise in the text of such a document
   falls from 0.12 to 0.03).
+
+### Styles and producers
+
+**The style sheet** (`src/styles.cpp`). Before headers, footers and headings
+are looked for, every line is put into a style: font, size (half points),
+weight, italic and fill colour. For each style the converter counts how much
+of the text it holds, how often it starts a block of lines, stands alone
+(a block of at most 3 lines and 20 words that ends without a full stop),
+is followed by body text, carries a section number or the word "Figure" or
+"Table", and where on the page it stands. The styles get a role:
+
+| Role | Rule |
+|---|---|
+| body | the style with the most text (not code, not at the page edge) |
+| code | the font is monospace (measured, see AGENTS.md) |
+| header/footer | at least 90 % of its lines are in the top or bottom band, on 3 pages or more, and smaller than the body |
+| footnote | smaller than the body, 70 % of its lines in the lower third of the page |
+| caption | at least 60 % of its lines start "Figure N", "Fig. N", "Table N" (not in the body style) |
+| table text | at least 60 % of its lines are rows of a table |
+| heading 1, 2, ... | rare (at most 12 % of the text), 3 blocks or more on 2 pages or more (2 blocks in a document of 3 pages or less), at least 90 % short, 80 % ending without a full stop, 80 % followed by body, table or code text or by another heading style; in the size of the body, also one block more than the minimum, each directly before body text. Levels: larger first, then bold, then, for two styles of one size and weight, the one that stands before the other, or has the smaller section depth |
+
+The notes of every bundle list the roles found, one line each (`heading 2:
+Verdana 15 pt #0091BD, 49 lines`, FORMAT.md section 3.2).
+
+The roles are used only where they make a decision more certain; where the
+style sheet is unsure, today's rules decide, and every heading found without
+it is still found:
+
+* **Headings.** A line in a heading style that the size rule does not take
+  (the same size as the text, set apart by colour, weight, font or italic) is
+  a heading; its level is one below the nearest larger heading style. A line
+  that starts like a caption is never promoted.
+* **Headers and footers.** A small style that stands in one slot of the band
+  on at least 70 % of the pages with text (4 pages or more, one line a page)
+  is page furniture although its text changes from page to page (a chapter
+  title). A style larger than the body is a title, as on slides, and stays.
+* **Tags.** The deeper tag headings under bookmarks (see "Tagged PDFs").
+
+**Producers.** The Producer and Creator entries of the PDF tell which program
+made it: Word, LibreOffice, LaTeX (pdfTeX, XeTeX, LuaTeX), Chrome/Skia (web
+pages, Confluence), wkhtmltopdf, InDesign; anything else is "other" and
+unknown (no entry) is "unknown" - those get the general rules only. The notes
+say it (`Made by: Skia/PDF m153, read as Chrome/Skia.`). The habits used:
+
+* **Chrome/Skia**: its print template puts the date and time before the title
+  above every page and the page count (`n/N`, with an address in front of it
+  when Chrome writes one) below. When the topmost line of every page starts
+  with the same date and time, it is taken out as a header; when the lowest
+  line of every page is `n/N` with n the number of the page and N the number
+  of pages, it is a footer - also in a document of one or two pages, where
+  nothing repeats three times. They are listed in the notes like any removed
+  header or footer. (On the bench: the 1-page German, Hindi and Gujarati web
+  pages of the zoo.)
+* **LaTeX**: a chapter is set as the line `Chapter 3` (or `Appendix A`) with
+  its title in a larger size on the next line. With a LaTeX producer the two
+  lines are one heading, `Chapter 3 Results`, number 3, level 1. Not shown on
+  the bench of this machine, which has no LaTeX: tested with a PDF made for
+  it (`tests/data/latex_chapters.pdf`); the zoo makes LaTeX books where
+  `xelatex` is installed.
+* **Word / LibreOffice**: no habit of its own. Their heading styles show in
+  the style sheet and, where the PDF is tagged, in the tags (the gate above).
+
+Cost and gain (`tests/bench`, 57 documents, best of 5, converter before S2 and
+after on the same machine): total time 3.17 s to 3.22 s (+1.4 %; the style
+sheet is one pass over the lines), total size +0.2 % (the notes: about 300
+bytes a bundle), text, headings, table rows and figures of the public documents
+unchanged, eval (test and tune split) unchanged question by question. What it
+gives: a document whose headings differ from the text only by colour or
+weight goes from 2 sections to 12 (`tests/data/styles_weight.pdf`), a LaTeX
+chapter is one heading, the date, title, address and `1/1` that Chrome
+prints on a one-page web page leave the text (`german-web`: words in order
+84.0 % to 91.7 %). One cost in the bench numbers is a measuring effect: the
+Hindi and Gujarati web pages show 6 more "lost words", the date and time of
+the removed Chrome header, which `pdftotext` mixes into another line and the
+bench cannot take out of the PDF page; the removed header is listed in the
+notes with its text.
 
 ## Build
 
@@ -257,7 +355,7 @@ htpd info manual.pdf                     # show what would be found, write nothi
 | `--headings none` | No headings: one section per page. |
 | `--keep-headers` | Keeps the running headers and footers in the text. |
 | `--dehyphenate` | `inter-` + `rupt` becomes `interrupt` instead of `inter-rupt`. |
-| `--tags auto\|on\|off` | The structure tags of a tagged PDF (headings, tables, lists, figures, page furniture), used where they agree with the page text. `auto` (default): when the PDF is tagged, has no bookmarks and has at most 200 pages. `on`: whenever the PDF has tags. `off`: read every PDF as if it had no tags. Reading the tags costs time, see "Tagged PDFs". |
+| `--tags auto\|on\|off` | The structure tags of a tagged PDF (headings, tables, lists, figures, page furniture), used where they agree with the page text. `auto` (default): when the PDF is tagged and the headings found without the tags are poor (see "Tagged PDFs"). `on`: whenever the PDF has tags. `off`: read every PDF as if it had no tags. Reading the tags costs time, see "Tagged PDFs". |
 | `--ocr auto\|on\|off` | Read text from pictures and scanned pages with Tesseract. `auto` (default): when it is installed. `on`: stop with an error when it is not. `off`: never. |
 | `--ocr-lang <langs>` | Tesseract languages, e.g. `eng+deu` (default `eng`). Each must be installed (`tesseract --list-langs`). |
 | `--figures on\|off` | Store figures (pictures and drawings) as PNG pictures in the bundle (default `on`). |
@@ -303,9 +401,10 @@ One PDF goes through seven steps. Each step is one small file.
 | 1c. Figures | `src/figures.cpp`, `src/png.cpp` | The pictures and drawings of each page that are figures, with their caption; drawn by PDFium and packed as PNG (several at a time). See "Figures" above. |
 | 1d. Tags | `src/tags.cpp` | In a tagged PDF: the structure tree and the marked-content ID of every character (read in `pdf_reader_pdfium.cpp`) tell which characters are a heading, a table cell, a list item, a figure or page furniture. See "Tagged PDFs" above. |
 | 2. Lines | `src/layout.cpp` | Characters become lines. Wide gaps are marked (table columns); raised and lowered numbers stay raised (2³¹). |
+| 2b. Styles | `src/styles.cpp` | The style sheet: every line into a style, the styles into roles (body, headings, captions, table text, code, header/footer, footnote), and the producer of the PDF. See "Styles and producers" above. |
 | 3. Headers and footers | `src/furniture.cpp` | Lines that repeat at the page edge on many pages are taken out and reported (in a document of two or three pages: on every page). A running header is set apart from the text: a line that stands right on top of the text below it (closer than 2.5 of its font sizes) stays in the text - a heading or the header row of a table at the top of the page - unless it holds the number of its page or stands on almost every page. |
 | 3b. Columns | `src/columns.cpp` | A table set tight (LaTeX, web pages, slides) has column gaps narrower than two font sizes. Its rows leave the same strips of the page free; the spaces on those strips become column gaps, also in the header row. Running text crosses the strips and is left alone. |
-| 4. Headings | `src/headings.cpp` | From the bookmarks of the PDF (each found as its heading line on its page - the line in the largest font, so not a running header with the same words - or at the top of the next page); or from a table of contents printed in the document, whose titles are looked for in the text after it, in order (also when the text shows them without their number); or from the text: section numbers (also `Register 30.2.43: ...`, one level below its section), font size, bold, another font. A numbered cell of a table row (another cell beside it on its line) is no heading. Large titles in a smaller style than the numbered headings, used three times or more, are headings one level below them. |
+| 4. Headings | `src/headings.cpp` | From the bookmarks of the PDF (each found as its heading line on its page - the line in the largest font, so not a running header with the same words - or at the top of the next page); or from a table of contents printed in the document, whose titles are looked for in the text after it, in order (also when the text shows them without their number); or from the text: section numbers (also `Register 30.2.43: ...`, one level below its section), font size, bold, another font, and a heading style of the style sheet (a colour or a weight of its own). A numbered cell of a table row (another cell beside it on its line) is no heading. Large titles in a smaller style than the numbered headings, used three times or more, are headings one level below them. |
 | 4b. Structure | `src/structure.cpp` | For documents with few headings: a running header that changes starts a section with its text as title. Text longer than a few pages is cut into parts of about 2 pages, where a sentence ends (FORMAT.md 3.3). |
 | 5. Sections | `src/sections.cpp` | The text is cut at the headings. Lines become paragraphs, table rows (wrapped cells and tables stored cell by cell are put together) and code blocks. The tree of sections is built. |
 | 6. Links | `src/links.cpp` | The links of the pages become links from section to section. |
@@ -355,7 +454,7 @@ as values (`std::expected`); the library does not throw for a bad PDF.
 
 ## What was tested
 
-* **142 automatic tests** (`make test`). Most build their input in memory.
+* **156 automatic tests** (`make test`). Most build their input in memory.
   The others convert small PDFs in `tests/data` through the real PDF
   library: rotated pages, scaled fonts, text spaced only by kerning,
   two columns, code listings, fonts whose names lie about their widths,

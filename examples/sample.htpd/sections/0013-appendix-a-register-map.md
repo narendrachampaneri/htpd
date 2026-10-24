@@ -4,7 +4,7 @@ title: "Appendix A Register map"
 description: "No text of its own; 1 subsection."
 resource: "sample.pdf#page=5"
 tags: [htpd, section]
-generated: { by: htpd/0.1.1, at: 2026-10-21T08:29:24Z }
+generated: { by: htpd/0.1.2, at: 2026-10-24T05:39:17Z }
 sources:
   - id: source-pdf
     resource: "sample.pdf#page=5"

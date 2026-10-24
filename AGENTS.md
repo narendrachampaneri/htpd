@@ -98,6 +98,7 @@ same for `eval/tests` and `model/tests`). Tests must not need the internet.
 | 1b. OCR of scanned pages and pictures (runs the Tesseract program, when installed) | `src/ocr.cpp` |
 | 1c. Figures: find them, draw them, pack them as PNG | `src/figures.cpp`, `src/png.cpp` |
 | 2. Characters to lines | `src/layout.cpp` |
+| 2b. Style sheet and producer (styles, roles; used by 3 and 4) | `src/styles.cpp` |
 | 3. Headers and footers | `src/furniture.cpp` |
 | 3b. Columns of tables set tight | `src/columns.cpp` |
 | 4. Headings (bookmarks, a printed table of contents, the text) | `src/headings.cpp` |

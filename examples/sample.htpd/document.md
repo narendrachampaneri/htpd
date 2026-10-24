@@ -4,7 +4,7 @@ title: "ACME DC Charger Controller Reference Manual"
 description: "5 pages converted into 14 sections. Source: sample.pdf."
 resource: "sample.pdf"
 tags: [htpd, document]
-generated: { by: htpd/0.1.1, at: 2026-10-21T08:29:24Z }
+generated: { by: htpd/0.1.2, at: 2026-10-24T05:39:17Z }
 sources:
   - id: source-pdf
     resource: "sample.pdf"
@@ -52,6 +52,13 @@ htpd:
 
 * Source file: `sample.pdf` (8693 bytes, SHA-256 `0fe9f080d96c46019fc87678346270a9a53924adb7f54f5d3d32ad2f8a834ada`).[^source-pdf]
 * Headings come from the PDF bookmarks (13 bookmarks, 13 located in the page text).
+* Made by: ReportLab PDF Library - (opensource), read as other.
+* Styles of the text:
+  * body: Helvetica 10 pt, 88 lines
+  * heading 1: Helvetica-Bold 16 pt, 5 lines
+  * heading 2: Helvetica-Bold 13 pt, 7 lines
+  * table text: Helvetica 9 pt, 8 lines
+  * header/footer: Helvetica 8 pt, 8 lines
 * Removed 8 running header/footer lines (2 patterns):
   * header, 4 pages: `ACME DC Charger Controller Reference Manual Rev 1.2`
   * footer, 4 pages: `ACME Confidential Page 2`

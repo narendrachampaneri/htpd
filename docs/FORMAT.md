@@ -140,9 +140,11 @@ The same OKF fields (`type: Document`, `tags: [htpd, document]`), and under
 | `children` | IDs of the top-level sections, in order. |
 
 The `title` of the document is the title stored in the PDF. When the PDF
-has none (or only "untitled" or "(anonymous)"), it is the title printed on
-the first page - its line or lines in the largest font, clearly larger than
-the text - and when there is none, the file name without `.pdf`.
+has none (or only "untitled" or "(anonymous)"), it is the text of the `Title`
+element of the PDF's tags (when the tags were read, section 4.6), then the
+title printed on the first page - its line or lines in the largest font,
+clearly larger than the text - and when there is none, the file name without
+`.pdf`.
 
 The body of `document.md` has two parts:
 
@@ -160,9 +162,13 @@ The body of `document.md` has two parts:
   is about: `- starts: `Byte ordering of the core.``. The same holds for
   the contents of the single file.
 * **`# Conversion notes`** - what the converter did and what it left out:
-  where the headings come from, which header and footer lines were
-  removed, how many rotated characters were skipped, how many pages have
-  no text.
+  where the headings come from, which program made the PDF and how it was
+  read (`Made by: ..., read as LibreOffice.`), the styles of the text and
+  their roles (`heading 2: Arial Bold 12 pt, 84 lines`; one line for body
+  text, each heading level, captions, table text, code, header/footer,
+  footnotes), which header and footer lines were removed, how many rotated
+  characters were skipped, how many pages have no text. These lines are for
+  a person or an AI to read; no field of the format depends on them.
 
 ### 3.3 Two special sections
 
@@ -414,7 +420,7 @@ elements it left to the ordinary rules.
 
 | Tag | What it gives |
 |---|---|
-| `H`, `H1`-`H6` | A heading with the level of the tag (`H`: one plus the number of `Sect` elements around it), `heading_from: tags`. Used when the PDF has no usable bookmarks, and the tags name at least as many headings as a printed table of contents or numbered headings in the text show. The lines of a heading are its title and are not repeated in the text. A heading tag on more than 200 characters, or on text that is not in one piece, is no heading. |
+| `H`, `H1`-`H6` | A heading with the level of the tag (`H`: one plus the number of `Sect` elements around it), `heading_from: tags`. Used when the PDF has no usable bookmarks, and the tags name at least as many headings as a printed table of contents or numbered headings in the text show. With bookmarks, a tag heading that lies deeper than the bookmark above it (a bookmark that is a tag heading itself, with a smaller tag level) is added one level below it, but only where the style of its text is a heading style of the document too (`heading_from: tags`). The lines of a heading are its title and are not repeated in the text. A heading tag on more than 200 characters, or on text that is not in one piece, is no heading. |
 | `Table`, `TR`, `TH`, `TD` | The rows of the table with every cell exactly, also a cell of several lines (joined with one space). The block is a table (section 4.2) also when it has only two columns. An empty cell is written as nothing between two bars. A cell that spans columns or rows is written in the cell it starts in, with a mark after its text: `[>]` for one more column, `[>>]` for two more, `[=]` for one more row (a cell can have both). The cells it covers are written empty, so every row has the same number of cells. Where the tags leave out an empty cell, the cells are put into their columns by their positions on the page; where that is not certain, the table is read by the ordinary rules. A table is only taken when its cells lie in the order of the page, nothing else is stored between them, and no text lies on it that the table does not name. |
 | `L`, `LI`, `Lbl`, `LBody` | Every list item is a paragraph of its own, also when its label is no list mark (`A.`, `§1`); the lines of an item stay together. |
 | `Figure`, `Caption` | A figure (section 4.5) with the text of its `Caption` as caption (the element right before or after it, or inside it), or its alternate text when it has no caption. A figure the tags name and the ordinary rules do not find is stored too, unless it is an icon, a frame round the page or a logo in the page margin. |
