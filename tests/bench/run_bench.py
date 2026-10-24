@@ -1013,6 +1013,12 @@ def analyse(job: dict) -> dict:
             got = score_layout(truth, h.units, tokens, align)
             for k in LAYOUT_KEYS:
                 m[k] = got.get(k, 0)
+            # pdftotext reads across columns: for a page made to test the reading order, the numbers that depend
+            # on its order (and the table rows it finds in its lines) are not a measure; the truth is.
+            m["order_ref_words"] = None
+            for k in ("order_words", "coverage_order", "pages_ok", "pages_text", "missing_pieces", "extra_pieces",
+                      "rows_pdf", "rows_found", "rows_stray"):
+                m[k] = None
     return {"m": m, "d": d}
 
 
@@ -1110,7 +1116,8 @@ def totals(docs: dict[str, dict]) -> dict:
         vals = [d[k] for d in ok if d.get(k) is not None]
         t[k] = sum(vals) if vals else None
     pw = sum(d["pdf_words"] for d in ok if d.get("pdf_words"))
-    t["coverage_order"] = sum(d["order_words"] for d in ok if d.get("order_words") is not None) / pw if pw else None
+    pw_order = sum(d.get("order_ref_words", d.get("pdf_words")) or 0 for d in ok if d.get("order_words") is not None)
+    t["coverage_order"] = sum(d["order_words"] for d in ok if d.get("order_words") is not None) / pw_order if pw_order else None
     t["coverage_words"] = sum(d["hit_words"] for d in ok if d.get("hit_words") is not None) / pw if pw else None
     t["notes_ok"] = sum(d["notes_ok"] for d in ok)
     t["documents"] = len(ok)

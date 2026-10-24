@@ -527,3 +527,12 @@ class LayoutScore(unittest.TestCase):
         self.assertNotEqual([it.text for it in d.store[0]], natural)
         truth = make_layouts.truth_of(d, "cols2")
         self.assertEqual(len(truth["pages"][0]["paragraphs"]), 6)
+
+
+class LayoutTotals(unittest.TestCase):
+    def test_the_order_of_pdftotext_is_no_measure_for_a_page_made_to_test_the_order(self):
+        docs = {"a": {"pdf_words": 100, "order_words": 90, "hit_words": 100, "pages_ok": 1, "notes_ok": 1},
+                "b": {"pdf_words": 50, "order_words": None, "order_ref_words": None, "hit_words": 50, "notes_ok": 1}}
+        total = rb.totals(docs)
+        self.assertAlmostEqual(total["coverage_order"], 0.9)    # not 90 of 150
+        self.assertAlmostEqual(total["coverage_words"], 1.0)

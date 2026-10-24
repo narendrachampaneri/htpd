@@ -46,7 +46,7 @@ headings can add "extra" ones), but each one needs an explanation.
 | `private` | `private/bench/*.pdf` - your own PDFs | never: `private/` is git-ignored; nothing from it is committed, uploaded or put into a prompt |
 | `eval` | `eval/docs/*.pdf` - the five public manuals of the evaluation (`eval/get_docs.sh`) | no (downloaded, checked by SHA-256) |
 | `zoo` | `build/zoo/*.pdf` - the document zoo (`tests/zoo/make_zoo.py`; only the makers installed on the machine). Its Word, slides and `word-*` PDFs are tagged PDFs: `word-tagged` has no bookmarks, `word-flat` also sets its headings like body text, `word-hf` has a running header and a page number | no (made) |
-| `data` | `tests/data/*.pdf` - the small test PDFs (`tagged*.pdf` are tagged by hand) | yes |
+| `data` | `tests/data/*.pdf` - the small test PDFs (`tagged*.pdf` are tagged by hand; `reading_order.pdf` has a `reading_order.truth.json` and is scored like the `layouts`) | yes |
 | `tables` | `build/tables/*.pdf` - tables whose cells are known (`tests/bench/make_tables.py`; needs reportlab). Each PDF has a `<case>.truth.json` next to it; the bench scores the table cell by cell (see "Tables with known cells") | no (made) |
 | `layouts` | `build/layouts/*.pdf` - pages whose reading order is known (`tests/bench/make_layouts.py`; needs reportlab): columns, a full-width title and figure, side boxes, pull quotes, captions, footnotes, margin notes, a newsletter and a paper - each also with the text stored in another order. Each PDF has a `<case>.truth.json`; the bench scores the words in reading order and the paragraphs (see "Reading order with known paragraphs") | no (made) |
 
@@ -157,7 +157,9 @@ columns above it, a side box, a pull quote and a margin note after the paragraph
 caption right after its figure, footnotes at the end of the page). The file's text is cut into blocks (a
 paragraph, a block of rows or code, a heading; a picture line or a blank line ends a block) and its words of
 each page are compared with the truth of that page. A heading made up for a document that has none
-("Page 3", "Front matter") is not counted.
+("Page 3", "Front matter") is not counted. For these documents the numbers of `pdftotext` that depend on the order of
+the words (words in order, pages ok, missing and extra pieces, table rows) are not given (`-`): `pdftotext -layout`
+reads across columns, so they would count a right reading order as a loss. Lost, moved and invented words are given.
 
 | Number | Meaning | Better |
 |---|---|---|

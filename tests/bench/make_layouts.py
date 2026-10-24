@@ -221,8 +221,12 @@ class Flow:
             self.fresh = True
             frame0 = self.frames[self.fi]
         p = Para(pid, kind, text, frame0.page)
+        stop = interrupt[0] if interrupt else -1
+        # a box stands in the middle of a sentence: not after a line that ends one
+        while interrupt and 0 < stop < len(lines) - 1 and lines[stop - 1].rstrip().endswith((".", "!", "?")):
+            stop += 1
         for k, line in enumerate(lines):
-            if interrupt and k == interrupt[0]:
+            if interrupt and k == stop:
                 f = self.frames[self.fi]
                 top = self.y + 4
                 self.y += interrupt[1] + 8
