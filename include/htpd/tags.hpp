@@ -34,25 +34,26 @@
 
 #include "htpd/figures.hpp"
 #include "htpd/furniture.hpp"
+#include "htpd/headings.hpp"
 #include "htpd/types.hpp"
 
 namespace htpd {
 
 // Whether the structure tags of a PDF are read.
-//   Auto  the default. Read them when the PDF is tagged, has no bookmarks (then
-//         they give the headings) and has at most kAutoTagPages pages. PDFium
-//         builds the tree of a page from the whole structure of the document,
-//         so reading it costs time that grows faster than the document does.
+//   Auto  the default. The PDF is converted once without its tags; the tags are read (the
+//         conversion is made again with them) only when the headings that come out are poor:
+//         none, few for the number of pages, or all on one level in a long text. Good headings
+//         need no help, and PDFium builds the tree of a page from the whole structure of the
+//         document, so reading it costs time that grows faster than the document does.
 //   On    read them whenever the PDF has a structure tree.
 //   Off   never.
 enum class TagMode { Auto, On, Off };
 
-inline constexpr int kAutoTagPages = 200;
-
-// Whether to read the tags of a PDF: `tagged` is what the PDF says about itself,
-// `bookmarks` the number of bookmarks that point at a page. When the answer is
-// no for a tagged PDF in Auto mode, `why` says why.
-bool should_read_tags(TagMode mode, bool tagged, std::size_t bookmarks, int pages, std::string& why);
+// Whether to read the tags of a PDF: `tagged` is what the PDF says about itself, `quality`
+// how good the headings of the first conversion (without tags) came out. In Auto mode a
+// tagged PDF whose headings are not yet known (Unknown) is not read; when the answer is no
+// for a tagged PDF whose headings are known, `why` says why.
+bool should_read_tags(TagMode mode, bool tagged, HeadingQuality quality, std::string& why);
 
 // What the tags gave, over the whole document.
 struct TagReport {

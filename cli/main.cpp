@@ -38,8 +38,9 @@ Options for convert:
       --tags <mode>         The structure tags of a tagged PDF (headings, tables,
                             lists, figures, page furniture), used where they
                             agree with the page text:
-                              auto  when the PDF has no bookmarks and at most
-                                    200 pages (default)
+                              auto  when the headings found without the
+                                    tags are poor: none, few for the
+                                    pages, or all on one level (default)
                               on    whenever the PDF has tags
                               off   never
       --ocr <mode>          Text in pictures and scanned pages, read with the

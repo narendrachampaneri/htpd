@@ -736,6 +736,120 @@ def actualtext(path):
     c.save()
 
 
+def tagged_styled(path):
+    """A tagged PDF whose headings are also set apart by their look (bold, larger), with no bookmarks and
+    no /Title: the text alone gives good headings, so the tags are not needed for them. A Title element
+    names the document; H1 and H2 give two levels; a table has the tags' cells."""
+    t = Tagged(2)
+    para = ('The charger supervises the power stage and the vehicle interface and reports the values',
+            'over the internal bus every ten milliseconds, as long as a vehicle is connected and',
+            'the safety controller has released the output contactor of the power stage.')
+    t.plain(0, 72, 770, 'ACME POWER', size=24, font='F2')       # a name in the largest type that is no title
+    body = [t.elem('Title', t.text(0, 72, 745, 'Charger overview sheet', size=20, font='F2', tag='Title'))]
+    y = 715
+    for page, heads in ((0, (('H1', 'Introduction', 16), ('H2', 'Scope', 13), ('H2', 'Limits', 13))),
+                        (1, (('H1', 'Details', 16), ('H2', 'Wiring', 13)))):
+        y = 715 if page == 0 else 745
+        for kind, title, size in heads:
+            body.append(t.elem(kind, t.text(page, 72, y, title, size=size, font='F2', tag=kind)))
+            y -= size + 12
+            body.append(t.elem('P', *[t.text(page, 72, y - 14 * k, line) for k, line in enumerate(para)]))
+            y -= 14 * len(para) + 20
+    t.write(path, t.elem('Document', *body))
+
+
+PARA = ('The controller supervises the power stage and the vehicle interface, samples the bus voltage and the '
+        'output current every ten milliseconds and reports the values over the internal bus. All limits in this '
+        'part apply over the full operating temperature range unless a different condition is stated.')
+
+
+def styles_weight(path):
+    """Headings that differ from the text by weight or by colour only: the same size, the same font.
+    Level 1 is bold (Helvetica-Bold 10), level 2 is regular but blue (Helvetica 10). Nothing else tells
+    them from body text: no number, no larger size, no bookmark."""
+    c = canvas.Canvas(path, pagesize=letter)
+    c.setTitle('Style sheet test: weight and colour')
+    c.setProducer('ReportLab test')
+    blue = colors.Color(0.1, 0.2, 0.7)
+    topics = [('Overview', ['Purpose', 'Audience']), ('Operation', ['Start up', 'Shut down']),
+              ('Maintenance', ['Cleaning', 'Fuses']), ('Warranty', ['Terms', 'Claims'])]
+    page = 0
+    y = H - 72
+    for title, subs in topics:
+        for head, size_font, colour in [(title, 'Helvetica-Bold', colors.black)] + [(s, 'Helvetica', blue) for s in subs]:
+            if y < 200:
+                c.showPage()
+                y = H - 72
+            c.setFont(size_font, 10)
+            c.setFillColor(colour)
+            c.drawString(72, y, head)
+            y -= 16
+            c.setFillColor(colors.black)
+            c.setFont('Helvetica', 10)
+            words = PARA.split()
+            for k in range(3):
+                c.drawString(72, y, ' '.join(words[k * 9:(k + 1) * 9 + 3]))
+                y -= 13
+            y -= 10
+    c.showPage()
+    c.save()
+
+
+def latex_chapters(path):
+    """A LaTeX report without bookmarks: every chapter starts with the line "Chapter N" above its title."""
+    c = canvas.Canvas(path, pagesize=letter)
+    c.setTitle('Chapter page test')
+    c.setCreator('LaTeX with hyperref')
+    c.setProducer('pdfTeX-1.40.25')
+    chapters = [('Introduction', ['Scope', 'Terms']), ('Method', ['Setup', 'Procedure']), ('Results', ['Data', 'Errors']),
+                ('Discussion', ['Limits', 'Outlook'])]
+    for number, (title, subs) in enumerate(chapters, 1):
+        y = H - 150
+        c.setFont('Helvetica-Bold', 17)
+        c.drawString(72, y, 'Chapter %d' % number)
+        y -= 40
+        c.setFont('Helvetica-Bold', 25)
+        c.drawString(72, y, title)
+        y -= 50
+        for k, sub in enumerate(subs, 1):
+            c.setFont('Helvetica-Bold', 14)
+            c.drawString(72, y, '%d.%d %s' % (number, k, sub))
+            y -= 22
+            c.setFont('Helvetica', 10)
+            words = PARA.split()
+            for j in range(4):
+                c.drawString(72, y, ' '.join(words[j * 8:(j + 1) * 8 + 3]))
+                y -= 13
+            y -= 14
+        c.setFont('Helvetica', 10)
+        c.drawCentredString(W / 2, 50, str(number))
+        c.showPage()
+    c.save()
+
+
+def chrome_template(path, pages=1):
+    """A web page printed by Chrome with its default header and footer: date and title above, address and
+    "n/N" below. One page has nothing that repeats, so only the shape of the template says what it is."""
+    c = canvas.Canvas(path, pagesize=letter)
+    c.setTitle('Chrome print test')
+    c.setCreator('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36')
+    c.setProducer('Skia/PDF m153')
+    for n in range(1, pages + 1):
+        c.setFont('Helvetica', 8)
+        c.drawString(36, H - 30, '10/24/26, 5:10 AM Charger status page')
+        c.drawString(36, 30, 'https://example.org/status')
+        c.drawRightString(W - 36, 30, '%d/%d' % (n, pages))
+        c.setFont('Helvetica-Bold', 18)
+        c.drawString(72, H - 100, 'Charger status')
+        c.setFont('Helvetica', 11)
+        y = H - 130
+        for line in PARA.split('. ')[:2] * 2:
+            c.drawString(72, y, line[:90])
+            y -= 15
+        c.showPage()
+    c.save()
+
+
 if __name__ == '__main__':
     Manual(os.path.join(OUT, 'sample.pdf'), bookmarks=True).build(manual_story())
     Manual(os.path.join(OUT, 'sample_nobookmarks.pdf'), bookmarks=False).build(manual_story())
@@ -749,4 +863,8 @@ if __name__ == '__main__':
     tagged(os.path.join(OUT, 'tagged.pdf'))
     tagged(os.path.join(OUT, 'tagged_bookmarks.pdf'), bookmarks=True)
     tagged_disagree(os.path.join(OUT, 'tagged_disagree.pdf'))
-    print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf, sideways.pdf, links.pdf, ocr.pdf, figures.pdf, actualtext.pdf, tagged.pdf, tagged_bookmarks.pdf, tagged_disagree.pdf to', OUT)
+    styles_weight(os.path.join(OUT, 'styles_weight.pdf'))
+    latex_chapters(os.path.join(OUT, 'latex_chapters.pdf'))
+    chrome_template(os.path.join(OUT, 'chrome_template.pdf'))
+    tagged_styled(os.path.join(OUT, 'tagged_styled.pdf'))
+    print('wrote sample.pdf, sample_nobookmarks.pdf, lowlevel.pdf, fonts.pdf, sideways.pdf, links.pdf, ocr.pdf, figures.pdf, actualtext.pdf, tagged.pdf, tagged_bookmarks.pdf, tagged_disagree.pdf, styles_weight.pdf, latex_chapters.pdf, chrome_template.pdf, tagged_styled.pdf to', OUT)

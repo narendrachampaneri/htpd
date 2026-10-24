@@ -34,6 +34,7 @@
 #include "htpd/sections.hpp"
 #include "htpd/sha256.hpp"
 #include "htpd/structure.hpp"
+#include "htpd/styles.hpp"
 #include "htpd/tags.hpp"
 #include "htpd/text.hpp"
 
@@ -3587,18 +3588,19 @@ TEST(tags_that_disagree_with_the_page_text_leave_it_to_the_ordinary_rules) {
 TEST(tags_auto_mode_reads_the_tags_only_where_they_pay_for_themselves) {
     std::string why;
     // Not tagged: nothing to read, nothing to say.
-    CHECK(!should_read_tags(TagMode::Auto, false, 0, 10, why) && why.empty());
-    // Tagged, no bookmarks, a small document: read.
-    CHECK(should_read_tags(TagMode::Auto, true, 0, 10, why) && why.empty());
-    CHECK(should_read_tags(TagMode::Auto, true, 2, kAutoTagPages, why));
-    // Bookmarks give the headings already; a long document costs PDFium too much time.
-    CHECK(!should_read_tags(TagMode::Auto, true, 3, 10, why));
+    CHECK(!should_read_tags(TagMode::Auto, false, HeadingQuality::Poor, why) && why.empty());
+    // Tagged, and the headings found without the tags are poor (at any page count): read.
+    CHECK(should_read_tags(TagMode::Auto, true, HeadingQuality::Poor, why) && why.empty());
+    // Before the headings are known nothing is read, and nothing is said.
+    CHECK(!should_read_tags(TagMode::Auto, true, HeadingQuality::Unknown, why) && why.empty());
+    // Good headings need no help: the bookmarks give them, or the text does.
+    CHECK(!should_read_tags(TagMode::Auto, true, HeadingQuality::GoodFromBookmarks, why));
     CHECK(why.contains("bookmarks"));
-    CHECK(!should_read_tags(TagMode::Auto, true, 0, kAutoTagPages + 1, why));
-    CHECK(why.contains("more than 200 pages"));
+    CHECK(!should_read_tags(TagMode::Auto, true, HeadingQuality::Good, why));
+    CHECK(why.contains("headings"));
     // On reads always, Off never.
-    CHECK(should_read_tags(TagMode::On, true, 50, 5000, why) && why.empty());
-    CHECK(!should_read_tags(TagMode::Off, true, 0, 1, why));
+    CHECK(should_read_tags(TagMode::On, true, HeadingQuality::Good, why) && why.empty());
+    CHECK(!should_read_tags(TagMode::Off, true, HeadingQuality::Poor, why));
 
     // End to end: the default reads tagged.pdf (no bookmarks) ...
     ConvertOptions options = tagged_options("tagged.pdf", "tags_auto_read");
@@ -3724,6 +3726,416 @@ TEST(tags_figures_from_the_tags_add_a_caption_and_a_figure_the_rules_missed) {
     std::vector<Figure> named = {Figure{0, Box{72, 100, 300, 220}, Figure::Kind::Drawing, "Figure 1. Clock", 0}};
     CHECK_EQ(merge_tag_figures(named, tagged, 0, 612, 792, 0.07), std::size_t{1});   // only the photo is new
     CHECK(named[0].caption == "Figure 1. Clock");
+}
+
+// ---- style sheet, producer habits, the tag gate (S2) -----------------------------
+
+namespace {
+
+StyleSheet sheet_of(const std::vector<Line>& lines, int pages, Producer producer = Producer::Unknown) {
+    std::vector<std::vector<Line>> by_page(static_cast<std::size_t>(pages));
+    for (const Line& l : lines) by_page[static_cast<std::size_t>(l.page)].push_back(l);
+    const std::vector<float> heights(static_cast<std::size_t>(pages), 792.0f);
+    StyleOptions options;
+    options.page_count = static_cast<std::size_t>(pages);
+    return build_style_sheet(by_page, heights, {}, producer, options);
+}
+
+Line coloured(Line line, std::uint32_t color) {
+    line.color = color;
+    return line;
+}
+
+// Five lines of body text under a heading.
+void add_body(std::vector<Line>& lines, int page, float& y, int count = 5) {
+    for (int k = 0; k < count; ++k) {
+        lines.push_back(make_line(page, "Body line " + std::to_string(k + 1) + " of the text under the heading above", y));
+        y += 14;
+    }
+    y += 12;
+}
+
+}  // namespace
+
+TEST(styles_a_heading_that_differs_only_by_colour_is_found) {
+    std::vector<Line> lines;
+    const char* heads[] = {"Overview", "Operation", "Maintenance", "Warranty", "Transport", "Storage", "Disposal", "Contact"};
+    for (int p = 0; p < 4; ++p) {
+        float y = 100;
+        for (int k = 0; k < 2; ++k) {
+            lines.push_back(coloured(make_line(p, heads[p * 2 + k], y), 0x1A33B3));   // same font, size and weight as the text
+            y += 16;
+            add_body(lines, p, y);
+        }
+    }
+    const StyleSheet sheet = sheet_of(lines, 4);
+    REQUIRE(sheet.body >= 0);
+    CHECK_EQ(sheet.heading_level(lines[0]), 1);
+    CHECK_EQ(sheet.heading_level(lines[1]), 0);
+    const auto notes = sheet.describe({});
+    REQUIRE(notes.size() == 2);
+    CHECK(notes[0].starts_with("body: "));
+    CHECK(notes[1].starts_with("heading 1: ") && notes[1].contains("#1A33B3") && notes[1].contains("8 lines"));
+
+    HeadingOptions with;
+    with.styles = &sheet;
+    const HeadingResult found = detect_headings(lines, {}, {}, with);
+    CHECK_EQ(found.headings.size(), std::size_t{8});
+    CHECK(titles(found.headings).front() == "Overview" && titles(found.headings).back() == "Contact");
+    // The ordinary rules alone see nothing: same size, same weight.
+    CHECK_EQ(detect_headings(lines, {}, {}).headings.size(), std::size_t{0});
+}
+
+TEST(styles_a_heading_that_differs_only_by_weight_is_found) {
+    std::vector<Line> lines;
+    const char* heads[] = {"Overview", "Operation", "Maintenance", "Warranty"};
+    for (int p = 0; p < 4; ++p) {
+        float y = 100;
+        lines.push_back(make_line(p, heads[p], y, 10, true));
+        y += 16;
+        add_body(lines, p, y);
+    }
+    const StyleSheet sheet = sheet_of(lines, 4);
+    HeadingOptions with;
+    with.styles = &sheet;
+    CHECK_EQ(detect_headings(lines, {}, {}, with).headings.size(), std::size_t{4});
+    CHECK_EQ(detect_headings(lines, {}, {}).headings.size(), std::size_t{0});
+}
+
+TEST(styles_two_heading_levels_of_one_size_keep_the_order_they_come_in) {
+    // Level 1 and level 2 differ by colour only; a level 1 heading is directly followed by a level 2 one.
+    std::vector<Line> lines;
+    const char* top[] = {"Overview", "Operation", "Maintenance", "Warranty"};
+    const char* sub[] = {"Purpose", "Start up", "Cleaning", "Terms"};
+    for (int p = 0; p < 4; ++p) {
+        float y = 100;
+        lines.push_back(coloured(make_line(p, top[p], y), 0xB31A33));
+        y += 18;
+        lines.push_back(coloured(make_line(p, sub[p], y), 0x1AB333));
+        y += 16;
+        add_body(lines, p, y);
+        lines.push_back(coloured(make_line(p, std::string("More ") + sub[p], y), 0x1AB333));
+        y += 16;
+        add_body(lines, p, y);
+    }
+    const StyleSheet sheet = sheet_of(lines, 4);
+    CHECK_EQ(sheet.heading_level(lines[0]), 1);
+    CHECK_EQ(sheet.heading_level(lines[1]), 2);
+    HeadingOptions with;
+    with.styles = &sheet;
+    const HeadingResult found = detect_headings(lines, {}, {}, with);
+    REQUIRE(found.headings.size() == 12);
+    CHECK_EQ(found.headings[0].level, 1);
+    CHECK_EQ(found.headings[1].level, 2);
+}
+
+TEST(styles_bold_and_regular_headings_of_the_same_size_are_two_levels) {
+    std::vector<Line> lines;
+    for (int p = 0; p < 4; ++p) {
+        float y = 100;
+        lines.push_back(make_line(p, "Chapter heading " + std::to_string(p), y, 12, true));
+        y += 20;
+        lines.push_back(coloured(make_line(p, "Section heading " + std::to_string(p), y, 12), 0x1A33B3));
+        y += 18;
+        add_body(lines, p, y);
+        lines.push_back(coloured(make_line(p, "Next section heading " + std::to_string(p), y, 12), 0x1A33B3));
+        y += 18;
+        add_body(lines, p, y);
+    }
+    const StyleSheet sheet = sheet_of(lines, 4);
+    HeadingOptions with;
+    with.styles = &sheet;
+    const HeadingResult found = detect_headings(lines, {}, {}, with);
+    REQUIRE(found.headings.size() == 12);
+    CHECK_EQ(found.headings[0].level, 1);
+    CHECK_EQ(found.headings[1].level, 2);
+    CHECK_EQ(found.headings[2].level, 2);
+}
+
+TEST(styles_a_caption_style_is_never_a_heading) {
+    CHECK(starts_like_caption("Figure 3"));
+    CHECK(starts_like_caption("Figure 12. Block diagram"));
+    CHECK(starts_like_caption("Fig. 2.1: Timing"));
+    CHECK(starts_like_caption("Table 4-2 Limits"));
+    CHECK(starts_like_caption("Table A-1: Pins"));
+    CHECK(!starts_like_caption("Table of contents"));
+    CHECK(!starts_like_caption("Figures of merit"));
+    CHECK(!starts_like_caption("Tablet 3 is broken"));
+    CHECK(!starts_like_caption("Figure"));
+
+    std::vector<Line> lines;
+    for (int p = 0; p < 4; ++p) {
+        float y = 100;
+        lines.push_back(make_line(p, "Figure " + std::to_string(p + 1) + ": Block diagram of the power path", y, 10, true));
+        y += 16;
+        add_body(lines, p, y);
+        lines.push_back(make_line(p, "Table " + std::to_string(p + 1) + ": Limits of the supply", y, 10, true));
+        y += 16;
+        add_body(lines, p, y);
+    }
+    const StyleSheet sheet = sheet_of(lines, 4);
+    CHECK(sheet.role_of(lines[0]) == Role::Caption);
+    CHECK_EQ(sheet.heading_level(lines[0]), 0);
+    HeadingOptions with;
+    with.styles = &sheet;
+    CHECK_EQ(detect_headings(lines, {}, {}, with).headings.size(), std::size_t{0});
+}
+
+TEST(styles_a_header_that_changes_on_every_page_is_page_furniture) {
+    const char* header[] = {"Power stage", "Vehicle interface", "Safety limits", "Thermal design",
+                            "Cable losses", "Contactor wear", "Service plan", "Warranty terms"};
+    std::vector<std::vector<Line>> pages(8);
+    const std::vector<float> heights(8, 792.0f);
+    std::vector<Line> flat;
+    for (int p = 0; p < 8; ++p) {
+        pages[static_cast<std::size_t>(p)].push_back(make_line(p, header[p], 36, 8));
+        float y = 200;
+        add_body(pages[static_cast<std::size_t>(p)], p, y, 6);
+    }
+    for (const auto& page : pages) flat.insert(flat.end(), page.begin(), page.end());
+    const StyleSheet sheet = sheet_of(flat, 8);
+    CHECK(sheet.role_of(pages[0][0]) == Role::Furniture);
+
+    auto plain = pages;
+    CHECK_EQ(remove_furniture(plain, heights).removed_lines, std::size_t{0});   // nothing repeats
+    FurnitureOptions options;
+    options.styles = &sheet;
+    const FurnitureReport report = remove_furniture(pages, heights, options);
+    CHECK_EQ(report.removed_lines, std::size_t{8});
+    REQUIRE(report.patterns.size() == 1);
+    CHECK_EQ(report.patterns[0].variants, std::size_t{8});
+    CHECK_EQ(pages[3].size(), std::size_t{6});
+
+    // A title in a larger type than the text, on every page (a slide deck) is a title, not a header.
+    std::vector<std::vector<Line>> slides(8);
+    std::vector<Line> slide_lines;
+    for (int p = 0; p < 8; ++p) {
+        slides[static_cast<std::size_t>(p)].push_back(make_line(p, header[p], 50, 24));
+        float y = 200;
+        add_body(slides[static_cast<std::size_t>(p)], p, y, 6);
+        slide_lines.insert(slide_lines.end(), slides[static_cast<std::size_t>(p)].begin(), slides[static_cast<std::size_t>(p)].end());
+    }
+    const StyleSheet slide_sheet = sheet_of(slide_lines, 8);
+    options.styles = &slide_sheet;
+    CHECK_EQ(remove_furniture(slides, heights, options).removed_lines, std::size_t{0});
+}
+
+TEST(styles_the_producer_is_read_from_creator_and_producer) {
+    CHECK(classify_producer("", "") == Producer::Unknown);
+    CHECK(classify_producer("Writer", "LibreOffice 24.2") == Producer::LibreOffice);
+    CHECK(classify_producer("Microsoft\xC2\xAE Word 2016", "Microsoft\xC2\xAE Word 2016") == Producer::Word);
+    CHECK(classify_producer("LaTeX with hyperref", "XeTeX 0.99999") == Producer::LaTeX);
+    CHECK(classify_producer("", "pdfTeX-1.40.25") == Producer::LaTeX);
+    CHECK(classify_producer("Mozilla/5.0 (X11) AppleWebKit/537.36 HeadlessChrome/153.0.0.0 Safari/537.36", "Skia/PDF m153") == Producer::Chrome);
+    CHECK(classify_producer("wkhtmltopdf 0.12.6", "Qt 4.8.7") == Producer::Wkhtmltopdf);
+    CHECK(classify_producer("Adobe InDesign 19.0 (Macintosh)", "Adobe PDF Library 17.0") == Producer::InDesign);
+    CHECK(classify_producer("", "ReportLab PDF Library - www.reportlab.com") == Producer::Other);
+}
+
+TEST(latex_a_chapter_line_and_its_title_are_one_heading) {
+    std::vector<Line> lines;
+    const char* titles_of[] = {"Introduction", "Method", "Results"};
+    for (int c = 0; c < 3; ++c) {
+        float y = 100;
+        lines.push_back(make_line(c, "Chapter " + std::to_string(c + 1), y, 17, true));
+        y += 40;
+        lines.push_back(make_line(c, titles_of[c], y, 25, true));
+        y += 50;
+        lines.push_back(make_line(c, std::to_string(c + 1) + ".1 Scope", y, 14, true));
+        y += 22;
+        add_body(lines, c, y);
+        lines.push_back(make_line(c, std::to_string(c + 1) + ".2 Terms", y, 14, true));
+        y += 22;
+        add_body(lines, c, y);
+    }
+    HeadingOptions latex;
+    latex.producer = Producer::LaTeX;
+    const HeadingResult with = detect_headings(lines, {}, {}, latex);
+    REQUIRE(with.headings.size() == 9);
+    CHECK_EQ(with.headings[0].title, std::string("Chapter 1 Introduction"));
+    CHECK_EQ(with.headings[0].number, std::string("1"));
+    CHECK_EQ(with.headings[0].level, 1);
+    CHECK_EQ(with.headings[1].title, std::string("1.1 Scope"));
+    CHECK_EQ(with.headings[1].level, 2);
+    // The same lines from another producer: the chapter line stays alone.
+    const HeadingResult plain = detect_headings(lines, {}, {});
+    CHECK_EQ(plain.headings[0].title, std::string("Chapter 1"));
+}
+
+TEST(chrome_header_and_footer_of_the_print_template_are_taken_out_of_one_page) {
+    // The address and the count stand on one baseline: one line with a wide gap.
+    const auto page_of = [](int n, int total, bool with_url) {
+        std::vector<Line> page;
+        page.push_back(make_line(0, "10/24/26, 5:10 AM Charger status page", 30, 8));
+        page.push_back(make_line(0, "Charger status", 100, 18, true));
+        page.push_back(make_line(0, "The controller supervises the power stage.", 130));
+        const std::string count = std::to_string(n) + "/" + std::to_string(total);
+        page.push_back(make_line(0, with_url ? "https://example.org/status " + count : count, 770, 8));
+        return page;
+    };
+    const std::vector<float> heights(1, 792.0f);
+    FurnitureOptions chrome;
+    chrome.producer = Producer::Chrome;
+
+    std::vector<std::vector<Line>> one = {page_of(1, 1, false)};
+    const FurnitureReport report = remove_furniture(one, heights, chrome);
+    CHECK_EQ(report.removed_lines, std::size_t{2});
+    REQUIRE(report.patterns.size() == 2);
+    CHECK(report.patterns[0].top && report.patterns[0].sample == "10/24/26, 5:10 AM Charger status page");
+    CHECK(!report.patterns[1].top && report.patterns[1].sample == "1/1");
+    CHECK_EQ(one[0].size(), std::size_t{2});
+    // The address in front of the count is the footer too.
+    std::vector<std::vector<Line>> joined = {page_of(1, 1, true)};
+    CHECK_EQ(remove_furniture(joined, heights, chrome).removed_lines, std::size_t{2});
+
+    // Any other producer: one page stays as it is.
+    std::vector<std::vector<Line>> other = {page_of(1, 1, true)};
+    CHECK_EQ(remove_furniture(other, heights).removed_lines, std::size_t{0});
+    // A count that is not "this page of all pages" is no template: only the header, whose date and time are complete.
+    std::vector<std::vector<Line>> wrong = {page_of(2, 5, true)};
+    CHECK_EQ(remove_furniture(wrong, heights, chrome).removed_lines, std::size_t{1});
+    // Without a date in front of the title and with a wrong count nothing is taken.
+    std::vector<std::vector<Line>> neither = {page_of(2, 5, true)};
+    neither[0].front().text = "Charger status page";
+    CHECK_EQ(remove_furniture(neither, heights, chrome).removed_lines, std::size_t{0});
+}
+
+TEST(tags_the_headings_are_judged_by_the_size_of_the_document) {
+    const auto result = [](std::initializer_list<int> levels, HeadingSource source = HeadingSource::FontSize) {
+        HeadingResult r;
+        r.source = source;
+        for (const int level : levels) {
+            Heading h;
+            h.level = level;
+            r.headings.push_back(h);
+        }
+        return r;
+    };
+    CHECK(assess_headings(result({}), 1) == HeadingQuality::Poor);
+    CHECK(assess_headings(result({1}), 2) == HeadingQuality::Good);
+    CHECK(assess_headings(result({1}), 3) == HeadingQuality::Poor);            // few for the pages
+    CHECK(assess_headings(result({1, 2}), 3) == HeadingQuality::Good);
+    CHECK(assess_headings(result({1, 2, 2}), 300) == HeadingQuality::Poor);   // three headings in 300 pages
+    CHECK(assess_headings(result({1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 1}), 300) == HeadingQuality::Good);
+    CHECK(assess_headings(result({1, 1, 1, 1, 1, 1, 1, 1, 1, 1}), 100) == HeadingQuality::Poor);   // flat in a long text
+    CHECK(assess_headings(result({1, 1, 1, 1, 1, 1, 1, 1, 1, 1}), 10) == HeadingQuality::Good);    // a slide deck
+    CHECK(assess_headings(result({1, 2, 2}, HeadingSource::Bookmark), 10) == HeadingQuality::GoodFromBookmarks);
+}
+
+TEST(tags_the_gate_reads_the_tags_only_when_the_headings_are_poor) {
+    // tagged.pdf: its headings are set in the body font, nothing but the tags finds them -> read.
+    ConvertOptions poor = tagged_options("tagged.pdf", "tags_gate_poor");
+    poor.tags = TagMode::Auto;
+    const auto read = convert(poor);
+    REQUIRE(read.has_value());
+    CHECK(read->tags.any() && !read->tags.unread);
+    CHECK(read->heading_source == HeadingSource::Tags);
+    // tagged_styled.pdf: the headings are bold and larger, found without the tags -> not read, and the notes say why.
+    ConvertOptions good = tagged_options("tagged_styled.pdf", "tags_gate_good");
+    good.tags = TagMode::Auto;
+    const auto skipped = convert(good);
+    REQUIRE(skipped.has_value());
+    CHECK(!skipped->tags.any() && skipped->tags.unread);
+    CHECK(skipped->heading_source != HeadingSource::Tags);
+    CHECK(read_file(good.output_dir / "document.md").contains("the headings found without them are good"));
+    // On reads them anyway.
+    good = tagged_options("tagged_styled.pdf", "tags_gate_good_on");
+    const auto forced = convert(good);
+    REQUIRE(forced.has_value());
+    CHECK(forced->tags.any());
+    CHECK(forced->heading_source == HeadingSource::Tags);
+}
+
+TEST(tags_the_title_element_names_a_document_that_has_no_title) {
+    // tagged_styled.pdf has no /Title; the largest type on its first page is a name, not the title.
+    ConvertOptions off = tagged_options("tagged_styled.pdf", "tags_title_off", false);
+    const auto without = convert(off);
+    REQUIRE(without.has_value());
+    CHECK_EQ(without->title, std::string("ACME POWER"));
+    ConvertOptions on = tagged_options("tagged_styled.pdf", "tags_title_on");
+    const auto with = convert(on);
+    REQUIRE(with.has_value());
+    CHECK_EQ(with->title, std::string("Charger overview sheet"));
+}
+
+TEST(tags_deeper_headings_go_under_shallow_bookmarks_when_the_style_sheet_agrees) {
+    std::vector<Line> lines;
+    float y = 100;
+    const auto heading = [&](const char* text, float size, int tag_level) {
+        Line l = make_line(0, text, y, size, true);
+        l.tag = 1 + static_cast<std::int32_t>(lines.size());
+        l.tag_heading = static_cast<std::uint8_t>(tag_level);
+        lines.push_back(std::move(l));
+        y += size + 8;
+        add_body(lines, 0, y, 3);
+    };
+    heading("2 Supply", 16, 1);
+    heading("Limits", 12, 2);
+    heading("Contactor", 12, 2);
+    heading("3 Faults", 16, 1);
+    heading("Reset", 12, 2);
+    heading("Service", 12, 2);
+    heading("4 Warranty", 16, 1);
+    heading("Terms", 12, 2);
+    heading("Claims", 12, 2);
+    // A tag heading in the body type: the style sheet does not agree.
+    Line odd = make_line(0, "Odd one", y);
+    odd.tag = 99;
+    odd.tag_heading = 2;
+    lines.push_back(odd);
+    y += 14;
+    add_body(lines, 0, y, 3);
+
+    const StyleSheet sheet = sheet_of(lines, 1);
+    const std::vector<OutlineEntry> outline = {{"2 Supply", 1, 0, {}, {}}, {"3 Faults", 1, 0, {}, {}}, {"4 Warranty", 1, 0, {}, {}}};
+    const std::vector<Affine> transforms(1);
+    HeadingOptions options;
+    options.styles = &sheet;
+    const HeadingResult result = detect_headings(lines, outline, transforms, options);
+    CHECK(result.source == HeadingSource::Bookmark);
+    CHECK_EQ(result.tags_added, std::size_t{6});
+    const std::vector<std::string> expected = {"2 Supply", "Limits", "Contactor", "3 Faults", "Reset", "Service",
+                                               "4 Warranty", "Terms", "Claims"};
+    REQUIRE(titles(result.headings) == expected);
+    CHECK_EQ(result.headings[1].level, 2);
+    CHECK(result.headings[1].source == HeadingSource::Tags);
+    // Without the style sheet nothing is taken from the tags below the bookmarks.
+    CHECK_EQ(detect_headings(lines, outline, transforms).tags_added, std::size_t{0});
+}
+
+TEST(styles_end_to_end_headings_by_colour_and_weight_producer_and_notes) {
+    ConvertOptions options;
+    options.input = fs::path(HTPD_TEST_DATA) / "styles_weight.pdf";
+    options.output_dir = fresh_temp_dir("styles_weight");
+    options.ocr = OcrMode::Off;
+    const auto report = convert(options);
+    REQUIRE(report.has_value());
+    CHECK_EQ(report->sections, std::size_t{12});   // 4 bold chapters and 8 blue sections, nothing before the first
+    const std::string notes = read_file(options.output_dir / "document.md");
+    CHECK(notes.contains("* Styles of the text:"));
+    CHECK(notes.contains("heading 1: Helvetica-Bold 10 pt, 4 lines"));
+    CHECK(notes.contains("heading 2: Helvetica 10 pt #1A33B3, 8 lines"));
+    CHECK(notes.contains("Made by: ReportLab test, read as other."));
+
+    ConvertOptions latex;
+    latex.input = fs::path(HTPD_TEST_DATA) / "latex_chapters.pdf";
+    latex.output_dir = fresh_temp_dir("latex_chapters");
+    latex.ocr = OcrMode::Off;
+    REQUIRE(convert(latex).has_value());
+    CHECK(read_file(latex.output_dir / "document.md").contains("read as LaTeX."));
+    CHECK(fs::exists(latex.output_dir / "sections/0001-chapter-1-introduction.md"));
+
+    ConvertOptions chrome;
+    chrome.input = fs::path(HTPD_TEST_DATA) / "chrome_template.pdf";
+    chrome.output_dir = fresh_temp_dir("chrome_template");
+    chrome.ocr = OcrMode::Off;
+    const auto chrome_report = convert(chrome);
+    REQUIRE(chrome_report.has_value());
+    CHECK_EQ(chrome_report->furniture.removed_lines, std::size_t{2});   // the date and title; the address with the count
+    const std::string chrome_notes = read_file(chrome.output_dir / "document.md");
+    CHECK(chrome_notes.contains("read as Chrome/Skia."));
+    CHECK(chrome_notes.contains("10/24/26, 5:10 AM Charger status page"));
+    CHECK(!read_file(chrome.output_dir / "sections/0001-charger-status.md").contains("example.org"));
 }
 
 TEST(errors_are_reported_not_thrown) {

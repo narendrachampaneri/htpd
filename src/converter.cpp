@@ -22,6 +22,7 @@
 #include "htpd/sha256.hpp"
 #include "htpd/tags.hpp"
 #include "htpd/structure.hpp"
+#include "htpd/styles.hpp"
 #include "htpd/text.hpp"
 
 namespace htpd {
@@ -46,6 +47,12 @@ struct Analysis {
     OcrReport ocr;
     std::vector<FigureFile> figures;
     TagReport tags;                       // what the PDF's structure tags gave (tags.hpp)
+    std::string tag_title;                // the text of the tags' Title element, "" when there is none
+    bool wants_tags = false;              // Auto: the PDF is tagged and its headings came out poor - convert again with the tags
+    StyleSheet styles;                    // the styles of the text and their roles (styles.hpp)
+    std::vector<std::string> style_notes; // one line per role, for the conversion notes
+    Producer producer = Producer::Unknown;
+    std::string producer_text;            // the PDF's Producer entry, as it is
 };
 
 // A figure is drawn at most this large (pixels): enough to read its labels.
@@ -190,15 +197,15 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
         packing.pop_front();
     };
 
-    // Bookmarks: the headings of the document, and the reason to read the structure tags or not.
+    // Bookmarks: the headings of the document.
     const std::vector<OutlineEntry> outline = doc.outline();
     a.outline_entries = outline.size();
-    const auto usable_bookmarks = std::ranges::count_if(outline, [&](const OutlineEntry& e) {
-        return e.page >= 0 && e.page < page_count && !e.title.empty();
-    });
-    const bool read_tags = should_read_tags(options.tags, doc.is_tagged(), static_cast<std::size_t>(usable_bookmarks),
-                                            page_count, a.tags.unread_reason);
-    a.tags.unread = options.tags == TagMode::Auto && !read_tags && !a.tags.unread_reason.empty();
+    // In Auto mode a tagged PDF is first read without its tags: they are read (convert() makes the
+    // conversion again) only when the headings come out poor (see the end of this function).
+    const bool tagged = doc.is_tagged();
+    std::string unused_reason;
+    const bool read_tags = should_read_tags(options.tags, tagged, HeadingQuality::Unknown, unused_reason);
+    const bool probing = options.tags == TagMode::Auto && tagged;
 
     // 1. Pages -> lines.
     std::vector<std::vector<Line>> pages(static_cast<std::size_t>(page_count));
@@ -384,11 +391,24 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
 
     a.fonts = doc.fonts();   // measured while the pages were read
 
+    // 1e. The style sheet: the styles of the text and their roles, before headers, footers and headings are looked for.
+    a.producer = classify_producer(a.meta.creator, a.meta.producer);
+    a.producer_text = a.meta.producer;
+    {
+        StyleOptions style_options;
+        style_options.band = options.margin_band;
+        style_options.page_count = static_cast<std::size_t>(page_count);
+        a.styles = build_style_sheet(pages, heights, a.fonts, a.producer, style_options);
+        a.style_notes = a.styles.describe(a.fonts);
+    }
+
     // 2. Running headers and footers.
     const std::size_t marked_artifacts = options.keep_furniture ? 0 : count_artifacts(pages, heights);
     if (!options.keep_furniture) {
         FurnitureOptions furniture;
         furniture.band = options.margin_band;
+        furniture.styles = &a.styles;
+        furniture.producer = a.producer;
         a.furniture = remove_furniture(pages, heights, furniture);
     }
     if (!options.keep_furniture) {
@@ -417,13 +437,45 @@ Result<Analysis> analyse(const std::filesystem::path& input, const AnalysisOptio
     // 4. Headings.
     HeadingOptions heading_options;
     heading_options.mode = options.headings;
+    heading_options.styles = &a.styles;
+    heading_options.producer = a.producer;
     a.headings = detect_headings(a.lines, outline, a.page_transforms, heading_options);
+
+    // 4b. The tags: read only where the headings are poor without them.
+    if (probing) {
+        const HeadingQuality quality = assess_headings(a.headings, page_count);
+        a.wants_tags = should_read_tags(options.tags, tagged, quality, a.tags.unread_reason);
+        a.tags.unread = !a.wants_tags && !a.tags.unread_reason.empty();
+        if (a.wants_tags) return a;   // convert() makes the conversion again with the tags
+    }
+    if (a.tags.any()) {
+        // The title the tags name, when the PDF names none.
+        for (std::size_t i = 0; i < a.lines.size() && a.tag_title.empty(); ++i) {
+            if (!a.lines[i].tag_title) continue;
+            std::string title;
+            for (std::size_t k = i; k < a.lines.size() && a.lines[k].tag == a.lines[i].tag && a.lines[k].page == a.lines[i].page; ++k) {
+                if (!title.empty()) title += ' ';
+                title += text::collapse_spaces(a.lines[k].text);
+            }
+            if (title.size() >= 3 && title.size() <= 200) a.tag_title = title;
+            break;
+        }
+    }
 
     // 5. Parts for documents with few headings, and for long stretches of text.
     if (options.headings != HeadingMode::None) {
         a.structure = add_structure(a.headings.headings, a.lines, a.furniture, page_count);
     }
     return a;
+}
+
+// The conversion; in Auto mode a tagged PDF whose headings come out poor is converted again with its tags.
+Result<Analysis> analyse_with_gate(const std::filesystem::path& input, const AnalysisOptions& options) {
+    auto first = analyse(input, options);
+    if (!first || !first->wants_tags) return first;
+    AnalysisOptions again = options;
+    again.tags = TagMode::On;
+    return analyse(input, again);
 }
 
 }  // namespace
@@ -435,7 +487,7 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     auto digest = sha256_file(options.input);
     if (!digest) return std::unexpected(digest.error());
 
-    auto analysed = analyse(options.input, {options.password, options.figures, options.figure_dpi, options.ocr,
+    auto analysed = analyse_with_gate(options.input, {options.password, options.figures, options.figure_dpi, options.ocr,
                                             options.ocr_options,
                                             options.keep_furniture, options.margin_band, options.headings,
                                             options.on_progress, options.tags});
@@ -462,11 +514,16 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
     info.contents_entries = a.headings.contents_entries;
     info.contents_located = a.headings.source == HeadingSource::Contents ? a.headings.headings.size() : 0;
     info.headings_from_text = a.headings.text_added;
+    info.headings_from_tags_below = a.headings.tags_added;
     info.running_titles = a.structure.running_titles;
     info.page_parts = a.structure.page_parts;
     info.furniture_removed = !options.keep_furniture;
     info.furniture = a.furniture;
     info.tags = a.tags;
+    info.tag_title = a.tag_title;
+    info.producer = a.producer;
+    info.producer_text = a.producer_text;
+    info.style_notes = std::move(a.style_notes);
     for (const Heading& h : a.headings.headings) info.headings_from_tags += h.source == HeadingSource::Tags;
     info.skipped_rotated = a.skipped_rotated;
     info.unmapped = a.unmapped;
@@ -520,7 +577,7 @@ Result<ConvertReport> convert(const ConvertOptions& options) {
 
 Result<InspectReport> inspect(const std::filesystem::path& input, const std::string& password,
                               HeadingMode headings, double margin_band) {
-    auto analysed = analyse(input, {password, false, 120, OcrMode::Off, {}, false, margin_band, headings, {}});
+    auto analysed = analyse_with_gate(input, {password, false, 120, OcrMode::Off, {}, false, margin_band, headings, {}});
     if (!analysed) return std::unexpected(analysed.error());
     Analysis& a = *analysed;
 

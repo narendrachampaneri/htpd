@@ -29,6 +29,7 @@
 #include <string_view>
 #include <vector>
 
+#include "htpd/styles.hpp"
 #include "htpd/types.hpp"
 
 namespace htpd {
@@ -39,6 +40,13 @@ struct FurnitureOptions {
     double band = 0.09;
     // A text counts as repeating when it is found on at least this many pages.
     std::size_t min_pages = 3;
+    // The style sheet and the producer of the document (styles.hpp), or null / unknown.
+    // A small style that sits in the band on nearly every page is page furniture even
+    // when its text changes from page to page. Chrome prints a date and the title above
+    // and an address and "n/N" below every page: those are taken out also in a short
+    // document, where nothing repeats three times.
+    const StyleSheet* styles = nullptr;
+    Producer producer = Producer::Unknown;
 };
 
 // What was removed from one position (slot) of the page.

@@ -1,0 +1,123 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /StructTreeRoot 9 0 R /MarkInfo << /Marked true >> /Lang (en-US) >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [6 0 R 8 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<< /Length 1546 >>
+stream
+BT /F2 24 Tf 72 770 Td (ACME POWER) Tj ET
+/Title <</MCID 0>> BDC BT /F2 20 Tf 72 745 Td (Charger overview sheet) Tj ET EMC
+/H1 <</MCID 1>> BDC BT /F2 16 Tf 72 715 Td (Introduction) Tj ET EMC
+/P <</MCID 2>> BDC BT /F1 11 Tf 72 687 Td (The charger supervises the power stage and the vehicle interface and reports the values) Tj ET EMC
+/P <</MCID 3>> BDC BT /F1 11 Tf 72 673 Td (over the internal bus every ten milliseconds, as long as a vehicle is connected and) Tj ET EMC
+/P <</MCID 4>> BDC BT /F1 11 Tf 72 659 Td (the safety controller has released the output contactor of the power stage.) Tj ET EMC
+/H2 <</MCID 5>> BDC BT /F2 13 Tf 72 625 Td (Scope) Tj ET EMC
+/P <</MCID 6>> BDC BT /F1 11 Tf 72 600 Td (The charger supervises the power stage and the vehicle interface and reports the values) Tj ET EMC
+/P <</MCID 7>> BDC BT /F1 11 Tf 72 586 Td (over the internal bus every ten milliseconds, as long as a vehicle is connected and) Tj ET EMC
+/P <</MCID 8>> BDC BT /F1 11 Tf 72 572 Td (the safety controller has released the output contactor of the power stage.) Tj ET EMC
+/H2 <</MCID 9>> BDC BT /F2 13 Tf 72 538 Td (Limits) Tj ET EMC
+/P <</MCID 10>> BDC BT /F1 11 Tf 72 513 Td (The charger supervises the power stage and the vehicle interface and reports the values) Tj ET EMC
+/P <</MCID 11>> BDC BT /F1 11 Tf 72 499 Td (over the internal bus every ten milliseconds, as long as a vehicle is connected and) Tj ET EMC
+/P <</MCID 12>> BDC BT /F1 11 Tf 72 485 Td (the safety controller has released the output contactor of the power stage.) Tj ET EMC
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 5 0 R /StructParents 0 /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>
+endobj
+7 0 obj
+<< /Length 944 >>
+stream
+/H1 <</MCID 0>> BDC BT /F2 16 Tf 72 745 Td (Details) Tj ET EMC
+/P <</MCID 1>> BDC BT /F1 11 Tf 72 717 Td (The charger supervises the power stage and the vehicle interface and reports the values) Tj ET EMC
+/P <</MCID 2>> BDC BT /F1 11 Tf 72 703 Td (over the internal bus every ten milliseconds, as long as a vehicle is connected and) Tj ET EMC
+/P <</MCID 3>> BDC BT /F1 11 Tf 72 689 Td (the safety controller has released the output contactor of the power stage.) Tj ET EMC
+/H2 <</MCID 4>> BDC BT /F2 13 Tf 72 655 Td (Wiring) Tj ET EMC
+/P <</MCID 5>> BDC BT /F1 11 Tf 72 630 Td (The charger supervises the power stage and the vehicle interface and reports the values) Tj ET EMC
+/P <</MCID 6>> BDC BT /F1 11 Tf 72 616 Td (over the internal bus every ten milliseconds, as long as a vehicle is connected and) Tj ET EMC
+/P <</MCID 7>> BDC BT /F1 11 Tf 72 602 Td (the safety controller has released the output contactor of the power stage.) Tj ET EMC
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 7 0 R /StructParents 1 /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>
+endobj
+9 0 obj
+<< /Type /StructTreeRoot /K [11 0 R] /ParentTree 10 0 R >>
+endobj
+10 0 obj
+<< /Nums [0 [12 0 R 13 0 R 14 0 R 14 0 R 14 0 R 15 0 R 16 0 R 16 0 R 16 0 R 17 0 R 18 0 R 18 0 R 18 0 R] 1 [19 0 R 20 0 R 20 0 R 20 0 R 21 0 R 22 0 R 22 0 R 22 0 R] ] >>
+endobj
+11 0 obj
+<< /Type /StructElem /S /Document /P 9 0 R /K [12 0 R 13 0 R 14 0 R 15 0 R 16 0 R 17 0 R 18 0 R 19 0 R 20 0 R 21 0 R 22 0 R] >>
+endobj
+12 0 obj
+<< /Type /StructElem /S /Title /P 11 0 R /Pg 6 0 R /K [<< /Type /MCR /Pg 6 0 R /MCID 0 >>] >>
+endobj
+13 0 obj
+<< /Type /StructElem /S /H1 /P 11 0 R /Pg 6 0 R /K [<< /Type /MCR /Pg 6 0 R /MCID 1 >>] >>
+endobj
+14 0 obj
+<< /Type /StructElem /S /P /P 11 0 R /Pg 6 0 R /K [<< /Type /MCR /Pg 6 0 R /MCID 2 >> << /Type /MCR /Pg 6 0 R /MCID 3 >> << /Type /MCR /Pg 6 0 R /MCID 4 >>] >>
+endobj
+15 0 obj
+<< /Type /StructElem /S /H2 /P 11 0 R /Pg 6 0 R /K [<< /Type /MCR /Pg 6 0 R /MCID 5 >>] >>
+endobj
+16 0 obj
+<< /Type /StructElem /S /P /P 11 0 R /Pg 6 0 R /K [<< /Type /MCR /Pg 6 0 R /MCID 6 >> << /Type /MCR /Pg 6 0 R /MCID 7 >> << /Type /MCR /Pg 6 0 R /MCID 8 >>] >>
+endobj
+17 0 obj
+<< /Type /StructElem /S /H2 /P 11 0 R /Pg 6 0 R /K [<< /Type /MCR /Pg 6 0 R /MCID 9 >>] >>
+endobj
+18 0 obj
+<< /Type /StructElem /S /P /P 11 0 R /Pg 6 0 R /K [<< /Type /MCR /Pg 6 0 R /MCID 10 >> << /Type /MCR /Pg 6 0 R /MCID 11 >> << /Type /MCR /Pg 6 0 R /MCID 12 >>] >>
+endobj
+19 0 obj
+<< /Type /StructElem /S /H1 /P 11 0 R /Pg 8 0 R /K [<< /Type /MCR /Pg 8 0 R /MCID 0 >>] >>
+endobj
+20 0 obj
+<< /Type /StructElem /S /P /P 11 0 R /Pg 8 0 R /K [<< /Type /MCR /Pg 8 0 R /MCID 1 >> << /Type /MCR /Pg 8 0 R /MCID 2 >> << /Type /MCR /Pg 8 0 R /MCID 3 >>] >>
+endobj
+21 0 obj
+<< /Type /StructElem /S /H2 /P 11 0 R /Pg 8 0 R /K [<< /Type /MCR /Pg 8 0 R /MCID 4 >>] >>
+endobj
+22 0 obj
+<< /Type /StructElem /S /P /P 11 0 R /Pg 8 0 R /K [<< /Type /MCR /Pg 8 0 R /MCID 5 >> << /Type /MCR /Pg 8 0 R /MCID 6 >> << /Type /MCR /Pg 8 0 R /MCID 7 >>] >>
+endobj
+xref
+0 23
+0000000000 65535 f 
+0000000009 00000 n 
+0000000123 00000 n 
+0000000186 00000 n 
+0000000256 00000 n 
+0000000331 00000 n 
+0000001929 00000 n 
+0000002082 00000 n 
+0000003077 00000 n 
+0000003230 00000 n 
+0000003304 00000 n 
+0000003490 00000 n 
+0000003634 00000 n 
+0000003744 00000 n 
+0000003851 00000 n 
+0000004027 00000 n 
+0000004134 00000 n 
+0000004310 00000 n 
+0000004417 00000 n 
+0000004596 00000 n 
+0000004703 00000 n 
+0000004879 00000 n 
+0000004986 00000 n 
+trailer
+<< /Size 23 /Root 1 0 R >>
+startxref
+5162
+%%EOF

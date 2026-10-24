@@ -119,6 +119,157 @@ void set_affixes(BandLine& line) {
     line.tail = std::string(before_last == std::string_view::npos ? key : key.substr(before_last + 1));
 }
 
+
+// ---- Chrome's print template -------------------------------------------------
+
+bool digits_at(std::string_view s, std::size_t& i, std::size_t min_n, std::size_t max_n) {
+    std::size_t n = 0;
+    while (i < s.size() && s[i] >= '0' && s[i] <= '9' && n < max_n) {
+        ++i;
+        ++n;
+    }
+    return n >= min_n;
+}
+
+bool char_at(std::string_view s, std::size_t& i, char c) {
+    if (i < s.size() && s[i] == c) {
+        ++i;
+        return true;
+    }
+    return false;
+}
+
+// "10/24/26, 5:10 AM Title", "24.10.2026, 05:10 Title", "2026-10-24, 05:10 Title": the date and time
+// Chrome puts above every page. Returns the length of the date and time, 0 when the line does not start so.
+std::size_t chrome_date_time(std::string_view s) {
+    std::size_t i = 0;
+    if (!digits_at(s, i, 1, 4)) return 0;
+    if (i >= s.size() || (s[i] != '/' && s[i] != '.' && s[i] != '-')) return 0;
+    const char sep = s[i++];
+    if (!digits_at(s, i, 1, 4) || !char_at(s, i, sep) || !digits_at(s, i, 1, 4)) return 0;
+    if (!char_at(s, i, ',')) return 0;
+    char_at(s, i, ' ');
+    if (!digits_at(s, i, 1, 2) || !char_at(s, i, ':') || !digits_at(s, i, 2, 2)) return 0;
+    if (char_at(s, i, ':')) digits_at(s, i, 2, 2);
+    const std::size_t before_ampm = i;
+    char_at(s, i, ' ');
+    if (i + 1 < s.size() && (s[i] == 'A' || s[i] == 'P') && s[i + 1] == 'M') {
+        i += 2;
+    } else {
+        i = before_ampm;
+    }
+    return i;
+}
+
+// "1/2" or "https://example.org/page 1/2": the address and page count Chrome puts below every page.
+// Gives the page number n and the count N, 0 when the line is not such a footer.
+bool chrome_counter(std::string_view s, long& n, long& total) {
+    const std::size_t slash = s.rfind('/');
+    if (slash == std::string_view::npos || slash + 1 >= s.size()) return false;
+    std::size_t k = slash + 1;
+    long b = 0;
+    for (; k < s.size(); ++k) {
+        if (s[k] < '0' || s[k] > '9' || b > 99999) return false;
+        b = b * 10 + (s[k] - '0');
+    }
+    std::size_t start = slash;
+    while (start > 0 && s[start - 1] >= '0' && s[start - 1] <= '9') --start;
+    if (start == slash || slash - start > 5) return false;
+    long a = 0;
+    for (std::size_t m = start; m < slash; ++m) a = a * 10 + (s[m] - '0');
+    const std::string_view before = s.substr(0, start);
+    // Nothing before the count, or an address and a blank.
+    if (!before.empty()) {
+        if (before.back() != ' ') return false;
+        const std::string_view address = before.substr(0, before.find(' '));
+        if (!(address.starts_with("http://") || address.starts_with("https://") || address.starts_with("file://"))) {
+            return false;
+        }
+    }
+    n = a;
+    total = b;
+    return true;
+}
+
+// The topmost line of a page's top band and the lowest of its bottom band (index in the page, -1 when none).
+struct EdgeLines {
+    int top = -1, bottom = -1;
+};
+
+EdgeLines edge_lines(const std::vector<Line>& page, float height, double band) {
+    EdgeLines edge;
+    float top_y = 1e9f, bottom_y = -1e9f;
+    for (std::size_t i = 0; i < page.size(); ++i) {
+        const Line& l = page[i];
+        if (l.figure > 0 || l.text.empty()) continue;
+        const double centre = (l.y0 + l.y1) / 2.0;
+        if (centre < band * height && l.baseline < top_y) {
+            top_y = l.baseline;
+            edge.top = static_cast<int>(i);
+        }
+        if (centre > (1.0 - band) * height && l.baseline > bottom_y) {
+            bottom_y = l.baseline;
+            edge.bottom = static_cast<int>(i);
+        }
+    }
+    return edge;
+}
+
+// Chrome's header and footer: taken out when they stand on every page exactly as Chrome writes
+// them (the same date and time above; below, the page n of N for every page). Adds a pattern to the
+// report for the header and one for the footer, and removes the lines from the pages.
+void remove_chrome_template(std::vector<std::vector<Line>>& pages, std::span<const float> heights, double band,
+                            FurnitureReport& report) {
+    std::vector<EdgeLines> edges(pages.size());
+    bool header = true, footer = true;
+    std::string date;
+    for (std::size_t p = 0; p < pages.size(); ++p) {
+        const float height = p < heights.size() ? heights[p] : 0.0f;
+        if (height <= 0) return;
+        edges[p] = edge_lines(pages[p], height, band);
+        if (edges[p].top < 0) {
+            header = false;
+        } else {
+            const std::string_view text = pages[p][static_cast<std::size_t>(edges[p].top)].text;
+            const std::size_t n = chrome_date_time(text);
+            if (n == 0 || (!date.empty() && text.substr(0, n) != date)) header = false;
+            else if (date.empty()) date = std::string(text.substr(0, n));
+        }
+        long n = 0, total = 0;
+        if (edges[p].bottom < 0 || !chrome_counter(pages[p][static_cast<std::size_t>(edges[p].bottom)].text, n, total) ||
+            n != static_cast<long>(p) + 1 || total != static_cast<long>(pages.size())) {
+            footer = false;
+        }
+    }
+    for (const bool top : {true, false}) {
+        if (top ? !header : !footer) continue;
+        FurniturePattern pattern;
+        pattern.top = top;
+        pattern.pages = pages.size();
+        pattern.page_text.resize(pages.size());
+        std::vector<std::string> keys;
+        for (std::size_t p = 0; p < pages.size(); ++p) {
+            const int at = top ? edges[p].top : edges[p].bottom;
+            const std::string& text = pages[p][static_cast<std::size_t>(at)].text;
+            if (pattern.sample.empty()) pattern.sample = text;
+            pattern.page_text[p] = text;
+            keys.push_back(furniture_key(text));
+        }
+        std::ranges::sort(keys);
+        pattern.variants = static_cast<std::size_t>(std::unique(keys.begin(), keys.end()) - keys.begin());
+        report.removed_lines += pages.size();
+        report.patterns.push_back(std::move(pattern));
+        // Remove: the indices are those of the page as it was, so the footer goes first when both are removed.
+    }
+    for (std::size_t p = 0; p < pages.size(); ++p) {
+        std::vector<int> gone;
+        if (header) gone.push_back(edges[p].top);
+        if (footer) gone.push_back(edges[p].bottom);
+        std::ranges::sort(gone, std::greater{});
+        for (const int at : gone) pages[p].erase(pages[p].begin() + at);
+    }
+}
+
 }  // namespace
 
 std::string furniture_key(std::string_view text) {
@@ -137,9 +288,9 @@ std::string furniture_key(std::string_view text) {
     return key;
 }
 
-FurnitureReport remove_furniture(std::vector<std::vector<Line>>& pages,
-                                 std::span<const float> page_heights,
-                                 const FurnitureOptions& options) {
+static FurnitureReport remove_furniture_general(std::vector<std::vector<Line>>& pages,
+                                                std::span<const float> page_heights,
+                                                const FurnitureOptions& options) {
     FurnitureReport report;
     // A short document (two or three pages): a line must repeat on every page.
     if (pages.size() < 2) return report;
@@ -291,7 +442,23 @@ FurnitureReport remove_furniture(std::vector<std::vector<Line>>& pages,
             (static_cast<double>(repeated_pages) >= kMinRepeated * page_count || same_head || same_tail ||
              same_number);
 
-        if (!is_furniture) {
+        // The style sheet makes a slot certain that repeats no text: a small style that stands in
+        // this slot on nearly every page with text and nowhere else (a header that names the
+        // chapter, a footer with the title of the page). Larger than the body it is a slide
+        // title, not a header: the style sheet gives that role to small styles only.
+        bool by_style = false;
+        if (!is_furniture && options.styles != nullptr && slot_pages.size() >= 4 &&
+            static_cast<double>(slot_pages.size()) >= 0.7 * static_cast<double>(text_pages) &&
+            static_cast<double>(attached_pages) >= kMinAttached * page_count &&
+            slot.size() * 10 <= slot_pages.size() * 12) {
+            std::size_t styled = 0;
+            for (const BandLine& line : slot) {
+                styled += options.styles->role_of(pages[line.page][line.index]) == Role::Furniture;
+            }
+            by_style = styled * 10 >= slot.size() * 9;
+        }
+
+        if (!is_furniture && !by_style) {
             for (const std::size_t page : slot_pages) zone_blocked[page] = true;
             continue;
         }
@@ -311,7 +478,8 @@ FurnitureReport remove_furniture(std::vector<std::vector<Line>>& pages,
             // chapter page in a book).
             const bool with_number = numbered(line.key);
             line.remove = repeats || (same_number && with_number) ||
-                          (same_affix && (pages[line.page].size() > 1 || with_number));
+                          (same_affix && (pages[line.page].size() > 1 || with_number)) ||
+                          (by_style && options.styles->role_of(pages[line.page][line.index]) == Role::Furniture);
             line.pattern = pattern_index;
             line.everywhere = static_cast<double>(keys.pages(line.key)) >= kEverywhere * static_cast<double>(text_pages);
             if (!line.remove) zone_blocked[line.page] = true;
@@ -407,6 +575,27 @@ FurnitureReport remove_furniture(std::vector<std::vector<Line>>& pages,
         if (a.pages != b.pages) return a.pages > b.pages;
         return a.sample < b.sample;
     });
+    return report;
+}
+
+FurnitureReport remove_furniture(std::vector<std::vector<Line>>& pages,
+                                 std::span<const float> page_heights,
+                                 const FurnitureOptions& options) {
+    FurnitureReport chrome;
+    if (options.producer == Producer::Chrome && !pages.empty()) {
+        remove_chrome_template(pages, page_heights, options.band, chrome);
+    }
+    FurnitureReport report = remove_furniture_general(pages, page_heights, options);
+    if (chrome.removed_lines > 0) {
+        report.removed_lines += chrome.removed_lines;
+        report.patterns.insert(report.patterns.end(), std::make_move_iterator(chrome.patterns.begin()),
+                               std::make_move_iterator(chrome.patterns.end()));
+        std::ranges::sort(report.patterns, [](const FurniturePattern& a, const FurniturePattern& b) {
+            if (a.top != b.top) return a.top;
+            if (a.pages != b.pages) return a.pages > b.pages;
+            return a.sample < b.sample;
+        });
+    }
     return report;
 }
 

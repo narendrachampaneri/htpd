@@ -22,6 +22,7 @@
 #include "htpd/figures.hpp"
 #include "htpd/furniture.hpp"
 #include "htpd/ocr.hpp"
+#include "htpd/styles.hpp"
 #include "htpd/tags.hpp"
 #include "htpd/types.hpp"
 
@@ -29,6 +30,7 @@ namespace htpd {
 
 struct BundleInfo {
     DocumentMeta meta;
+    std::string tag_title;              // the text of the Title element of the PDF's tags ("" when there is none)
     std::string printed_title;          // the title printed on the first page ("" when none is clear)
     std::string source_file;            // file name only, e.g. "manual.pdf"
     std::string source_sha256;
@@ -42,6 +44,7 @@ struct BundleInfo {
     std::size_t contents_entries = 0;   // a printed table of contents: its entries
     std::size_t contents_located = 0;   // ... found as headings in the text
     std::size_t headings_from_text = 0; // found in the text below the bookmark level
+    std::size_t headings_from_tags_below = 0;   // taken from the tags below the bookmark level
     std::size_t running_titles = 0;     // sections started where the running header changes
     std::size_t page_parts = 0;         // parts of long text, cut by pages
 
@@ -55,6 +58,9 @@ struct BundleInfo {
     std::size_t links = 0;               // links from one section to another
     OcrReport ocr;
     std::vector<FigureFile> figures;     // by id: figures[id - 1]
+    Producer producer = Producer::Unknown;   // the program that made the PDF, as styles.hpp classifies it
+    std::string producer_text;           // ... its Producer entry
+    std::vector<std::string> style_notes;    // one line per style role ("heading 2: Arial Bold 12 pt, 84 lines")
 };
 
 struct WriteOptions {

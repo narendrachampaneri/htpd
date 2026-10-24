@@ -416,6 +416,11 @@ std::string conversion_notes(const BundleInfo& info) {
                                   "by their section numbers (`heading_from: numbering`).\n",
                                   info.headings_from_text);
             }
+            if (info.headings_from_tags_below > 0) {
+                md += std::format("* {} more headings below the bookmark level come from the structure tags of the PDF, "
+                                  "where the style of their text agrees (`heading_from: tags`).\n",
+                                  info.headings_from_tags_below);
+            }
             break;
         case HeadingSource::Numbering:
             md += "* Headings were detected in the text from section numbers and font style.\n";
@@ -439,6 +444,16 @@ std::string conversion_notes(const BundleInfo& info) {
         case HeadingSource::RunningTitle:
         case HeadingSource::Pages:
             break;   // never the source of the whole document
+    }
+    if (info.producer != Producer::Unknown) {
+        std::string made_by = info.producer_text.substr(0, 60);
+        std::erase_if(made_by, [](char c) { return c == '`' || c == '\n' || c == '*'; });
+        md += std::format("* Made by: {}, read as {}.\n", made_by.empty() ? "(no producer named)" : made_by,
+                          to_string(info.producer));
+    }
+    if (!info.style_notes.empty()) {
+        md += "* Styles of the text:\n";
+        for (const std::string& line : info.style_notes) md += std::format("  * {}\n", line);
     }
     if (info.running_titles > 0) {
         md += std::format("* {} sections start where the running header of the pages changes; the header "
@@ -631,6 +646,7 @@ std::string document_title(const BundleInfo& info) {
     const bool says_nothing = lowered.empty() || lowered == "untitled" || lowered == "(anonymous)" ||
                               lowered == "anonymous";
     if (!says_nothing) return info.meta.title;
+    if (!info.tag_title.empty()) return info.tag_title;
     if (!info.printed_title.empty()) return info.printed_title;
     return fs::path(info.source_file).stem().string();
 }

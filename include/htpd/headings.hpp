@@ -23,6 +23,7 @@
 #include <string_view>
 #include <vector>
 
+#include "htpd/styles.hpp"
 #include "htpd/types.hpp"
 
 namespace htpd {
@@ -38,6 +39,11 @@ struct HeadingOptions {
     HeadingMode mode = HeadingMode::Auto;
     // Auto mode uses bookmarks when the PDF has at least this many usable ones.
     std::size_t min_bookmarks = 3;
+    // The style sheet of the document (styles.hpp), or null: it makes a heading
+    // certain where the ordinary rules are not (a heading set in the colour or
+    // the font of the body text).
+    const StyleSheet* styles = nullptr;
+    Producer producer = Producer::Unknown;
 };
 
 struct HeadingResult {
@@ -47,6 +53,7 @@ struct HeadingResult {
     std::size_t bookmarks_total = 0;      // when bookmarks were used
     std::size_t bookmarks_located = 0;    // ... of which were found in the text
     std::size_t text_added = 0;           // headings added below the bookmark level
+    std::size_t tags_added = 0;           // ... of which come from the structure tags (deeper than the bookmarks)
     std::size_t contents_entries = 0;     // entries of a printed table of contents (source Contents)
 };
 
@@ -56,6 +63,17 @@ HeadingResult detect_headings(std::span<const Line> lines,
                               std::span<const OutlineEntry> outline,
                               std::span<const Affine> page_transforms,
                               const HeadingOptions& options = {});
+
+// How good the headings are for the size of the document. Decides whether the structure
+// tags of a tagged PDF are worth their time (tags.hpp): good headings need no help.
+enum class HeadingQuality {
+    Unknown,            // not looked at yet
+    Good,
+    GoodFromBookmarks,  // good, and the bookmarks of the PDF give them
+    Poor,               // none, or few for the page count, or all on one level in a long text
+};
+
+HeadingQuality assess_headings(const HeadingResult& result, int page_count);
 
 // The title printed on the first page with text: its line or lines (at most
 // three, one below the other) in the largest font, at least 1.3 times the

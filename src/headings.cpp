@@ -1,6 +1,7 @@
 #include "htpd/headings.hpp"
 
 #include <algorithm>
+#include <ranges>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -207,6 +208,8 @@ struct Candidate {
     std::optional<SectionNumber> number;
     bool styled = false;      // set in a larger, bolder or different font than the body text
     bool font_only = false;   // ... and the font is the only difference
+    bool bare_keyword = false;   // "Chapter 3" with nothing after the number
+    int style_level = 0;      // the style sheet's level: set when only the style sheet makes this line a heading
 };
 
 int size_bucket(float size) {
@@ -340,7 +343,8 @@ bool plain_heading_shape(const Line& line, const TextColumn& column) {
     return line.x1 < column.left + 0.85f * (column.right - column.left);
 }
 
-HeadingResult detect_from_text(std::span<const Line> lines) {
+HeadingResult detect_from_text(std::span<const Line> lines, const StyleSheet* styles = nullptr,
+                               Producer producer = Producer::Unknown) {
     HeadingResult result;
     result.body_size = body_font_size(lines);
     const float body = result.body_size;
@@ -388,7 +392,10 @@ HeadingResult detect_from_text(std::span<const Line> lines) {
             // the column "Tag #") - unless it is set larger than the text.
             const bool title_ok = !line.table && (larger || !cell_beside(i)) &&
                                   (rest.empty() ? number->keyword : plausible_numbered_title(rest, line, emphasised));
-            if (title_ok) numbered.push_back({i, std::move(number), styled, styled && !emphasised});
+            if (title_ok) {
+                const bool bare = rest.empty();
+                numbered.push_back({i, std::move(number), styled, styled && !emphasised, bare});
+            }
             continue;
         }
         // On a scanned page the size comes from the height of the letters
@@ -404,6 +411,13 @@ HeadingResult detect_from_text(std::span<const Line> lines) {
                                                           (line.text[0] >= '0' && line.text[0] <= '9'));
         if (large && !line.table && (line.ocr == Line::Ocr::None || capital_start) && plausible_unnumbered_title(line)) {
             unnumbered.push_back({i, std::nullopt, true, false});
+        } else if (styles != nullptr && !large && !line.table && line.ocr == Line::Ocr::None &&
+                   plausible_unnumbered_title(line) && !starts_like_caption(line.text)) {
+            // Not large, but set in a style that is a heading style of this document: rare, short,
+            // standing alone before body text (a colour, a weight or a font of its own).
+            if (const int level = styles->heading_level(line); level > 0) {
+                unnumbered.push_back({i, std::nullopt, true, false, false, level});
+            }
         }
     }
     drop_contents_blocks(numbered, lines);
@@ -460,6 +474,7 @@ HeadingResult detect_from_text(std::span<const Line> lines) {
         for (const auto& [key, level] : level_of_size) deepest = std::max(deepest, level);
         std::map<int, std::size_t> smaller;
         for (const Candidate& c : unnumbered) {
+            if (c.style_level > 0) continue;
             const int key = size_key(lines[c.line]);
             if (key < smallest) ++smaller[key];
         }
@@ -467,19 +482,53 @@ HeadingResult detect_from_text(std::span<const Line> lines) {
             if (count >= 3) level_of_size[key] = std::min(deepest + 1, static_cast<int>(kMaxDepth));
         }
         for (const Candidate& c : unnumbered) {
-            if (level_of_size.contains(size_key(lines[c.line]))) accepted_unnumbered.push_back(c);
+            if (c.style_level > 0 || level_of_size.contains(size_key(lines[c.line]))) accepted_unnumbered.push_back(c);
         }
     } else {
         // No numbering to learn from: the larger the font, the higher the level.
         accepted_unnumbered = unnumbered;
         std::vector<int> sizes;
-        for (const Candidate& c : unnumbered) sizes.push_back(size_key(lines[c.line]));
+        for (const Candidate& c : unnumbered) {
+            if (c.style_level == 0) sizes.push_back(size_key(lines[c.line]));
+        }
         std::ranges::sort(sizes, std::greater{});
         sizes.erase(std::unique(sizes.begin(), sizes.end()), sizes.end());
         for (std::size_t rank = 0; rank < sizes.size(); ++rank) {
             level_of_size[sizes[rank]] = static_cast<int>(std::min<std::size_t>(rank + 1, kMaxDepth));
         }
     }
+
+    // Lines that only the style sheet makes headings: one level below the nearest larger heading
+    // style; two such styles of the same size keep the order the style sheet gives them.
+    std::map<int, std::vector<int>> style_levels_at;   // size key -> style sheet levels seen there
+    for (const Candidate& c : accepted_unnumbered) {
+        if (c.style_level == 0) continue;
+        auto& seen = style_levels_at[size_key(lines[c.line])];
+        if (std::ranges::find(seen, c.style_level) == seen.end()) seen.push_back(c.style_level);
+    }
+    std::map<int, int> style_base;       // size key -> level of its first style
+    {
+        std::map<int, int> top;          // size key -> deepest level it takes
+        for (auto it = style_levels_at.rbegin(); it != style_levels_at.rend(); ++it) {
+            const int key = it->first;
+            int base = 1;
+            for (const auto& [k, level] : level_of_size) {
+                if (k > key) base = std::max(base, level + 1);
+            }
+            for (const auto& [k, deepest] : top) {
+                if (k > key) base = std::max(base, deepest + 1);
+            }
+            std::ranges::sort(it->second);
+            style_base[key] = base;
+            top[key] = base + static_cast<int>(it->second.size()) - 1;
+        }
+    }
+    const auto level_of_style_line = [&](const Candidate& c) {
+        const int key = size_key(lines[c.line]);
+        const std::vector<int>& seen = style_levels_at[key];
+        const auto rank = std::ranges::find(seen, c.style_level) - seen.begin();
+        return std::min(style_base[key] + static_cast<int>(rank), static_cast<int>(kMaxDepth));
+    };
 
     result.source = !accepted.empty()              ? HeadingSource::Numbering
                     : !accepted_unnumbered.empty() ? HeadingSource::FontSize
@@ -514,7 +563,21 @@ HeadingResult detect_from_text(std::span<const Line> lines) {
         // told apart from body text.
         std::size_t count = 1;
         std::size_t bytes = lines[c.line].text.size();
-        while (c.styled && c.line + count < lines.size() && continues_title(c.line + count)) {
+        bool joined = false;
+        // LaTeX sets a chapter as two lines: "Chapter 3" above its title, in a larger size.
+        if (producer == Producer::LaTeX && c.bare_keyword && c.line + 1 < lines.size()) {
+            const Line& chapter = lines[c.line];
+            const Line& title = lines[c.line + 1];
+            std::string_view unused;
+            if (title.page == chapter.page && title.figure == 0 && !title.table && title.size >= chapter.size &&
+                title.baseline > chapter.baseline && title.baseline - chapter.baseline < 4.0f * chapter.size &&
+                title.gaps.size() < 2 && !parse_section_number(title.text, unused) && plausible_unnumbered_title(title)) {
+                bytes += title.text.size() + 1;
+                count = 2;
+                joined = true;
+            }
+        }
+        while (!joined && c.styled && c.line + count < lines.size() && continues_title(c.line + count)) {
             bytes += lines[c.line + count].text.size() + 1;
             ++count;
         }
@@ -539,7 +602,7 @@ HeadingResult detect_from_text(std::span<const Line> lines) {
             h.level = c.number->keyword ? 1 : static_cast<int>(c.number->parts.size());
             h.source = HeadingSource::Numbering;
         } else {
-            h.level = level_of_size.at(size_key(first));
+            h.level = c.style_level > 0 ? level_of_style_line(c) : level_of_size.at(size_key(first));
             h.source = HeadingSource::FontSize;
         }
         result.headings.push_back(std::move(h));
@@ -814,6 +877,48 @@ void refine_with_text_headings(HeadingResult& result, const HeadingResult& from_
     result.headings.insert(result.headings.end(), std::make_move_iterator(added.begin()),
                            std::make_move_iterator(added.end()));
     // Stable: where a bookmark and a text heading start at the same line, the bookmark comes first.
+    std::ranges::stable_sort(result.headings, {}, &Heading::line_index);
+}
+
+// Adds the headings of the PDF's structure tags that lie deeper than the bookmarks (bookmarks often
+// stop at the second level). A tag heading is taken only when
+//   - it lies below a bookmark heading that is a tag heading itself, with a smaller tag level, and
+//   - the style sheet agrees: its line is set in a heading style, and in a deeper one than the
+//     line of that bookmark.
+// Its level is the level of the bookmark plus the difference of the tag levels.
+void refine_with_tag_headings(HeadingResult& result, const HeadingResult& from_tags, std::span<const Line> lines,
+                              const StyleSheet* styles) {
+    if (styles == nullptr || from_tags.headings.empty()) return;
+    std::vector<bool> taken(lines.size(), false);
+    for (const Heading& h : result.headings) {
+        for (std::size_t k = 0; k < std::max<std::size_t>(h.line_count, 1) && h.line_index + k < lines.size(); ++k) {
+            taken[h.line_index + k] = true;
+        }
+    }
+    std::vector<Heading> added;
+    std::size_t next_bookmark = 0;
+    const Heading* enclosing = nullptr;
+    for (const Heading& t : from_tags.headings) {
+        while (next_bookmark < result.headings.size() && result.headings[next_bookmark].line_index <= t.line_index) {
+            enclosing = &result.headings[next_bookmark++];
+        }
+        if (enclosing == nullptr || enclosing->line_count == 0 || enclosing->line_index >= lines.size()) continue;
+        if (std::ranges::any_of(std::views::iota(std::size_t{0}, std::max<std::size_t>(t.line_count, 1)),
+                                [&](std::size_t k) { return t.line_index + k < lines.size() && taken[t.line_index + k]; })) {
+            continue;
+        }
+        const Line& above = lines[enclosing->line_index];
+        if (above.tag_heading == 0 || t.level <= above.tag_heading) continue;
+        const int sheet = styles->heading_level(lines[t.line_index]);
+        const int sheet_above = styles->heading_level(above);
+        if (sheet == 0 || (sheet_above > 0 && sheet <= sheet_above)) continue;
+        Heading h = t;
+        h.level = std::min(enclosing->level + (t.level - above.tag_heading), static_cast<int>(kMaxDepth));
+        added.push_back(std::move(h));
+    }
+    result.tags_added = added.size();
+    result.headings.insert(result.headings.end(), std::make_move_iterator(added.begin()),
+                           std::make_move_iterator(added.end()));
     std::ranges::stable_sort(result.headings, {}, &Heading::line_index);
 }
 
@@ -1202,6 +1307,18 @@ float body_font_size(std::span<const Line> lines) {
     return static_cast<float>(best) / 2.0f;
 }
 
+HeadingQuality assess_headings(const HeadingResult& result, int page_count) {
+    const std::size_t n = result.headings.size();
+    if (n == 0) return HeadingQuality::Poor;
+    // A document of three pages or more should show a few headings, and one more for every fifteen pages.
+    const std::size_t expected = page_count <= 2 ? 1 : 2 + static_cast<std::size_t>(page_count) / 15;
+    if (n < expected) return HeadingQuality::Poor;
+    // All on one level in a long text (not a slide deck, which has a title on every page or two).
+    const bool one_level = std::ranges::all_of(result.headings, [](const Heading& h) { return h.level == 1; });
+    if (one_level && n >= 8 && static_cast<double>(page_count) >= 1.5 * static_cast<double>(n)) return HeadingQuality::Poor;
+    return result.source == HeadingSource::Bookmark ? HeadingQuality::GoodFromBookmarks : HeadingQuality::Good;
+}
+
 HeadingResult detect_headings(std::span<const Line> lines, std::span<const OutlineEntry> outline,
                               std::span<const Affine> page_transforms,
                               const HeadingOptions& options) {
@@ -1216,7 +1333,7 @@ HeadingResult detect_headings(std::span<const Line> lines, std::span<const Outli
     const bool use_bookmarks = options.mode == HeadingMode::Bookmarks ||
                                (options.mode == HeadingMode::Auto && usable >= options.min_bookmarks);
     if (!use_bookmarks || usable == 0) {
-        HeadingResult from_text = detect_from_text(lines);
+        HeadingResult from_text = detect_from_text(lines, options.styles, options.producer);
         // A printed table of contents whose titles are found in the text wins
         // over headings found by their look, unless those are as many and numbered.
         HeadingResult from_contents = detect_from_contents(lines);
@@ -1239,7 +1356,8 @@ HeadingResult detect_headings(std::span<const Line> lines, std::span<const Outli
 
     HeadingResult result = detect_from_bookmarks(lines, outline, page_transforms);
     if (options.mode == HeadingMode::Auto) {
-        refine_with_text_headings(result, detect_from_text(lines), lines.size());
+        refine_with_text_headings(result, detect_from_text(lines, options.styles, options.producer), lines.size());
+        refine_with_tag_headings(result, detect_from_tags(lines), lines, options.styles);
     }
     return result;
 }

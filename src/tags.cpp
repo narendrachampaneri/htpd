@@ -497,7 +497,7 @@ TaggedPage build_tagged_lines(PageText& page, TagReport& report) {
             const auto owner = tags.owner.find(g.mcid);
             if (owner == tags.owner.end()) continue;
             if (tags.inside(owner->second, "Table")) continue;   // cells of a table the tags do not describe: ordinary rules
-            const int e = tags.up(owner->second, [](const TagNode& n) { return heading_type(n.type) >= 0 || n.type == "LI"; });
+            const int e = tags.up(owner->second, [](const TagNode& n) { return heading_type(n.type) >= 0 || n.type == "LI" || n.type == "Title"; });
             if (e < 0) continue;
             member[i] = e;
             ++size_of[e];
@@ -514,9 +514,10 @@ TaggedPage build_tagged_lines(PageText& page, TagReport& report) {
         std::unordered_set<int> accepted, lists;
         for (const auto& [e, glyphs] : size_of) {
             const bool heading = heading_type(tags.node(e).type) >= 0;
+            const bool title = tags.node(e).type == "Title";
             const bool one_run = runs[e] == 1;
-            if (!one_run || !has_text.contains(e) || (heading && glyphs > kMaxHeadingGlyphs)) {
-                (heading ? report.headings_left : report.items_left) += 1;
+            if (!one_run || !has_text.contains(e) || ((heading || title) && glyphs > kMaxHeadingGlyphs)) {
+                if (!title) (heading ? report.headings_left : report.items_left) += 1;
                 continue;
             }
             accepted.insert(e);
@@ -567,7 +568,9 @@ TaggedPage build_tagged_lines(PageText& page, TagReport& report) {
             }
             const int e = line.tag - 1;
             const int level = heading_type(tags.node(e).type);
-            if (level >= 0) {
+            if (tags.node(e).type == "Title") {
+                line.tag_title = true;
+            } else if (level >= 0) {
                 line.tag_heading = static_cast<std::uint8_t>(heading_level(tags, e));
                 if (seen.insert(e).second) ++report.headings;
             } else {
@@ -598,13 +601,17 @@ std::size_t count_artifacts(const std::vector<std::vector<Line>>& pages, std::sp
     return n;
 }
 
-bool should_read_tags(TagMode mode, bool tagged, std::size_t bookmarks, int pages, std::string& why) {
+bool should_read_tags(TagMode mode, bool tagged, HeadingQuality quality, std::string& why) {
     why.clear();
     if (mode == TagMode::On) return true;
     if (mode == TagMode::Off || !tagged) return false;
-    if (bookmarks >= 3) why = "it has bookmarks, which give the headings";
-    else if (pages > kAutoTagPages) why = std::format("it has more than {} pages", kAutoTagPages);
-    return why.empty();
+    switch (quality) {
+        case HeadingQuality::Poor: return true;
+        case HeadingQuality::GoodFromBookmarks: why = "it has bookmarks, which give the headings"; break;
+        case HeadingQuality::Good: why = "the headings found without them are good"; break;
+        case HeadingQuality::Unknown: break;
+    }
+    return false;
 }
 
 std::vector<ArtifactLine> take_artifacts(std::vector<std::vector<Line>>& pages, std::span<const float> heights) {
