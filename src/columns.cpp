@@ -1,5 +1,7 @@
 #include "htpd/columns.hpp"
 
+#include "htpd/tables.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <string_view>
@@ -122,7 +124,29 @@ std::size_t mark_table_columns(std::vector<Line>& lines, std::span<const char> s
             continue;
         }
         std::size_t end = begin + 1;
-        while (end < lines.size() && seed(end) && close(end - 1, end)) ++end;
+        std::vector<char> filler(lines.size(), 0);   // lines inside the block that have no sure gap of their own
+        while (end < lines.size()) {
+            if (seed(end) && close(end - 1, end)) {
+                ++end;
+                continue;
+            }
+            // One or two lines between rows that hold the rest of a cell that wraps ("controller."
+            // under a description): they belong to the block when a row follows them.
+            std::size_t k = end;
+            // (A line in another size or weight - a heading between two tables - is no such rest.)
+            const Line& anchor = lines[end - 1];
+            while (k < lines.size() && k < end + 2 && usable(k) && !lines[k].table && !seed(k) && !words_of(lines[k]).empty() &&
+                   close(k - 1, k) && std::fabs(lines[k].size - anchor.size) <= 0.1f * std::max(anchor.size, 1.0f) &&
+                   lines[k].bold == anchor.bold && lines[k].figure == 0) {
+                ++k;
+            }
+            if (k > end && k < lines.size() && seed(k) && close(k - 1, k)) {
+                for (std::size_t f = end; f < k; ++f) filler[f] = 1;
+                end = k + 1;
+                continue;
+            }
+            break;
+        }
         // A tight block needs more: four rows and two column gaps (a "river"
         // of spaces in running text never makes two).
         if (end - begin < (tight ? o.min_rows + 1 : o.min_rows)) {
@@ -142,15 +166,32 @@ std::size_t mark_table_columns(std::vector<Line>& lines, std::span<const char> s
         std::vector<Strip> gutters;
         for (const Strip& s : free_strips(rows, left, right)) {
             if (s.x0 <= left || s.x1 >= right || s.x1 - s.x0 < o.min_gutter * size) continue;
-            std::size_t both = 0;
-            for (const auto& r : rows) {
-                const bool l = std::ranges::any_of(r, [&](const Word& w) { return w.x1 <= s.x0; });
-                const bool rr = std::ranges::any_of(r, [&](const Word& w) { return w.x0 >= s.x1; });
+            std::size_t both = 0, counted = 0;
+            for (std::size_t r = 0; r < rows.size(); ++r) {
+                if (filler[begin + r]) continue;   // the rest of a cell has text on one side only
+                ++counted;
+                const bool l = std::ranges::any_of(rows[r], [&](const Word& w) { return w.x1 <= s.x0; });
+                const bool rr = std::ranges::any_of(rows[r], [&](const Word& w) { return w.x0 >= s.x1; });
                 both += l && rr;
             }
-            if (both * 10 >= rows.size() * 6) gutters.push_back(s);
+            if (both * 10 >= counted * 6) gutters.push_back(s);
         }
         if (gutters.empty() || (tight && gutters.size() < 2)) {
+            begin = end;
+            continue;
+        }
+
+        // A line inside the block without a gap of its own must keep to the columns: text across a gutter
+        // (a sentence between two tables) is no rest of a cell.
+        bool crosses = false;
+        for (std::size_t i = begin; i < end && !crosses; ++i) {
+            if (!filler[i]) continue;
+            for (const Strip& g : gutters) {
+                const float mid = (g.x0 + g.x1) / 2;
+                crosses = crosses || std::ranges::any_of(words_of(lines[i]), [&](const Word& w) { return w.x0 < mid && w.x1 > mid; });
+            }
+        }
+        if (crosses) {
             begin = end;
             continue;
         }
@@ -238,15 +279,23 @@ std::size_t mark_table_columns(std::vector<Line>& lines, std::span<const char> s
             for (const std::size_t k : marks) count += mark_gap(lines[i], k);
             return true;
         };
+        std::size_t top = begin;   // the first line of the table, header row included
         for (std::size_t i = begin; i-- > 0;) {
             if (!close(i, i + 1) || !side_row(i)) break;
             lines[i].table = true;
+            top = i;
         }
         for (std::size_t i = end; i < lines.size(); ++i) {
             if (!close(i - 1, i) || !side_row(i)) break;
             end = i + 1;
         }
         for (std::size_t i = begin; i < end; ++i) lines[i].table = true;
+        {
+            // Which lines only hold the rest of cells of a row next to them.
+            std::vector<float> cuts;
+            for (const Strip& g : gutters) cuts.push_back((g.x0 + g.x1) / 2);
+            mark_row_continuations(lines, top, end, cuts);
+        }
         added += count;
         begin = end;
     }

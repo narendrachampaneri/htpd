@@ -70,4 +70,17 @@ inline constexpr std::int32_t kLatticeTableId = 1 << 20;
 LatticeReport find_lattice_tables(std::vector<Line>& lines, std::span<const Rule> rules, std::int32_t& next_id,
                                   const LatticeOptions& options = {});
 
+// ---- stream ---------------------------------------------------------------------------------
+
+// The lines [begin, end) are the rows of a table set by its text, whose columns are separated at
+// the places `cuts` (x, ascending). A line with nothing in the first column that holds only the
+// rest of cells of the row above (cells that wrap: `Line::continues` = 1), or the beginning of
+// cells whose row comes below it (cells set in the middle of tall rows: 2) is marked. Evidence,
+// all of it needed: the first column is empty in the line and is filled in most lines that have
+// cells; no piece is a number (a number under a number is a row, not the rest of a cell); the line
+// stands as close to its row as the lines of one cell do - closer than rows do when the rows are
+// set apart. Returns the number of lines marked.
+std::size_t mark_row_continuations(std::vector<Line>& lines, std::size_t begin, std::size_t end,
+                                   std::span<const float> cuts);
+
 }  // namespace htpd

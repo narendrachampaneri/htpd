@@ -897,6 +897,80 @@ TEST(lattice_leaves_a_table_alone_when_a_word_crosses_a_line_of_the_grid) {
     CHECK_EQ(find_lattice_tables(lines, rules, id).tables, std::size_t{0});
 }
 
+TEST(stream_a_line_with_nothing_in_the_first_column_is_the_rest_of_the_row_above) {
+    // Rows set apart (16 points) whose cells wrap (12 points): the line under CAN_FD_CONT holds the
+    // rest of the name and of the description.
+    auto make = [] {
+        std::vector<Line> lines;
+        lines.push_back(placed_line(100, {{72, "Offset"}, {130, "Name"}, {230, "Mode"}, {300, "Access"}, {380, "Description"}}));
+        lines.push_back(placed_line(116, {{72, "0x000"}, {130, "Control"}, {230, "CTRL"}, {300, "RW"}, {380, "Enables"}, {421, "the"}}));
+        lines.push_back(placed_line(132, {{72, "0x004"}, {130, "Status"}, {230, "STAT"}, {300, "RO"}, {380, "Shows"}, {411, "flags"}}));
+        lines.push_back(placed_line(148, {{72, "0x018"}, {130, "CAN_FD_CONT"}, {230, "CFCS"}, {300, "RW"}, {380, "Write"}, {411, "one"}}));
+        lines.push_back(placed_line(160, {{130, "ROL_STATUS"}, {380, "to"}, {394, "clear"}}));
+        lines.push_back(placed_line(176, {{72, "0x01C"}, {130, "Receive"}, {230, "RXD"}, {300, "RO"}, {380, "Reads"}, {414, "data"}}));
+        return lines;
+    };
+    std::vector<Line> lines = make();
+    mark_table_columns(lines, {});
+    CHECK_EQ(int(lines[4].continues), 1);
+    CHECK_EQ(int(lines[3].continues), 0);
+    const auto paragraphs = build_paragraphs(lines, 1.2f);
+    REQUIRE(paragraphs.size() == 1);
+    CHECK(paragraphs[0].kind == ParagraphKind::Rows);
+    CHECK(paragraphs[0].text.contains("\n0x018 | CAN_FD_CONTROL_STATUS | CFCS | RW | Write one to clear\n0x01C | Receive"));
+
+    // The same line with a number in a cell is a row of its own (a value under a value).
+    std::vector<Line> numbers = make();
+    numbers[4] = placed_line(160, {{130, "ROL_STATUS"}, {300, "2"}, {380, "to"}, {394, "clear"}});
+    mark_table_columns(numbers, {});
+    CHECK_EQ(int(numbers[4].continues), 0);
+}
+
+TEST(stream_cells_set_in_the_middle_of_tall_rows_get_their_first_line_from_the_line_above) {
+    // The name wraps over two lines, the offset and the acronym stand between them: the line above
+    // them begins the cells of the row, the line below goes on.
+    std::vector<Line> lines;
+    lines.push_back(placed_line(100, {{72, "Offset"}, {130, "Name"}, {230, "Mode"}, {300, "Access"}, {380, "Description"}}));
+    lines.push_back(placed_line(120, {{72, "0x000"}, {130, "Control"}, {230, "CTRL"}, {300, "RW"}, {380, "Enables"}, {421, "it"}}));
+    lines.push_back(placed_line(142, {{130, "CAN_FD_CONT"}, {380, "Write"}, {411, "one"}}));
+    lines.push_back(placed_line(150, {{72, "0x018"}, {230, "CFCS"}, {300, "RW"}}));
+    lines.push_back(placed_line(158, {{130, "ROL_STATUS"}, {380, "to"}, {394, "clear"}}));
+    lines.push_back(placed_line(180, {{72, "0x01C"}, {130, "Receive"}, {230, "RXD"}, {300, "RO"}, {380, "Reads"}, {414, "data"}}));
+    mark_table_columns(lines, {});
+    CHECK_EQ(int(lines[2].continues), 2);
+    CHECK_EQ(int(lines[4].continues), 1);
+    const auto paragraphs = build_paragraphs(lines, 1.2f);
+    REQUIRE(paragraphs.size() == 1);
+    CHECK(paragraphs[0].text.contains("\n0x018 | CAN_FD_CONTROL_STATUS | CFCS | RW | Write one to clear\n0x01C | Receive"));
+}
+
+TEST(stream_a_heading_between_two_tables_is_not_the_rest_of_a_cell) {
+    std::vector<Line> lines;
+    lines.push_back(placed_line(100, {{72, "Pin"}, {130, "Name"}, {230, "Description"}}));
+    lines.push_back(placed_line(116, {{72, "1"}, {130, "VIN"}, {230, "Supply"}}));
+    lines.push_back(placed_line(132, {{72, "2"}, {130, "GND"}, {230, "Ground"}}));
+    Line heading = placed_line(150, {{72, "X2"}, {95, "Contactor"}, {150, "outputs"}}, 14);
+    heading.bold = true;
+    lines.push_back(heading);
+    lines.push_back(placed_line(170, {{72, "Pin"}, {130, "Name"}, {230, "Description"}}));
+    lines.push_back(placed_line(186, {{72, "1"}, {130, "HV1_OUT"}, {230, "Coil"}}));
+    lines.push_back(placed_line(202, {{72, "2"}, {130, "HV1_MIRROR"}, {230, "Contact"}}));
+    mark_table_columns(lines, {});
+    CHECK(!lines[3].table);
+    CHECK_EQ(int(lines[3].continues), 0);
+}
+
+TEST(stream_the_second_line_of_a_header_over_two_levels_is_not_the_rest_of_the_first) {
+    std::vector<Line> lines;
+    lines.push_back(placed_line(100, {{72, "Signal"}, {130, "Setup"}, {160, "time"}, {260, "Hold"}, {290, "time"}}));
+    lines.push_back(placed_line(112, {{130, "Min"}, {200, "Max"}, {260, "Min"}, {330, "Max"}}));
+    lines.push_back(placed_line(128, {{72, "DATA0"}, {130, "1.2"}, {200, "3.4"}, {260, "0.5"}, {330, "1.1"}}));
+    lines.push_back(placed_line(140, {{72, "DATA1"}, {130, "1.3"}, {200, "3.5"}, {260, "0.5"}, {330, "1.2"}}));
+    lines.push_back(placed_line(152, {{72, "ADDR"}, {130, "2.0"}, {200, "4.1"}, {260, "0.8"}, {330, "1.6"}}));
+    mark_table_columns(lines, {});
+    CHECK_EQ(int(lines[1].continues), 0);
+}
+
 // ---- headings ---------------------------------------------------------------
 
 TEST(section_numbers_are_parsed) {

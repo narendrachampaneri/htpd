@@ -174,6 +174,10 @@ struct Line {
     // A row of a table whose columns line up with the rows around it (columns.hpp):
     // a row even with only two cells.
     bool table = false;
+    // A line of a table set by its text (tables.hpp) that holds only the rest of cells of the row
+    // above it (1: the cell goes on below) or of the row below it (2: the cell began above, in a
+    // table whose cells are set in the middle of tall rows). 0: a row of its own.
+    std::uint8_t continues = 0;
     // Read by OCR, not from the text of the PDF: from a scanned page (Page) or
     // from a picture on a page that has text (Picture). Picture text is the
     // content of a figure: it is never taken for a heading.

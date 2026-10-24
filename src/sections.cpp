@@ -275,15 +275,21 @@ std::string rows_text(std::span<const Line* const> rows, std::span<const std::ui
     // The rest of a cell that wraps onto the next lines joins that cell. Each
     // piece must start in a column after the first and end before the next
     // column begins; otherwise the lines stay as they stand.
+    // A line marked 2 holds the beginning of cells of the row below it: its pieces go in front of
+    // what the row has in those cells.
     std::size_t row_index = 0;
     bool seen_row = false;
+    std::vector<std::vector<std::string>> before(placed_rows.size(), std::vector<std::string>(columns));
     for (std::size_t i = 0; i < rows.size(); ++i) {
         if (!is_rest(i)) {
             if (seen_row) ++row_index;
             seen_row = true;
             continue;
         }
-        if (!seen_row) return plain();
+        const bool above = rest[i] == 1;
+        if (above && !seen_row) return plain();
+        const std::size_t target = above ? row_index : (seen_row ? row_index + 1 : 0);
+        if (target >= placed_rows.size()) return plain();
         const std::vector<Cell> pieces = cells_of(*rows[i]);
         if (pieces.empty()) return plain();
         for (const Cell& piece : pieces) {
@@ -291,7 +297,14 @@ std::string rows_text(std::span<const Line* const> rows, std::span<const std::ui
             while (c + 1 < columns && piece.x0 >= left[c + 1] - kSlack) ++c;
             const bool clear_right = c + 1 == columns || piece.x1 <= left[c + 1] + kSlack;
             if (c == 0 || !clear_right) return plain();
-            join_cell_line(placed_rows[row_index][c], piece.text, false);
+            join_cell_line(above ? placed_rows[target][c] : before[target][c], piece.text, false);
+        }
+    }
+    for (std::size_t r = 0; r < placed_rows.size(); ++r) {
+        for (std::size_t c = 0; c < columns; ++c) {
+            if (before[r][c].empty()) continue;
+            if (!placed_rows[r][c].empty()) join_cell_line(before[r][c], placed_rows[r][c], false);
+            placed_rows[r][c] = std::move(before[r][c]);
         }
     }
 
@@ -1128,7 +1141,9 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
     for (std::size_t i = 0; i < lines.size(); ++i) {
         const bool listing = is_monospace(i) &&
                              ((i > 0 && listing_neighbour(i, i - 1)) || listing_neighbour(i, i + 1));
-        kinds[i] = listing ? ParagraphKind::Code : is_row(lines[i]) ? ParagraphKind::Rows : ParagraphKind::Text;
+        kinds[i] = listing ? ParagraphKind::Code
+                   : (is_row(lines[i]) || (lines[i].continues != 0 && lines[i].table)) ? ParagraphKind::Rows
+                                                                                      : ParagraphKind::Text;
     }
     const auto flush = [&] {
         if (code.size() == 1) {
@@ -1226,9 +1241,17 @@ std::vector<Paragraph> build_paragraphs(std::span<const Line> lines, float line_
                 continue;
             }
         }
-        if (rest_of_cell(line, kind)) {
+        if (rest_of_cell(line, kind) || (line.continues == 1 && current.kind == ParagraphKind::Rows && last_row != nullptr &&
+                                         previous != nullptr && line.page == previous->page)) {
             rows.push_back(&line);
             rest.push_back(1);
+            previous = &line;
+            continue;
+        }
+        if (line.continues == 2 && current.kind == ParagraphKind::Rows && !rows.empty() && previous != nullptr &&
+            line.page == previous->page) {
+            rows.push_back(&line);   // the beginning of the cells of the row that follows
+            rest.push_back(2);
             previous = &line;
             continue;
         }

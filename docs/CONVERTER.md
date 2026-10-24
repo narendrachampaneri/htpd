@@ -235,6 +235,18 @@ Values stacked in a cell - two cells of a row with a number on each of their lin
 with as many lines at the same heights ("Level 1..4 falling | 2.62 | 2.70 | 2.78") - become one row per line.
 `--tables text` switches the lattice method off.
 
+**Stream** (no tags, no lines): `src/columns.cpp` finds the columns from the strips the rows leave free - also
+through one or two lines between the rows that keep to the columns (the rest of a wrapped cell); a line of
+another size or weight between two tables (a heading) or text across a strip ends the block.
+`mark_row_continuations` (`src/tables.cpp`) then decides, for the lines with nothing in the first column, which
+are the rest of cells (`Line::continues` 1: of the row above, 2: of the row below). All of it is needed: the
+first column is filled in at least half of the lines that have cells (and in three), the rows are set apart
+(two steps wider than 1.3 times the step between lines of a cell), no piece is a number, the line stands as
+near its row as the lines of a cell do, and under the header row it keeps to the columns the header fills
+(the second line of a header over two levels does not). A table whose rows stand as close as the lines of a
+cell is not joined this way; the older rule of `sections.cpp` (a line right under a row that starts in a column
+after the first) still applies. `sections.cpp` puts the pieces into the cells of the row.
+
 **Joining the lines of a cell** (all methods): a space, except where the next line certainly continues the
 last word: the first part ends with `_` or `/`; the next starts with `_` or is a lone `)`; a short number
 follows a name that has letters and digits or `_` ("LCD_P2" + "4"; two numbers one under the other are not a

@@ -31,6 +31,7 @@ The cases:
     registers          register map: offset, name, acronym, access, reset, description
     ledger             financial ledger (ruled)
     datasheet          electrical characteristics (no rules)
+    registers_narrow   the register map in columns so narrow that a header cell breaks inside itself
     registers_stream   the register map without rules
     wrapped_middle     cells set in the middle of tall rows (ruled)
     wrapped_middle_stream   the same without rules
@@ -272,6 +273,11 @@ def case_multipage_plain():
     return [table(data, [60, 120, 50, 60], PLAIN, repeat=0)], {"rows": data, "header_rows": 1, "repeat_header": False}
 
 
+def case_registers_narrow():
+    data = regs_data()
+    return [table(data, REGS_NARROW, BOOK)], {"rows": data, "header_rows": 1}
+
+
 def case_registers():
     data = [["Offset", "Name", "Acronym", "Access", "Reset", "Description"],
             ["0x000", "Control register", "CTRL", "RW", "0x0000", "Enables the peripheral and selects the clock source and the mode."],
@@ -281,8 +287,12 @@ def case_registers():
             ["0x010", "Transmit data", "TXD", "WO", "0x0000", "A write puts one byte into the transmit FIFO."],
             ["0x014", "Receive data", "RXD", "RO", "0x0000", "A read takes one byte out of the receive FIFO."],
             ["0x018", "CAN_FD_CONTROL_STATUS", "CFCS", "RW1C", "0x8000", "Write one to clear the sticky bits of the CAN FD controller."]]
-    return [table(data, [38, 78, 44, 36, 40, 190], BOOK)], {"rows": data, "header_rows": 1}
+    return [table(data, REGS, BOOK)], {"rows": data, "header_rows": 1}
 
+
+
+REGS = [44, 84, 56, 50, 46, 200]      # wide enough for the header cells
+REGS_NARROW = [38, 78, 44, 36, 40, 190]   # the header cells "Acronym" and "Access" break inside themselves
 
 
 def regs_data():
@@ -298,27 +308,27 @@ def regs_data():
 
 def case_registers_stream():
     data = regs_data()
-    return [table(data, [38, 78, 44, 36, 40, 190], PLAIN[:2] + [PLAIN[2], PLAIN[3]])], {"rows": data, "header_rows": 1}
+    return [table(data, REGS, PLAIN[:2] + [PLAIN[2], PLAIN[3]])], {"rows": data, "header_rows": 1}
 
 
 def case_wrapped_middle():
     data = regs_data()
     style = GRID[:1] + [("VALIGN", (0, 0), (-1, -1), "MIDDLE"), GRID[2], GRID[3]]
-    return [table(data, [38, 78, 44, 36, 40, 190], style)], {"rows": data, "header_rows": 1}
+    return [table(data, REGS, style)], {"rows": data, "header_rows": 1}
 
 
 def case_wrapped_middle_stream():
     data = regs_data()
     style = [("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("TOPPADDING", (0, 0), (-1, -1), 4),
              ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]
-    return [table(data, [38, 78, 44, 36, 40, 190], style)], {"rows": data, "header_rows": 1}
+    return [table(data, REGS, style)], {"rows": data, "header_rows": 1}
 
 
 def case_rowrules():
     data = regs_data()
     style = [("LINEBELOW", (0, 0), (-1, -1), 0.3, colors.grey), ("VALIGN", (0, 0), (-1, -1), "TOP"),
              ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]
-    return [table(data, [38, 78, 44, 36, 40, 190], style)], {"rows": data, "header_rows": 1}
+    return [table(data, REGS, style)], {"rows": data, "header_rows": 1}
 
 
 def case_tight():
@@ -329,10 +339,10 @@ def case_tight():
             ["B2", "236", "5.11", "0.80", "3.35", "7.44", "6.48"],
             ["C1", "64", "6.90", "1.12", "4.20", "9.80", "8.77"]]
     style = [("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-             ("LEFTPADDING", (0, 0), (-1, -1), 2), ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+             ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5),
              ("LINEABOVE", (0, 0), (-1, 0), 1.0, colors.black), ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.black),
              ("LINEBELOW", (0, -1), (-1, -1), 1.0, colors.black)]
-    return [table(data, [22, 26, 30, 28, 28, 28, 28], style, cell_style=RIGHT)], {"rows": data, "header_rows": 1}
+    return [table(data, [30, 34, 40, 38, 38, 38, 38], style, cell_style=RIGHT)], {"rows": data, "header_rows": 1}
 
 
 def case_wrapped_first():
@@ -397,7 +407,7 @@ CASES = {
     "empty": case_empty, "multipage": case_multipage, "multipage_stream": case_multipage_stream,
     "multipage_plain": case_multipage_plain, "registers": case_registers, "ledger": case_ledger,
     "datasheet": case_datasheet, "chart": case_chart, "registers_stream": case_registers_stream,
-    "wrapped_middle": case_wrapped_middle, "wrapped_middle_stream": case_wrapped_middle_stream,
+    "registers_narrow": case_registers_narrow, "wrapped_middle": case_wrapped_middle, "wrapped_middle_stream": case_wrapped_middle_stream,
     "rowrules": case_rowrules, "tight": case_tight, "wrapped_first": case_wrapped_first,
 }
 

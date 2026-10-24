@@ -285,6 +285,13 @@ How the converter decides:
   inside one cell; it also gives a table of two columns. A chart with grid lines is no table. Values stacked
   in the cells of a row ("Level 1..4 falling | 2.62 | 2.70 | 2.78": a number on every line of two or more
   cells) are one row per line. The conversion notes say how many tables were read this way.
+* **A row whose cells wrap, in a table set apart**: where the columns are certain and the rows are set
+  apart (the space between two rows is wider than between two lines of one cell), a line with nothing in
+  the first column, none of whose pieces is a number, is the rest of the cells of the row next to it. It goes
+  to the row above; when it stands closer to the row below (a table whose cells are set in the middle of tall
+  rows: the first line of the description stands above the line with the offset), it goes in front of the
+  cells of the row below. A number under a number is a row of its own. Columns are also found through such
+  a line: one or two lines between rows that keep to the columns do not end the table.
 * **A cell with several lines** stays one cell: a line right under a row
   that starts in a column after the first, and whose pieces each stay in
   one column, is the rest of a cell and is joined to it with one space.

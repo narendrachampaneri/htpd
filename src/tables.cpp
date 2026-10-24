@@ -742,4 +742,91 @@ LatticeReport find_lattice_tables(std::vector<Line>& lines, std::span<const Rule
     return report;
 }
 
+
+// ---- stream --------------------------------------------------------------------------------
+
+std::size_t mark_row_continuations(std::vector<Line>& lines, std::size_t begin, std::size_t end,
+                                   std::span<const float> cuts) {
+    if (end > lines.size() || end < begin + 4 || cuts.empty() || cuts.size() > 30) return 0;
+    const std::size_t columns = cuts.size() + 1;
+
+    struct Info {
+        std::vector<std::string> piece;   // the text of the line in each column
+        std::size_t filled = 0;
+        bool numeric = false;
+    };
+    std::vector<Info> info(end - begin);
+    for (std::size_t i = begin; i < end; ++i) {
+        Info& in = info[i - begin];
+        in.piece.assign(columns, std::string());
+        const Line& l = lines[i];
+        std::vector<Word> ws = words_of(l, i);
+        if (ws.empty() && !l.text.empty() && l.text.find(' ') == std::string::npos) ws.push_back({l.x0, l.x1, 0, l.text.size(), i});
+        if (ws.empty()) {
+            info[i - begin].filled = 0;
+            in.numeric = true;   // not known: never a continuation
+            continue;
+        }
+        for (const Word& w : ws) {
+            const float centre = (w.x0 + w.x1) / 2;
+            std::size_t c = 0;
+            while (c < cuts.size() && centre > cuts[c]) ++c;
+            std::string& cell = in.piece[c];
+            if (!cell.empty()) cell += ' ';
+            cell += std::string_view(l.text).substr(w.begin, w.end - w.begin);
+        }
+        for (const std::string& cell : in.piece) {
+            in.filled += !cell.empty();
+            in.numeric = in.numeric || (!cell.empty() && numeric_item(cell));
+        }
+    }
+
+    // The distance between the lines of one cell: the smallest step between two lines of the block.
+    float min_step = 1e30f;
+    for (std::size_t i = begin + 1; i < end; ++i) {
+        const float step = lines[i].baseline - lines[i - 1].baseline;
+        if (step > 0.3f * std::max(lines[i].size, 1.0f)) min_step = std::min(min_step, step);
+    }
+    if (min_step > 1e29f) return 0;
+
+    // The first column is filled in at least half of the lines that have cells, and the rows are
+    // set apart: more than one step is wider than the step between two lines of one cell. (With rows
+    // as close as the lines of a cell, a line without a first cell cannot be told from a row.)
+    std::size_t with_cells = 0, with_first = 0, apart = 0;
+    for (std::size_t i = begin; i < end; ++i) {
+        const Info& in = info[i - begin];
+        if (in.filled >= 2) {
+            ++with_cells;
+            with_first += !in.piece[0].empty();
+        }
+        if (i > begin && lines[i].baseline - lines[i - 1].baseline > 1.3f * min_step) ++apart;
+    }
+    if (with_cells < 4 || with_first * 2 < with_cells || with_first < 3 || apart < 2) return 0;
+
+    const float tolerance = 1.15f * min_step + 0.3f;
+    std::size_t marked = 0;
+    for (std::size_t i = begin + 1; i < end; ++i) {
+        const Info& in = info[i - begin];
+        if (!in.piece[0].empty() || in.filled == 0 || in.numeric) continue;
+        const float before = lines[i].baseline - lines[i - 1].baseline;
+        const float after = i + 1 < end ? lines[i + 1].baseline - lines[i].baseline : 1e30f;
+        if (before <= tolerance && before <= after + 0.3f) {
+            // The rest of the row above. Under the header row (the first line) it must stay in the
+            // columns the header fills: the second line of a header over two levels does not.
+            if (i == begin + 1) {
+                const Info& head = info[0];
+                bool inside = true;
+                for (std::size_t c = 0; c < columns; ++c) inside = inside && (in.piece[c].empty() || !head.piece[c].empty());
+                if (!inside) continue;
+            }
+            lines[i].continues = 1;
+            ++marked;
+        } else if (after <= tolerance && before > after + 0.3f && i + 1 < end && !info[i + 1 - begin].piece[0].empty()) {
+            lines[i].continues = 2;   // the cells begin above the row they belong to
+            ++marked;
+        }
+    }
+    return marked;
+}
+
 }  // namespace htpd
