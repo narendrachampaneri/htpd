@@ -137,11 +137,12 @@ Word, LibreOffice, InDesign, Chrome and others write the structure of the
 document into the PDF (a "tagged PDF"): which text is a heading of which
 level, which is a cell of which table, a list item, a figure with its
 caption, or page furniture. The converter reads this tree with PDFium and
-uses it where it can be trusted (`--tags off` switches it off). What it gives
-(FORMAT.md 4.6):
+uses it where it can be trusted. What it gives (FORMAT.md 4.6):
 
 * `H`, `H1`-`H6`: headings with their level (`heading_from: tags`), when the
-  PDF has no usable bookmarks. With bookmarks the bookmarks stay the source.
+  PDF has no usable bookmarks and the tags name at least as many headings as
+  a printed table of contents or numbered headings in the text show. With
+  bookmarks the bookmarks stay the source.
 * `Table`: the rows with every cell exact, also cells of several lines and
   cells the page shows far apart; a cell over several columns or rows has
   `[>]` or `[=]` after its text and the cells it covers are empty.
@@ -159,9 +160,32 @@ so the result is what a PDF without tags gives, and the notes count these
 (`Left to the ordinary rules ...`). Text that is not tagged is never dropped.
 A PDF without tags gives exactly the same file as before.
 
-Cost: reading the tree and the marks of the characters is a few per cent of
-the conversion time of a tagged PDF (measured in `tests/bench`); a PDF without
-tags is not slower.
+Cost and gain (`tests/bench`, `tests/zoo`):
+
+* What it costs: PDFium builds the tree of one page from the structure of
+  the whole document, so one call of `FPDF_StructTree_GetForPage` costs about
+  0.5 to 1.5 ms per page and grows faster than the document does. A Word
+  datasheet repeated to 41, 81, 161 and 321 pages (dense tags, 100 elements
+  per page) converts in 0.056, 0.105, 0.216 and 0.433 s with `--tags off` and
+  in 0.124, 0.284, 0.639 and 1.849 s with `--tags on`. That call is about
+  three quarters of the added time (counted in instructions); walking the tree and the checks of
+  `src/tags.cpp` are about a sixth. The marks of the characters cost nothing
+  measurable. PDFium offers no cheaper way to read the tree, so the tree
+  costs more than 5 % of the conversion time of every tagged PDF tried (2 to
+  5 ms more for the 3-page documents of the zoo, which convert in 5 to 8 ms). A PDF without tags is
+  not slower, and neither is a tagged PDF with `--tags off`.
+* So the default `--tags auto` reads the tags only where they pay for
+  themselves: when the PDF is tagged, has no bookmarks (with bookmarks the
+  headings are known, and the tags changed nothing else on the public
+  documents) and has at most 200 pages. The notes of a tagged PDF whose tags
+  were not read say so and name `--tags on`.
+* What it gives: on Word exports without bookmarks whose headings look like
+  body text, the headings found go from 0 of 6 documents to all 6 (3, 1, 1,
+  1, 2 and 2 sections become 16, 4, 5, 4, 12 and 9); the table rows of the
+  zoo document "datasheet" 0.81 to 0.88. With `--tags on`, tagged documents
+  that have bookmarks gain too: a running header and a page number on a
+  one-page document are taken out (the noise in the text of such a document
+  falls from 0.12 to 0.03).
 
 ## Build
 
@@ -233,7 +257,7 @@ htpd info manual.pdf                     # show what would be found, write nothi
 | `--headings none` | No headings: one section per page. |
 | `--keep-headers` | Keeps the running headers and footers in the text. |
 | `--dehyphenate` | `inter-` + `rupt` becomes `interrupt` instead of `inter-rupt`. |
-| `--tags on\|off` | Use the structure tags of a tagged PDF (headings, tables, lists, figures, page furniture) where they agree with the page text (default `on`). `off` reads every PDF as if it had no tags. |
+| `--tags auto\|on\|off` | The structure tags of a tagged PDF (headings, tables, lists, figures, page furniture), used where they agree with the page text. `auto` (default): when the PDF is tagged, has no bookmarks and has at most 200 pages. `on`: whenever the PDF has tags. `off`: read every PDF as if it had no tags. Reading the tags costs time, see "Tagged PDFs". |
 | `--ocr auto\|on\|off` | Read text from pictures and scanned pages with Tesseract. `auto` (default): when it is installed. `on`: stop with an error when it is not. `off`: never. |
 | `--ocr-lang <langs>` | Tesseract languages, e.g. `eng+deu` (default `eng`). Each must be installed (`tesseract --list-langs`). |
 | `--figures on\|off` | Store figures (pictures and drawings) as PNG pictures in the bundle (default `on`). |
@@ -331,7 +355,7 @@ as values (`std::expected`); the library does not throw for a bad PDF.
 
 ## What was tested
 
-* **140 automatic tests** (`make test`). Most build their input in memory.
+* **142 automatic tests** (`make test`). Most build their input in memory.
   The others convert small PDFs in `tests/data` through the real PDF
   library: rotated pages, scaled fonts, text spaced only by kerning,
   two columns, code listings, fonts whose names lie about their widths,

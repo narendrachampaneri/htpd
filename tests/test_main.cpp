@@ -3550,11 +3550,12 @@ TEST(tags_take_header_and_footer_artifacts_out_and_list_them) {
 TEST(tags_that_disagree_with_the_page_text_leave_it_to_the_ordinary_rules) {
     const auto with = convert(tagged_options("tagged_disagree.pdf", "tags_disagree"));
     REQUIRE(with.has_value());
-    // Three tables (one with text lying on it that the tags do not name, one whose rows are tagged in the
-    // wrong order, one with other text stored in the middle of it), a heading tag on a whole paragraph and
-    // a list item in two parts: none is used ...
+    // Seven tables (text lying on one that the tags do not name; rows tagged in the wrong order; other text
+    // stored in the middle of one; a short row whose cell lies between two columns; a cell over rows in a
+    // short row; one column only; a table in a cell), a heading tag on a whole paragraph and a list item
+    // in two parts: none is used. On page 2 the tree names one piece of text twice: that page is read without tags ...
     CHECK_EQ(with->tags.tables, std::size_t{0});
-    CHECK_EQ(with->tags.tables_left, std::size_t{3});
+    CHECK_EQ(with->tags.tables_left, std::size_t{7});
     CHECK_EQ(with->tags.headings_left, std::size_t{1});
     CHECK_EQ(with->tags.items_left, std::size_t{1});
     CHECK_EQ(with->tags.list_items, std::size_t{0});
@@ -3578,6 +3579,9 @@ TEST(tags_that_disagree_with_the_page_text_leave_it_to_the_ordinary_rules) {
     CHECK(ta.contains("Bottom row"));
     CHECK(ta.contains("Left two"));
     CHECK(ta.contains("A note in the margin"));
+    CHECK(ta.contains("Claimed twice"));
+    CHECK(ta.contains("Stamp in the middle"));   // an artifact that is not at the edge of the page is text
+    CHECK_EQ(with->tags.artifact_lines, std::size_t{0});
 }
 
 TEST(tags_auto_mode_reads_the_tags_only_where_they_pay_for_themselves) {
@@ -3612,7 +3616,7 @@ TEST(tags_auto_mode_reads_the_tags_only_where_they_pay_for_themselves) {
     CHECK(skipped->tags.unread);
     CHECK(skipped->heading_source == HeadingSource::Bookmark);
     CHECK(read_file(bookmarked.output_dir / "document.md")
-              .contains("The PDF is tagged, but its structure tags were not read: it has bookmarks, which give the headings."));
+              .contains("The PDF is tagged; its structure tags were not read (it has bookmarks, which give the headings)."));
     // --tags on reads them anyway; with bookmarks they stay the source of the headings.
     bookmarked = tagged_options("tagged_bookmarks.pdf", "tags_auto_bookmarks_on");
     const auto forced = convert(bookmarked);
@@ -3629,6 +3633,54 @@ TEST(tags_auto_mode_reads_the_tags_only_where_they_pay_for_themselves) {
     REQUIRE(plain.has_value());
     CHECK(!plain->tags.unread && !plain->tags.any());
     CHECK(!read_file(untagged.output_dir / "document.md").contains("structure tags"));
+}
+
+TEST(tags_figure_takes_the_caption_before_it_or_its_alternate_text) {
+    PageText page;
+    page.index = 0;
+    page.width = 612;
+    page.height = 792;
+    auto& nodes = page.tags.nodes;
+    nodes.resize(5);
+    nodes[0].type = "Document";
+    nodes[0].kids = {{1, -1}, {2, -1}, {3, -1}, {4, -1}};
+    nodes[1].type = "Caption";   // stands before the figure it belongs to
+    nodes[1].parent = 0;
+    nodes[1].kids = {{-1, 10}};
+    nodes[2].type = "Figure";
+    nodes[2].parent = 0;
+    nodes[2].kids = {{-1, 11}};
+    nodes[3].type = "Figure";    // no caption: its alternate text
+    nodes[3].parent = 0;
+    nodes[3].alt = "Chart of the supply voltage";
+    nodes[3].kids = {{-1, 12}};
+    nodes[4].type = "Figure";    // nothing drawn for it
+    nodes[4].parent = 0;
+    nodes[4].kids = {{-1, 13}};
+    page.tags.roots = {0};
+    page.tags.objects = {{11, Box{72, 100, 200, 180}, TagObject::Kind::Image},
+                         {12, Box{72, 300, 200, 380}, TagObject::Kind::Path}};
+    float x = 72;
+    for (const char c : std::string_view("Cap")) {
+        Glyph g;
+        g.cp = static_cast<char32_t>(c);
+        g.x0 = x;
+        g.x1 = x += 6;
+        g.y0 = 80;
+        g.y1 = 90;
+        g.baseline = 88;
+        g.origin_x = g.x0;
+        g.size = 10;
+        g.mcid = 10;
+        page.glyphs.push_back(g);
+    }
+    const std::vector<TagFigure> figures = tagged_figures(page);
+    REQUIRE(figures.size() == 2);
+    CHECK(figures[0].caption == "Cap" && figures[0].has_caption);
+    CHECK(figures[0].picture);
+    CHECK(figures[0].box.y0 == 100.0f);
+    CHECK(figures[1].caption == "Chart of the supply voltage" && !figures[1].has_caption);
+    CHECK(!figures[1].picture);   // a drawing of shapes
 }
 
 TEST(tags_do_nothing_to_a_pdf_without_tags) {

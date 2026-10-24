@@ -450,8 +450,7 @@ std::string conversion_notes(const BundleInfo& info) {
                           info.page_parts);
     }
     if (info.tags.unread) {
-        md += std::format("* The PDF is tagged, but its structure tags were not read: {}. `--tags on` reads them "
-                          "(headings, tables, lists, figures, page furniture); it costs time.\n",
+        md += std::format("* The PDF is tagged; its structure tags were not read ({}). `--tags on` reads them.\n",
                           info.tags.unread_reason);
     }
     if (info.tags.any()) {

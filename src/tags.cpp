@@ -100,6 +100,15 @@ struct TableData {
     std::size_t first = 0, last = 0;   // the glyphs of the table lie in [first, last]
 };
 
+// Whether a Table element lies below `n`.
+bool contains_table(const Tags& tags, int n, int depth = 0) {
+    if (depth > 64) return true;
+    for (const TagKid& kid : tags.node(n).kids) {
+        if (kid.node >= 0 && (tags.node(kid.node).type == "Table" || contains_table(tags, kid.node, depth + 1))) return true;
+    }
+    return false;
+}
+
 // The rows of one Table element as a grid; nothing when the table is malformed
 // (a nested table, a row with something other than cells, absurd sizes).
 std::optional<TableData> read_grid(const Tags& tags, int table) {
@@ -138,6 +147,7 @@ std::optional<TableData> read_grid(const Tags& tags, int table) {
             cell.row_span = std::clamp(e.row_span, 1, data.rows - cell.row);
             cell.col_span = std::clamp(e.col_span, 1, static_cast<int>(kMaxColumns));
             if (col + cell.col_span > static_cast<int>(kMaxColumns)) return std::nullopt;
+            if (contains_table(tags, kid.node)) return std::nullopt;   // a table in a cell: its rows would be lost
             tags.collect_mcids(kid.node, cell.mcids);
             for (int dr = 0; dr < cell.row_span; ++dr) {
                 auto& row = taken[r + static_cast<std::size_t>(dr)];

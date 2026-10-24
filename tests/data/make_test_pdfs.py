@@ -583,10 +583,14 @@ def tagged(path, bookmarks=False):
 def tagged_disagree(path):
     """Tags that do not fit the page: a table with text lying on it that the tags
     do not name, a heading tag on a whole paragraph, a list item whose text is
-    split by other text, a table whose rows are tagged in the wrong order and a
-    table with other text stored in the middle of it.
-    The converter must read all of these as if the tags were not there."""
-    t = Tagged(1)
+    split by other text, a table whose rows are tagged in the wrong order, a
+    table with other text stored in the middle of it, a short row whose cell
+    lies between two columns, a cell over rows in a short row, a table of one
+    column, a table inside a table, and (page 2) one piece of text named twice
+    in the tree. An artifact in the middle of the page is not furniture. The
+    converter must read all of these as if the tags were not there."""
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+    t = Tagged(2)
     body = []
     body.append(t.elem('P', t.text(0, 72, 720, 'Opening paragraph of the page.')))
     # 1. a table with an untagged word lying inside it
@@ -620,8 +624,34 @@ def tagged_disagree(path):
     t.plain(0, 450, 380, 'A note in the margin')
     second_row = t.elem('TR', *[t.elem('TD', t.elem('P', t.text(0, x, 384, v))) for x, v in ((72, 'Left two'), (250, 'Right two'))])
     body.append(t.elem('Table', first_row, second_row))
-    t.write(path, t.elem('Document', *body))
 
+    def row(y, *cells_at, attrs=''):
+        return t.elem('TR', *[t.elem('TD', t.elem('P', t.text(0, x, y, v)), attrs=a) for x, v, a in cells_at])
+
+    # 6. a short row whose cell lies half in one column and half in the next
+    wide = 'Nine columns wide'
+    x0 = 163 - stringWidth(wide, 'Helvetica', 11) / 2          # its middle between the columns at 100 and 200
+    body.append(t.elem('Table',
+                       row(340, (100, 'Aaaa', ''), (200, 'Bbbb', ''), (330, 'Cccc', '')),
+                       row(326, (100, 'Dddd', ''), (200, 'Eeee', ''), (330, 'Ffff', '')),
+                       row(312, (x0, wide, ''), (330, 'Gggg', ''))))
+    # 7. a cell over two rows that starts in a short row
+    body.append(t.elem('Table',
+                       row(280, (72, 'One', ''), (200, 'Two', ''), (330, 'Three', '')),
+                       row(266, (200, 'Spanning', '/RowSpan 2'), (330, 'Four', '')),
+                       row(252, (330, 'Five', ''))))
+    # 8. a table of one column
+    body.append(t.elem('Table', row(220, (72, 'Alone', '')), row(206, (72, 'Still alone', ''))))
+    # 9. a table inside a table
+    inner = t.elem('Table', row(176, (72, 'Inner one', ''), (160, 'Inner two', '')))
+    body.append(t.elem('Table', t.elem('TR', t.elem('TD', inner), t.elem('TD', t.elem('P', t.text(0, 300, 176, 'Outer cell'))))))
+    # an artifact in the middle of the page is not furniture
+    t.artifact(0, 400, 300, 'Stamp in the middle', kind='Layout')
+    # page 2: the same piece of text is named twice by one heading
+    claimed = t.text(1, 72, 720, 'Claimed twice')
+    body.append(t.elem('H1', claimed, claimed))
+    body.append(t.elem('P', t.text(1, 72, 700, 'Other text of the second page.')))
+    t.write(path, t.elem('Document', *body))
 
 def figures(path):
     """Figures and things that are not figures: a block diagram drawn with

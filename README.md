@@ -204,7 +204,7 @@ flowchart LR
 
 | Part | What it does |
 |---|---|
-| **Converter** `htpd` (C++23, PDFium) | Reads every character with its position and font, removes headers and footers, finds the headings (bookmarks, a printed table of contents, numbering, font size), cuts the text into sections, keeps tables as rows and code as code, stores figures as PNG with their caption, reads scans with OCR. |
+| **Converter** `htpd` (C++23, PDFium) | Reads every character with its position and font, removes headers and footers, finds the headings (bookmarks, the PDF's own tags, a printed table of contents, numbering, font size), cuts the text into sections, keeps tables as rows and code as code, stores figures as PNG with their caption, reads scans with OCR. |
 | **Reader** `htpd-read` (Python, standard library only) | Finds the sections that answer a question (word search, the tree of titles, a small trained re-ranker), packs only that text with its pages, picks the exact answer lines, and says when the file cannot answer. Also as a skill, a plugin and an MCP server. |
 
 <p align="center">
