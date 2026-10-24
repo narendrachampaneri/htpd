@@ -8,6 +8,9 @@ The sources are the Markdown files in tests/zoo/sources. Each is made into a
 PDF the way real documents are made:
 
     word        pandoc -> .docx -> LibreOffice (headings without numbers, bookmarks)
+    word-tagged pandoc -> .docx -> LibreOffice as a tagged PDF without bookmarks: only the tags say what a heading is
+    word-flat   headings set like body text (same font, size and weight), no bookmarks: only the tags say what a heading is
+    word-hf     the same with bookmarks, a running header and a footer with the page number (artifacts in the tags)
     latex       pandoc -> LaTeX: numbered headings, a printed table of contents, bookmarks
     latex-nobm  the same without bookmarks: only the printed contents and the numbers
     latex-2col  two columns
@@ -67,6 +70,99 @@ def soffice_pdf(src: Path, out: Path) -> None:
         run(["soffice", "--headless", f"-env:UserInstallation=file://{t}/profile", "--convert-to", "pdf",
              "--outdir", t, str(src)])
         shutil.move(Path(t) / (src.stem + ".pdf"), out)
+
+
+TAGGED_NO_BOOKMARKS = 'pdf:writer_pdf_Export:{"ExportBookmarks":{"type":"boolean","value":"false"},"UseTaggedPDF":{"type":"boolean","value":"true"}}'
+TAGGED = 'pdf:writer_pdf_Export:{"UseTaggedPDF":{"type":"boolean","value":"true"}}'
+
+
+def soffice_tagged_pdf(src: Path, out: Path, export: str) -> None:
+    with tempfile.TemporaryDirectory() as t:
+        run(["soffice", "--headless", f"-env:UserInstallation=file://{t}/profile", "--convert-to", export,
+             "--outdir", t, str(src)])
+        shutil.move(Path(t) / (src.stem + ".pdf"), out)
+
+
+def make_word_tagged(md: Path, out: Path, tmp: Path) -> None:
+    docx = tmp / (md.stem + ".docx")
+    run(["pandoc", str(md), "-o", str(docx)])
+    soffice_tagged_pdf(docx, out, TAGGED_NO_BOOKMARKS)
+
+
+def add_header_footer(docx: Path, header: str) -> None:
+    """Gives the first section of a .docx a header and a footer with the page number (zip and XML only)."""
+    import zipfile
+    ns = ('xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+          'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"')
+    head = f'<?xml version="1.0" encoding="UTF-8"?><w:hdr {ns}><w:p><w:r><w:t>{header}</w:t></w:r></w:p></w:hdr>'
+    foot = (f'<?xml version="1.0" encoding="UTF-8"?><w:ftr {ns}><w:p><w:pPr><w:jc w:val="center"/></w:pPr>'
+            '<w:r><w:t xml:space="preserve">Page </w:t></w:r><w:fldSimple w:instr=" PAGE "><w:r><w:t>1</w:t></w:r>'
+            '</w:fldSimple></w:p></w:ftr>')
+    with zipfile.ZipFile(docx) as z:
+        files = {n: z.read(n) for n in z.namelist()}
+    files["word/header1.xml"] = head.encode()
+    files["word/footer1.xml"] = foot.encode()
+    rels = files["word/_rels/document.xml.rels"].decode()
+    rels = rels.replace("</Relationships>",
+                        '<Relationship Id="rIdHdr1" Type="http://schemas.openxmlformats.org/officeDocument/2006/'
+                        'relationships/header" Target="header1.xml"/><Relationship Id="rIdFtr1" Type="http://schemas.'
+                        'openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/></Relationships>')
+    files["word/_rels/document.xml.rels"] = rels.encode()
+    types = files["[Content_Types].xml"].decode()
+    types = types.replace("</Types>",
+                          '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-'
+                          'officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" '
+                          'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>')
+    files["[Content_Types].xml"] = types.encode()
+    document = files["word/document.xml"].decode()
+    refs = '<w:headerReference w:type="default" r:id="rIdHdr1"/><w:footerReference w:type="default" r:id="rIdFtr1"/>'
+    if "xmlns:r=" not in document.split(">", 2)[1]:
+        document = document.replace("<w:document ", "<w:document xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" ", 1)
+    if re.search(r"<w:sectPr\s*/>", document):
+        document = re.sub(r"<w:sectPr\s*/>", "<w:sectPr>" + refs + "</w:sectPr>", document, count=1)
+    else:
+        document = re.sub(r"(<w:sectPr(?:\s[^>]*)?>)", r"\1" + refs, document, count=1)
+    files["word/document.xml"] = document.encode()
+    with zipfile.ZipFile(docx, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, data in files.items():
+            z.writestr(name, data)
+
+
+def flatten_headings(docx: Path) -> None:
+    """Sets the heading styles (and the title) of a .docx like body text: same font, size and weight."""
+    import zipfile
+    with zipfile.ZipFile(docx) as z:
+        files = {n: z.read(n) for n in z.namelist()}
+    styles = files["word/styles.xml"].decode()
+
+    def flat(m: "re.Match[str]") -> str:
+        style = m.group(0)
+        style = re.sub(r"<w:(b|bCs|i|iCs)\s*/>", "", style)
+        style = re.sub(r"<w:color [^>]*/>", "", style)
+        style = re.sub(r"<w:rFonts [^>]*/>", "", style)
+        style = re.sub(r'<w:(sz|szCs) w:val="\d+"\s*/>', r'<w:\1 w:val="22"/>', style)
+        style = re.sub(r"<w:spacing [^>]*/>", '<w:spacing w:after="180" w:before="180"/>', style)
+        return style.replace('<w:jc w:val="center" />', "")
+
+    styles = re.sub(r'<w:style [^>]*w:styleId="(?:Heading[1-6]|Title|Subtitle)".*?</w:style>', flat, styles, flags=re.S)
+    files["word/styles.xml"] = styles.encode()
+    with zipfile.ZipFile(docx, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, data in files.items():
+            z.writestr(name, data)
+
+
+def make_word_flat(md: Path, out: Path, tmp: Path) -> None:
+    docx = tmp / (md.stem + ".docx")
+    run(["pandoc", str(md), "-o", str(docx)])
+    flatten_headings(docx)
+    soffice_tagged_pdf(docx, out, TAGGED_NO_BOOKMARKS)
+
+
+def make_word_hf(md: Path, out: Path, tmp: Path) -> None:
+    docx = tmp / (md.stem + ".docx")
+    run(["pandoc", str(md), "-o", str(docx)])
+    add_header_footer(docx, "ACME Reference Document Rev 1.2")
+    soffice_tagged_pdf(docx, out, TAGGED)
 
 
 def make_word(md: Path, out: Path, tmp: Path) -> None:
@@ -304,6 +400,9 @@ def make_outline(md: Path, out: Path, tmp: Path) -> None:
 
 MAKERS = {
     "word": (make_word, ("pandoc", "soffice")),
+    "word-tagged": (make_word_tagged, ("pandoc", "soffice")),
+    "word-flat": (make_word_flat, ("pandoc", "soffice")),
+    "word-hf": (make_word_hf, ("pandoc", "soffice")),
     "latex": (make_latex, ("pandoc", "xelatex")),
     "latex-nobm": (make_latex_nobm, ("pandoc", "xelatex")),
     "latex-2col": (make_latex_2col, ("pandoc", "xelatex")),

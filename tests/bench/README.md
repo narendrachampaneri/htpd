@@ -45,8 +45,8 @@ headings can add "extra" ones), but each one needs an explanation.
 |---|---|---|
 | `private` | `private/bench/*.pdf` - your own PDFs | never: `private/` is git-ignored; nothing from it is committed, uploaded or put into a prompt |
 | `eval` | `eval/docs/*.pdf` - the five public manuals of the evaluation (`eval/get_docs.sh`) | no (downloaded, checked by SHA-256) |
-| `zoo` | `build/zoo/*.pdf` - the document zoo (`tests/zoo/make_zoo.py`; only the makers installed on the machine) | no (made) |
-| `data` | `tests/data/*.pdf` - the small test PDFs | yes |
+| `zoo` | `build/zoo/*.pdf` - the document zoo (`tests/zoo/make_zoo.py`; only the makers installed on the machine). Its Word, slides and `word-*` PDFs are tagged PDFs: `word-tagged` has no bookmarks, `word-flat` also sets its headings like body text, `word-hf` has a running header and a page number | no (made) |
+| `data` | `tests/data/*.pdf` - the small test PDFs (`tagged*.pdf` are tagged by hand) | yes |
 
 The default (`--set auto`) takes `private` when it holds PDFs, then every
 public set that is present. `--set public` takes only `data,eval,zoo`;
@@ -158,7 +158,8 @@ If `private/bench/` is empty the tool still runs on the public sets.
 ```
 --converter PATH         another build (for example one built with -fsanitize=address,undefined: a crash or
                          a finding makes that document fail and the run exit with 1)
---converter-args '...'   extra options for `htpd convert`, for example '--ocr off' or '--headings text'
+--converter-args '...'   extra options for `htpd convert`, for example '--ocr off', '--headings text' or '--tags on'
+                         (the structure tags of a tagged PDF are read by default only when it has no bookmarks)
 --repeat N               conversions per document, the fastest counts (default 3)
 --jobs N                 parallel comparisons (default 4); the conversions are always sequential
 --tag NAME --out DIR     names of the report files (default `bench`) and their folder (`build/bench`)
